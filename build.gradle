@@ -19,6 +19,10 @@ repositories {
 }
 
 dependencies {
+
+    // 테스트 환경용 H2 인메모리 DB
+    testRuntimeOnly 'com.h2database:h2'
+
     // ... 기존 의존성 ...
 
     // Swagger / OpenAPI
