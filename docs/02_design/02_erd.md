@@ -1,452 +1,614 @@
-# 1. 데이터베이스 모델링 및 ERD 명세서 (하루배움 LMS)
+# PRODFLOW 데이터베이스 모델링 및 ERD 명세서
 
 ## 목차
-- [1. 데이터베이스 모델링 및 ERD 명세서 (하루배움 LMS)](#1-데이터베이스-모델링-및-erd-명세서-하루배움-lms)
-- [1.1 엔티티 관계 다이어그램 (ERD)](#11-엔티티-관계-다이어그램-erd)
-- [1.2 테이블별 상세 컬럼 명세](#12-테이블별-상세-컬럼-명세)
+
+- [1. ERD 다이어그램](#1-erd-다이어그램)
+- [2. 테이블 상세 명세서](#2-테이블-상세-명세서)
 
 ---
 
-## 1.1 엔티티 관계 다이어그램 (ERD)
+## 1. ERD 다이어그램
 
-하루배움 플랫폼의 16개 핵심 엔티티 간의 관계도이며, 회원 계정, 강좌 및 계층 커리큘럼, 주문/결제, 수강권 및 진도율, 과제/피드백, 커뮤니티, 정산 및 AI 학사 FAQ 테이블 간의 물리적 외래키(FK) 연관관계를 도식화.
+PRODFLOW의 핵심 엔티티 간 관계도이며, 직원·인증, 거래처, 품목, 수주·작업지시·생산라인, 결제·가상계좌, 배송·알림, AI 대화 테이블 간의 외래키(FK) 연관관계를 도식화한다.
 
 ```mermaid
 erDiagram
-    MEMBER ||--|| MEMBER_DETAIL : "1:1 수직 분할"
-    MEMBER ||--o{ COURSE : "1:N 강좌 개설"
-    COURSE ||--o{ CHAPTER : "1:N 챕터 구성"
-    CHAPTER ||--o{ LESSON : "1:N 차시 구성"
+    users ||--o{ refresh_token: "1:N"
+    users ||--o{ attendance: "1:N"
+    users ||--o{ client_detail: "1:N"
+    users ||--o{ ai_conversation: "1:N"
+    users ||--o{ status_history: "1:N"
+    client ||--|| client_detail: "1:1"
+    client ||--o{ orders: "1:N"
+    product ||--o{ order_product: "1:N"
+    product ||--o{ product_histories: "1:N"
+    product ||--o{ product_drawing: "1:N"
+    product ||--o{ work_order_product: "1:N"
+    orders ||--|{ order_product: "1:N"
+    orders ||--|{ order_allocations: "1:N"
+    orders ||--o{ work_order: "1:N"
+    orders ||--o| shipment: "1:0-1"
+    orders ||--o{ payment: "1:N"
+    orders ||--o{ risk_alert: "1:N"
+    line ||--o{ work_order: "1:N"
+    work_order ||--|{ work_order_product: "1:N"
+    carrier ||--o{ shipment: "1:N"
+    shipment ||--o{ shipment_message: "1:N"
+    payment ||--o| virtual_account: "1:0-1"
+    payment ||--o{ payment_histories: "1:N"
+    ai_conversation ||--o{ ai_message: "1:N"
 
-    MEMBER ||--o{ ORDER_INFO : "1:N 주문 생성"
-    ORDER_INFO ||--|| PAYMENT : "1:1 결제 내역"
-    ORDER_INFO ||--o{ ENROLLMENT : "1:N 수강권 발급"
-    COURSE ||--o{ ENROLLMENT : "1:N 강좌 수강"
-    MEMBER ||--o{ ENROLLMENT : "1:N 수강생 보유"
-
-    ENROLLMENT ||--o{ LESSON_PROGRESS : "1:N 차시별 진도"
-    LESSON ||--o{ LESSON_PROGRESS : "1:N 차시 진도 기록"
-
-    LESSON ||--o| ASSIGNMENT : "1:1 과제 출제"
-    ASSIGNMENT ||--o{ ASSIGNMENT_SUBMISSION : "1:N 과제 제출"
-    MEMBER ||--o{ ASSIGNMENT_SUBMISSION : "1:N 수강생 제출"
-
-    LESSON ||--o{ QNA_QUESTION : "1:N 강의 Q&A"
-    MEMBER ||--o{ QNA_QUESTION : "1:N 질문 작성"
-    QNA_QUESTION ||--o{ QNA_ANSWER : "1:N 질문 답변"
-    MEMBER ||--o{ QNA_ANSWER : "1:N 답변 작성"
-
-    COURSE ||--o{ COURSE_REVIEW : "1:N 수강 후기"
-    MEMBER ||--o{ COURSE_REVIEW : "1:N 수강생 작성"
-
-    MEMBER ||--o{ SETTLEMENT : "1:N 강사 정산"
-    ADMIN_FAQ {
-        bigint id PK "FAQ 고유 식별자"
-        varchar category "카테고리"
-        varchar question_pattern "질문 패턴"
-        text answer_content "표준 답변 텍스트"
-        varchar reference_link "참조 링크 URL"
-        varchar is_active "활성 여부 (Y/N)"
+    users {
+        bigint id PK "사용자 고유 ID"
+        varchar login_id UK "로그인 ID"
+        varchar password "BCrypt 암호화 비밀번호"
+        varchar name "사용자 이름"
+        varchar email UK "사용자 이메일"
+        varchar phone UK "사용자 연락처"
+        varchar role "사용자 권한 역할"
+        varchar status "계정 상태"
+        datetime last_login_at "마지막 로그인 일시"
+        datetime created_at "생성 일시"
+        datetime updated_at "수정 일시"
+        datetime deleted_at "삭제 일시"
     }
 
-    MEMBER {
-        bigint id PK "회원 고유 식별자"
-        varchar email "이메일 (UK)"
-        varchar password "암호화된 비밀번호"
-        varchar name "실명"
-        varchar nickname "닉네임"
-        varchar role "회원 역할 (STUDENT, INSTRUCTOR, ADMIN)"
-        varchar profile_image_url "프로필 이미지 S3 URL"
-        datetime created_at "가입 일시"
+    refresh_token {
+        bigint id PK "Refresh Token 고유 ID"
+        bigint user_id FK "사용자 고유 ID"
+        varchar token_hash UK "Refresh Token 해시값"
+        datetime expires_at "토큰 만료 일시"
+        datetime revoked_at "토큰 무효화 일시"
+        datetime created_at "토큰 생성 일시"
+    }
+
+    attendance {
+        bigint id PK "출퇴근 기록 ID"
+        bigint user_id FK "직원 ID"
+        datetime started_at "출근 시각"
+        datetime ended_at "퇴근 시각"
+    }
+
+    client {
+        bigint id PK "거래처 고유 ID"
+        varchar company "거래처 회사 이름"
+        varchar employee "거래처 직원 이름"
+        varchar email "거래처 이메일"
+        varchar phone "거래처 연락처"
+        int total_order "누적 수주량"
+        int total_amount "누적 거래액"
+        datetime recent_ordered_at "최근 수주 일자"
+        datetime created_at "생성 일시"
         datetime updated_at "수정 일시"
     }
 
-    MEMBER_DETAIL {
-        bigint member_id PK, FK "회원 기본 키"
-        text bio "강사/수강생 한 줄 소개"
-        varchar phone_number "연락처"
-        varchar marketing_agreed "마케팅 수신 동의 (Y/N)"
+    client_detail {
+        bigint id PK "거래처 고유 ID"
+        varchar address "거래처 주소"
+        bigint user_id FK "담당 직원 ID"
     }
 
-    COURSE {
-        bigint id PK "강좌 고유 식별자"
-        bigint instructor_id FK "개설 강사 회원 ID"
-        varchar title "강좌 제목"
-        text description "강좌 소개 본문"
-        varchar category "카테고리 (BACKEND, FRONTEND, INFRA)"
-        varchar level "난이도 (BEGINNER, INTERMEDIATE, ADVANCED)"
-        int price "수강료 (원 단위)"
-        int access_days "수강 가능 기간 (일수)"
-        varchar status "승인 상태 (DRAFT, PENDING, APPROVED, REJECTED)"
-        varchar thumbnail_url "썸네일 이미지 S3 URL"
-        decimal average_rating "평균 평점"
-        datetime created_at "개설 일시"
+    work_order {
+        bigint id PK "작업지시서 ID"
+        bigint order_id FK "수주 ID"
+        bigint line_id FK "담당 라인 ID"
+        varchar work_no UK "작업 지시 번호"
+        varchar supervisor "담당자"
+        date work_order_date "작업 지시일"
+        date work_start_date "작업 시작 예정일"
+        date work_end_date "작업 완료 예정일"
+        varchar status "작업 상태"
+        varchar production_stage "생산 진행 현황"
+        varchar working_content "작업 내용"
+        varchar working_conditions "작업 조건"
+        datetime created_at "생성 일시"
         datetime updated_at "수정 일시"
     }
 
-    CHAPTER {
-        bigint id PK "챕터 고유 식별자"
-        bigint course_id FK "소속 강좌 ID"
-        int sequence "챕터 순서"
-        varchar title "챕터 제목"
-    }
-
-    LESSON {
-        bigint id PK "차시 고유 식별자"
-        bigint chapter_id FK "소속 챕터 ID"
-        int sequence "차시 순서"
-        varchar title "차시 제목"
-        varchar video_url "동영상 스트리밍 S3 URL"
-        int duration_seconds "동영상 총 재생 시간 (초)"
-        varchar material_url "강의 첨부자료 S3 URL"
-        varchar is_free_preview "무료 미리보기 여부 (Y/N)"
-    }
-
-    ORDER_INFO {
-        bigint id PK "주문 고유 식별자"
-        varchar merchant_uid "주문 고유 식별 번호 (UK)"
-        bigint student_id FK "주문 수강생 ID"
-        int total_amount "총 결제 금액"
-        varchar status "주문 상태 (READY, PAID, CANCELLED)"
-        datetime ordered_at "주문 생성 일시"
-    }
-
-    PAYMENT {
-        bigint id PK "결제 고유 식별자"
-        bigint order_id FK "주문 식별자 (UK)"
-        varchar imp_uid "포트원 결제 고유 번호 (UK)"
-        varchar pay_method "결제 수단 (CARD, EASY_PAY, TRANS)"
-        int paid_amount "실결제 승인 금액"
-        datetime paid_at "결제 승인 일시"
-        int refund_amount "환불 금액"
-        datetime refunded_at "환불 일시"
-        varchar status "결제 상태 (PAID, CANCELLED, FORGERY_FAIL)"
-    }
-
-    ENROLLMENT {
-        bigint id PK "수강권 고유 식별자"
-        bigint student_id FK "수강생 회원 ID"
-        bigint course_id FK "수강 강좌 ID"
-        bigint order_id FK "원천 주문 ID"
-        datetime start_at "수강 시작 일시"
-        datetime end_at "수강 만료 일시"
-        varchar status "수강 상태 (ACTIVE, COMPLETED, EXPIRED)"
-        varchar certificate_issued "수료증 발급 여부 (Y/N)"
-        datetime completed_at "수료 일시"
-    }
-
-    LESSON_PROGRESS {
-        bigint id PK "차시 진도 고유 식별자"
-        bigint enrollment_id FK "소속 수강권 ID"
-        bigint lesson_id FK "대상 차시 ID"
-        int last_view_second "마지막 재생 위치 (초)"
-        int max_view_second "최대 시청 위치 (초)"
-        varchar is_completed "차시 완료 여부 (Y/N)"
-        datetime updated_at "진도 갱신 일시"
-    }
-
-    ASSIGNMENT {
-        bigint id PK "과제 고유 식별자"
-        bigint lesson_id FK "연계 차시 ID (UK)"
-        bigint instructor_id FK "출제 강사 ID"
-        varchar title "과제 제목"
-        text content "과제 가이드 본문"
-        varchar attachment_url "첨부 가이드 파일 S3 URL"
-        datetime deadline "과제 제출 마감 일시"
-    }
-
-    ASSIGNMENT_SUBMISSION {
-        bigint id PK "과제 제출 고유 식별자"
-        bigint assignment_id FK "대상 과제 ID"
-        bigint student_id FK "제출 수강생 ID"
-        text submission_content "제출 설명 텍스트"
-        varchar file_url "제출 소스코드/과제물 S3 URL"
-        int score "평가 점수 (0~100)"
-        text instructor_feedback "강사 평가 피드백"
-        varchar status "평가 상태 (PENDING, PASSED, FAILED)"
-        datetime submitted_at "제출 일시"
-        datetime graded_at "채점 일시"
-    }
-
-    QNA_QUESTION {
-        bigint id PK "Q&A 질문 고유 식별자"
-        bigint lesson_id FK "연계 차시 ID"
-        bigint student_id FK "질문 작성자 ID"
-        varchar title "질문 제목"
-        text content "질문 본문"
-        int timestamp_second "동영상 타임스탬프 (초)"
-        varchar is_resolved "해결 여부 (Y/N)"
+    work_order_product {
+        bigint id PK "지시 품목 ID"
+        bigint work_order_id FK "작업지시 ID"
+        bigint product_id FK "생산 품목 ID"
+        int quantity "해당 품목 수량"
         datetime created_at "등록 일시"
     }
 
-    QNA_ANSWER {
-        bigint id PK "Q&A 답변 고유 식별자"
-        bigint question_id FK "대상 질문 ID"
-        bigint responder_id FK "답변자 ID (강사/관리자)"
-        text content "답변 본문"
-        varchar is_accepted "공식 채택 여부 (Y/N)"
-        datetime created_at "등록 일시"
+    product {
+        bigint id PK "품목 고유 ID"
+        varchar model_code UK "모델 코드"
+        varchar product_name "제품명"
+        varchar device_name "기종"
+        varchar product_description "제품 설명"
+        int current_price "기준 단가"
+        varchar status "생산가능 또는 생산중단"
+        datetime created_at "등록 시각"
+        datetime updated_at "수정 시각"
     }
 
-    COURSE_REVIEW {
-        bigint id PK "후기 고유 식별자"
-        bigint course_id FK "대상 강좌 ID"
-        bigint student_id FK "작성 수강생 ID"
-        int rating "별점 (1~5점)"
-        text content "수강 후기 본문"
-        datetime created_at "등록 일시"
+    product_drawing {
+        bigint id PK "도면 ID"
+        bigint product_id FK "품목 ID"
+        varchar object_key UK "S3 객체 키"
+        varchar file_name "PDF 파일 이름"
+        datetime created_at "도면 등록 시각"
     }
 
-    SETTLEMENT {
-        bigint id PK "정산 고유 식별자"
-        bigint instructor_id FK "정산 대상 강사 ID"
-        varchar settlement_month "정산 대상 연월 (YYYY-MM)"
-        int total_sales "총 수강료 매출"
-        int platform_fee "플랫폼 수수료 공제액"
-        int net_settlement_amount "최종 정산 지급액"
-        varchar status "지급 상태 (PENDING, PAID)"
-        datetime executed_at "배치 정산 실행 일시"
+    product_histories {
+        bigint id PK "단가 변경 ID"
+        bigint product_id FK "품목 ID"
+        int previous_price "변경 전 단가"
+        int new_price "변경 후 단가"
+        datetime created_at "변경 시각"
+    }
+
+    orders {
+        bigint id PK "수주 고유 ID"
+        varchar order_no UK "수주번호"
+        bigint client_id FK "거래처 ID"
+        datetime requested_due_date "납기일"
+        datetime planned_start_date "생산 시작 예정일"
+        datetime planned_end_date "생산 완료 예정일"
+        varchar shipping_address "배송지"
+        varchar receiver_phone "배송 수신 연락처"
+        varchar notify_channel "SMS 또는 EMAIL"
+        varchar memo "업무 메모"
+        varchar status "수주 진행 상태"
+        varchar payment_status "UNPAID PARTIAL PAID"
+        int total_amount "품목 금액 합"
+        int covered_quantity "작업지시 수량"
+        int produced_quantity "생산 완료 수량"
+        datetime completed_at "배송 완료 시각"
+        datetime created_at "등록 시각"
+        datetime updated_at "수정 시각"
+    }
+
+    order_product {
+        bigint id PK "수주 품목 ID"
+        bigint order_id FK "수주 ID"
+        bigint product_id FK "품목 ID"
+        int quantity "수량"
+        int unit_price "단가"
+        int vat_included "VAT 포함 여부"
+        datetime created_at "등록 시각"
+    }
+
+    order_allocations {
+        bigint id PK "일별 생산 계획 ID"
+        bigint order_id FK "수주 ID"
+        datetime work_date "생산 계획일"
+        int quantity "해당일 생산 계획 수량"
+    }
+
+    status_history {
+        bigint id PK "이력 ID"
+        varchar entity "ORDER 또는 WORK_ORDER"
+        bigint entity_id "대상 ID"
+        varchar from_status "이전 상태"
+        varchar to_status "이후 상태"
+        bigint user_id FK "처리자 ID"
+        varchar user_name "처리자 이름"
+        varchar note "비고"
+        datetime created_at "처리 시각"
+    }
+
+    payment {
+        bigint id PK "결제건 ID"
+        bigint order_id FK "수주 ID"
+        varchar payment_id UK "PortOne 연동 결제 ID"
+        varchar payment_type "DEPOSIT 또는 BALANCE"
+        float amount "납부 금액"
+        varchar status "결제 진행 상태"
+        datetime created_at "생성 일시"
+    }
+
+    virtual_account {
+        bigint id PK "가상계좌 ID"
+        bigint payment_id FK "결제건 ID"
+        varchar bank_code "은행 코드"
+        varchar account_number "가상계좌 번호"
+        varchar account_name "예금주명"
+        varchar status "ACTIVE EXPIRED CANCELLED"
+        datetime expires_at "입금 만료 일시"
+    }
+
+    payment_histories {
+        bigint id PK "입금내역 ID"
+        bigint payment_id FK "결제건 ID"
+        varchar transaction_id UK "PortOne 거래 식별값"
+        float received_amount "실제 입금 금액"
+        datetime received_at "입금 완료 일시"
+        datetime created_at "저장 일시"
+    }
+
+    carrier {
+        varchar code PK "택배사 코드"
+        varchar name "택배사 이름"
+        varchar international "국제 택배 여부"
+    }
+
+    shipment {
+        bigint id PK "운송장 ID"
+        bigint order_id UK "수주 ID"
+        varchar carrier_code FK "택배사 코드"
+        varchar tracking_number "운송장 번호"
+        int level "현재 진행단계"
+        varchar result "조회 결과"
+        int complete "배송 완료 여부"
+        varchar estimate "배송 예정 시간"
+        datetime started_at "배송 시작 시각"
+        datetime delivered_at "배송 완료 시각"
+    }
+
+    shipment_message {
+        bigint id PK "발송 ID"
+        bigint shipment_id FK "운송장 ID"
+        varchar message_type "출발 또는 완료"
+        varchar phone_number "수신 전화번호"
+        varchar status "성공 또는 실패"
+        varchar failure_reason "실패 사유"
+        datetime sent_at "발송 시각"
+    }
+
+    line {
+        bigint id PK "생산라인 ID"
+        varchar line_name UK "생산라인명"
+        int production_capacity "일일 생산가능수량"
+        varchar status "라인 상태"
+        date introduced_date "도입일"
+        datetime updated_at "수정 시각"
+    }
+
+    risk_alert {
+        bigint id PK "알림 ID"
+        bigint order_id FK "대상 수주 ID"
+        varchar alert_type "알림 타입"
+        varchar message "알림 내용"
+        varchar send_status "발송 상태"
+        datetime sent_at "발송 일시"
+        datetime created_at "생성 일시"
+    }
+
+    ai_conversation {
+        bigint id PK "AI 대화방 ID"
+        bigint user_id FK "사용자 ID"
+        varchar title "대화 제목"
+        datetime created_at "생성 일시"
+        datetime updated_at "수정 일시"
+    }
+
+    ai_message {
+        bigint id PK "AI 메시지 ID"
+        bigint conversation_id FK "대화방 ID"
+        varchar role "AI 또는 USER"
+        varchar content "질문 및 답변"
+        varchar intent "검색 의도"
+        datetime created_at "생성 일시"
     }
 ```
 
 ---
 
-## 1.2 테이블별 상세 컬럼 명세
+## 2. 테이블 상세 명세서
 
-### 1.2.1 회원 및 인증 도메인 (MEMBER, MEMBER_DETAIL)
+### 2.1 user (직원 테이블)
 
-#### 1) MEMBER (회원 기본 계정 테이블)
-- 테이블 설명: 수강생, 강사, 관리자의 기본 계정 및 인증 정보를 저장하는 핵심 테이블.
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 사용자 고유 ID |
+| login_id | VARCHAR(50) | NOT NULL, UNIQUE | 로그인 ID |
+| password | VARCHAR(255) | NOT NULL | BCrypt 암호화 비밀번호 |
+| name | VARCHAR(50) | NOT NULL | 사용자 이름 |
+| email | VARCHAR(100) | NOT NULL, UNIQUE | 이메일 |
+| phone | VARCHAR(20) | NOT NULL, UNIQUE | 연락처 |
+| role | VARCHAR(30) | NOT NULL | 사용자 권한 역할. `SUPER_ADMIN`(최고관리자), `ORDER_MANAGER`(수주관리자), `PRODUCTION_MANAGER`(생산현장관리자), `INQUIRY_MANAGER`(업무조회담당자) |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'ACTIVE' | 계정 상태(활성화, 비활성화) |
+| last_login_at | DATETIME | NULL | 마지막 로그인 일시 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 생성일시 |
+| updated_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 수정일시 |
+| deleted_at | DATETIME | NULL | 삭제 일시 |
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 회원 고유 식별자 |
-| email | VARCHAR(100) | NOT NULL, UNIQUE | - | UK_MEMBER_EMAIL | 로그인 이메일 계정 |
-| password | VARCHAR(255) | NOT NULL | - | - | BCrypt 암호화된 비밀번호 |
-| name | VARCHAR(50) | NOT NULL | - | - | 회원 실명 |
-| nickname | VARCHAR(50) | NOT NULL | - | IDX_MEMBER_NICKNAME | 커뮤니티 노출용 닉네임 |
-| role | VARCHAR(20) | NOT NULL | 'ROLE_STUDENT' | - | 권한 (ROLE_STUDENT, ROLE_INSTRUCTOR, ROLE_ADMIN) |
-| profile_image_url | VARCHAR(500) | NULL | - | - | S3 프로필 이미지 URL |
-| created_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP | - | 회원 가입 일시 |
-| updated_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | - | 회원 정보 수정 일시 |
+### 2.2 refresh_token (리프레시 토큰 관리 테이블)
 
-#### 2) MEMBER_DETAIL (회원 부가 정보 테이블)
-- 테이블 설명: 회원 기본 정보와 1:1로 수직 분할된 상세 프로필 테이블.
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | Refresh Token 고유 ID |
+| user_id | BIGINT | FK → user.id, NOT NULL | 토큰을 발급받은 사용자 ID |
+| token_hash | VARCHAR(255) | NOT NULL, UNIQUE | Refresh Token 원문 대신 저장하는 해시값 |
+| expires_at | DATETIME | NOT NULL | Refresh Token 만료 일시 |
+| revoked_at | DATETIME | NULL | 로그아웃·재발급 등으로 토큰을 무효화한 일시 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Refresh Token 발급 일시 |
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| member_id | BIGINT | PK, FK (MEMBER.id) | - | PK, FK | 회원 고유 식별자 |
-| bio | TEXT | NULL | - | - | 강사 약력 또는 수강생 한 줄 소개 |
-| phone_number | VARCHAR(20) | NULL | - | - | 회원 연락처 |
-| marketing_agreed | CHAR(1) | NOT NULL | 'N' | - | 마케팅 수신 동의 여부 (Y/N) |
+### 2.3 attendance (현장 담당자 직원 출퇴근)
 
----
+작업지시서에 현장 담당자 자동 배정 시 출근 중인 직원 중에서 업무가 적은 직원에게 배정한다.
 
-### 1.2.2 강좌 및 커리큘럼 도메인 (COURSE, CHAPTER, LESSON)
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 출퇴근 기록 ID |
+| user_id | BIGINT | FK → user.id, NOT NULL | 직원 ID |
+| started_at | DATETIME | NOT NULL | 출근 시각 |
+| ended_at | DATETIME | NULL | 퇴근 시각. 출근 중이면 NULL |
 
-#### 3) COURSE (강좌 기본 테이블)
-- 테이블 설명: 강사가 개설하고 수강생이 수강하는 강좌 메타데이터 테이블.
+### 2.4 client (거래처 테이블)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 강좌 고유 식별자 |
-| instructor_id | BIGINT | NOT NULL, FK (MEMBER.id) | - | IDX_COURSE_INSTRUCTOR | 개설 강사 회원 식별자 |
-| title | VARCHAR(200) | NOT NULL | - | IDX_COURSE_TITLE | 강좌 제목 |
-| description | TEXT | NOT NULL | - | - | 강좌 상세 소개 본문 |
-| category | VARCHAR(50) | NOT NULL | - | IDX_COURSE_CATEGORY | 카테고리 (BACKEND, FRONTEND, INFRA) |
-| level | VARCHAR(20) | NOT NULL | 'BEGINNER' | - | 난이도 (BEGINNER, INTERMEDIATE, ADVANCED) |
-| price | INT | NOT NULL | 0 | - | 수강료 (0원일 경우 무료 강좌) |
-| access_days | INT | NOT NULL | 90 | - | 결제 후 기본 수강 가능 기간 (일수) |
-| status | VARCHAR(20) | NOT NULL | 'DRAFT' | IDX_COURSE_STATUS | 승인 상태 (DRAFT, PENDING, APPROVED, REJECTED) |
-| thumbnail_url | VARCHAR(500) | NULL | - | - | S3 강좌 대표 썸네일 이미지 URL |
-| average_rating | DECIMAL(2,1) | NOT NULL | 0.0 | - | 수강생 평균 평점 |
-| created_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP | - | 강좌 등록 일시 |
-| updated_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | - | 강좌 수정 일시 |
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 거래처 고유 ID |
+| company | VARCHAR(100) | NOT NULL | 거래처 회사 이름 |
+| employee | VARCHAR(50) | NOT NULL | 거래처 직원 이름 |
+| email | VARCHAR(100) | NOT NULL | 거래처 이메일 |
+| phone | VARCHAR(50) | NOT NULL | 거래처 연락처 |
+| total_order | INT | NOT NULL, DEFAULT 0 | 누적 수주량 |
+| total_amount | INT | NOT NULL, DEFAULT 0 | 누적 거래액 |
+| recent_ordered_at | DATETIME | NULL | 최근 수주 날짜 |
+| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 계정 생성 일시 |
+| updated_at | DATETIME | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 계정 수정 일시 |
 
-#### 4) CHAPTER (강좌 챕터/대단원 테이블)
-- 테이블 설명: 강좌 하위의 대단원 구조를 정의하는 테이블.
+### 2.5 client_detail (거래처 상세 테이블)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 챕터 고유 식별자 |
-| course_id | BIGINT | NOT NULL, FK (COURSE.id) | - | IDX_CHAPTER_COURSE | 소속 강좌 식별자 |
-| sequence | INT | NOT NULL | 1 | - | 강좌 내 챕터 표시 순서 |
-| title | VARCHAR(200) | NOT NULL | - | - | 챕터 제목 |
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, FK → client.id | 거래처 고유 ID (1:1) |
+| address | VARCHAR(255) | NOT NULL | 거래처 주소 (주소 API 연동 Address 객체 값) |
+| user_id | BIGINT | FK → user.id, NOT NULL | 담당 직원 ID |
 
-#### 5) LESSON (강좌 차시/소단원 테이블)
-- 테이블 설명: 실제 동영상 강의 및 강의 자료가 매핑되는 최소 학습 단위 테이블.
+### 2.6 work_order (작업지시서)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 차시 고유 식별자 |
-| chapter_id | BIGINT | NOT NULL, FK (CHAPTER.id) | - | IDX_LESSON_CHAPTER | 소속 챕터 식별자 |
-| sequence | INT | NOT NULL | 1 | - | 챕터 내 차시 표시 순서 |
-| title | VARCHAR(200) | NOT NULL | - | - | 차시 제목 |
-| video_url | VARCHAR(500) | NOT NULL | - | - | S3/CloudFront 동영상 스트리밍 URL |
-| duration_seconds | INT | NOT NULL | 0 | - | 동영상 총 재생 시간 (초 단위) |
-| material_url | VARCHAR(500) | NULL | - | - | S3 강의 첨부자료 URL |
-| is_free_preview | CHAR(1) | NOT NULL | 'N' | - | 무료 미리보기 제공 여부 (Y/N) |
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 작업지시서 고유 식별자 |
+| order_id | BIGINT | FK → order.id, NOT NULL | 수주 ID |
+| line_id | BIGINT | FK → line.id, NOT NULL | 담당 라인 ID |
+| work_no | VARCHAR(50) | NOT NULL, UNIQUE | 작업 지시 번호 |
+| supervisor | VARCHAR(10) | NOT NULL | 담당자 |
+| work_order_date | DATE | NOT NULL, DEFAULT (CURRENT_DATE) | 작업 지시일 |
+| work_start_date | DATE | NOT NULL | 작업 시작 예정일 |
+| work_end_date | DATE | NOT NULL | 작업 완료 예정일 |
+| status | VARCHAR(20) | NOT NULL, DEFAULT '작업 대기' | 작업 상태 (작업 대기, 진행중, 작업 중지, 작업 완료, 작업 취소) |
+| production_stage | VARCHAR(20) | NOT NULL, DEFAULT '준비' | 생산 진행 현황 (준비, 생산, 포장, 포장 완료) |
+| working_content | TEXT | NULL | 작업 내용 작성 (품목, 수량) |
+| working_conditions | TEXT | NULL | 작업 조건 작성 |
+| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 작업지시서 생성 일시 |
+| updated_at | DATETIME | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 작업지시서 수정 일시 |
 
----
+### 2.7 work_order_product (작업지시 품목)
 
-### 1.2.3 주문 및 결제 도메인 (ORDER_INFO, PAYMENT)
+이 지시가 맡은 품목을 저장한다.
 
-#### 6) ORDER_INFO (수강 주문 테이블)
-- 테이블 설명: 수강생의 강좌 결제 요청 단위를 관리하는 주문 테이블.
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 지시가 맡은 품목 고유 ID |
+| work_order_id | BIGINT | FK → work_order.id, NOT NULL | 작업지시 ID |
+| product_id | BIGINT | FK → product.id, NOT NULL | 해당 작업지시에 배정된 생산 품목 |
+| quantity | INT | NOT NULL, CHECK (quantity > 0) | 이 지시에 있는 해당 품목 수량 |
+| created_at | DATETIME | NOT NULL | 등록된 일시 |
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 주문 고유 식별자 |
-| merchant_uid | VARCHAR(100) | NOT NULL, UNIQUE | - | UK_ORDER_MERCHANT_UID | 주문 고유 식별 번호 (결제사 전달용) |
-| student_id | BIGINT | NOT NULL, FK (MEMBER.id) | - | IDX_ORDER_STUDENT | 주문 수강생 식별자 |
-| total_amount | INT | NOT NULL | - | - | 총 결제 예정 금액 |
-| status | VARCHAR(20) | NOT NULL | 'READY' | IDX_ORDER_STATUS | 주문 상태 (READY, PAID, CANCELLED) |
-| ordered_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP | - | 주문 생성 일시 |
+- UNIQUE(`work_order_id`, `product_id`)
 
-#### 7) PAYMENT (결제 트랜잭션 테이블)
-- 테이블 설명: 포트원 PG사와의 실제 결제 승인 및 사후 검증 결과를 보관하는 테이블.
+### 2.8 product (품목)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 결제 고유 식별자 |
-| order_id | BIGINT | NOT NULL, UNIQUE, FK (ORDER_INFO.id) | - | UK_PAYMENT_ORDER | 주문 식별자 (1:1 매핑) |
-| imp_uid | VARCHAR(100) | NOT NULL, UNIQUE | - | UK_PAYMENT_IMP_UID | 포트원 결제 고유 번호 |
-| pay_method | VARCHAR(30) | NOT NULL | 'CARD' | - | 결제 수단 (CARD, EASY_PAY, TRANS) |
-| paid_amount | INT | NOT NULL | - | - | PG사 실결제 승인 금액 |
-| paid_at | DATETIME | NOT NULL | - | - | 결제 승인 일시 |
-| refund_amount | INT | NOT NULL | 0 | - | 환불 금액 |
-| refunded_at | DATETIME | NULL | - | - | 환불 처리 일시 |
-| status | VARCHAR(20) | NOT NULL | 'PAID' | IDX_PAYMENT_STATUS | 결제 상태 (PAID, CANCELLED, FORGERY_FAIL) |
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 품목 고유 식별자 |
+| model_code | VARCHAR(50) | NOT NULL, UNIQUE | 모델코드 |
+| product_name | VARCHAR(100) | NOT NULL | 제품명 (예: 헬로키티케이스) |
+| device_name | VARCHAR(50) | NOT NULL | 기종 (예: 아이폰, 갤럭시) |
+| product_description | VARCHAR(500) | NULL | 제품 설명 |
+| current_price | INT | NOT NULL | 기준 단가 |
+| status | VARCHAR(20) | NOT NULL, DEFAULT '생산가능' | 생산가능, 생산중단 여부 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 등록시각 |
+| updated_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 수정시각 |
 
----
+### 2.9 product_drawing (도면)
 
-### 1.2.4 수강 및 학습 진도 도메인 (ENROLLMENT, LESSON_PROGRESS)
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 도면 한 개의 ID |
+| product_id | BIGINT | FK → product.id, NOT NULL | 어떤 제품의 도면인지 |
+| object_key | VARCHAR(1024) | NOT NULL, UNIQUE | S3 객체 키 |
+| file_name | VARCHAR(255) | NOT NULL | 올린 PDF 파일 이름 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 도면 등록 시각 |
 
-#### 8) ENROLLMENT (수강권 테이블)
-- 테이블 설명: 결제 완료 후 수강생에게 부여되는 강좌별 수강 권한 및 기간 관리 테이블.
+### 2.10 product_histories (제품 가격 기록)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 수강권 고유 식별자 |
-| student_id | BIGINT | NOT NULL, FK (MEMBER.id) | - | IDX_ENROLL_STUDENT | 수강생 회원 식별자 |
-| course_id | BIGINT | NOT NULL, FK (COURSE.id) | - | IDX_ENROLL_COURSE | 수강 강좌 식별자 |
-| order_id | BIGINT | NOT NULL, FK (ORDER_INFO.id) | - | - | 원천 주문 식별자 |
-| start_at | DATETIME | NOT NULL | - | - | 수강 시작 일시 |
-| end_at | DATETIME | NOT NULL | - | IDX_ENROLL_END_AT | 수강 만료 일시 (배치 조회 기준) |
-| status | VARCHAR(20) | NOT NULL | 'ACTIVE' | IDX_ENROLL_STATUS | 수강 상태 (ACTIVE, COMPLETED, EXPIRED) |
-| certificate_issued | CHAR(1) | NOT NULL | 'N' | - | 수료증 발급 여부 (Y/N) |
-| completed_at | DATETIME | NULL | - | - | 수료 달성 일시 |
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 변경 한 건의 고유 식별자 |
+| product_id | BIGINT | FK → product.id, NOT NULL | 어떤 품목의 단가가 바뀌는지 |
+| previous_price | INT | NOT NULL | 바꾸기 전 `current_price` |
+| new_price | INT | NOT NULL | 바꾼 후 단가 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 단가를 바꾼 시각 |
 
-#### 9) LESSON_PROGRESS (차시별 진도율 테이블)
-- 테이블 설명: 수강생의 차시별 동영상 재생 위치 및 80% 완료 여부를 저장하는 테이블.
+### 2.11 order (수주)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 진도 기록 고유 식별자 |
-| enrollment_id | BIGINT | NOT NULL, FK (ENROLLMENT.id) | - | IDX_PROGRESS_ENROLL | 소속 수강권 식별자 |
-| lesson_id | BIGINT | NOT NULL, FK (LESSON.id) | - | IDX_PROGRESS_LESSON | 대상 차시 식별자 |
-| last_view_second | INT | NOT NULL | 0 | - | 마지막 시청 재생 위치 (초 단위) |
-| max_view_second | INT | NOT NULL | 0 | - | 최대 진입 시청 위치 (초 단위) |
-| is_completed | CHAR(1) | NOT NULL | 'N' | - | 80% 이상 수강 완료 여부 (Y/N) |
-| updated_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | - | 진도율 최종 동기화 일시 |
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 수주 고유 식별자 |
+| order_no | VARCHAR(20) | NOT NULL, UNIQUE | 수주번호. 예: `PF-2026-001` |
+| client_id | BIGINT | FK → client.id, NOT NULL | 거래처 ID |
+| requested_due_date | DATETIME | NOT NULL | 납기일 |
+| planned_start_date | DATETIME | NOT NULL | 생산 시작 예정일 |
+| planned_end_date | DATETIME | NOT NULL | 생산 완료 예정일 |
+| shipping_address | VARCHAR(255) | NOT NULL | 배송지. 주소 검색으로 고른 값만 |
+| receiver_phone | VARCHAR(20) | NOT NULL | 배송 수신 연락처 |
+| notify_channel | VARCHAR(10) | NOT NULL | `SMS` 또는 `EMAIL` |
+| memo | VARCHAR(200) | NULL | 업무 메모 |
+| status | VARCHAR(20) | NOT NULL | 수주 진행 상태. `WAITING`(대기), `CONFIRMED`(생산대기), `IN_PRODUCTION`(생산중), `PACKING`(포장중), `PACKED`(포장완료), `SHIPPING`(배송중), `COMPLETED`(완료), `ON_HOLD`(생산보류), `CANCELLED`(취소) |
+| payment_status | VARCHAR(20) | NOT NULL | 입금 결제 상태. `UNPAID` / `PARTIAL` / `PAID`. 수주 `status`와 별개 |
+| total_amount | INT | NOT NULL | 수주 총액(원). 품목별 금액의 합. 선금 = 총액의 50% |
+| covered_quantity | INT | NOT NULL, DEFAULT 0 | 작업지시 수량. 선금 전이면 0. 선금 확인 후에는 품목 수량 합과 같음 |
+| produced_quantity | INT | NOT NULL, DEFAULT 0 | 생산 완료 수량. 완료 전이면 0. 완료면 작업지시 수량과 같음 |
+| completed_at | DATETIME | NULL | 배송 완료 시각. `COMPLETED`일 때만 |
+| created_at | DATETIME | NOT NULL | 등록된 시각 |
+| updated_at | DATETIME | NOT NULL | 수정된 시각 |
 
----
+`status`는 수주 진행 상태만 저장한다. 화면의 수주 등록 상태(예정 / 확정)는 `status`로 계산한다.
 
-### 1.2.5 과제 및 커뮤니티 도메인 (ASSIGNMENT, ASSIGNMENT_SUBMISSION, QNA, REVIEW)
+- 예정: 수주 등록 후 선금 전. `WAITING`(대기)
+- 확정: 선금(총액 50%) 확인 이후. `CONFIRMED`(생산대기)
 
-#### 10) ASSIGNMENT (차시 과제 출제 테이블)
-- 테이블 설명: 강사가 특정 차시에 연결하여 출제한 과제 정보 테이블.
+택배사·운송장 정보는 `shipment` 테이블에서 관리한다. (`carrier`, `tracking_no`는 order에 두지 않음)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 과제 고유 식별자 |
-| lesson_id | BIGINT | NOT NULL, UNIQUE, FK (LESSON.id) | - | UK_ASSIGN_LESSON | 연계 차시 식별자 (1:1 매핑) |
-| instructor_id | BIGINT | NOT NULL, FK (MEMBER.id) | - | - | 출제 강사 식별자 |
-| title | VARCHAR(200) | NOT NULL | - | - | 과제 제목 |
-| content | TEXT | NOT NULL | - | - | 과제 요구사항 및 가이드 본문 |
-| attachment_url | VARCHAR(500) | NULL | - | - | S3 첨부 가이드 파일 URL |
-| deadline | DATETIME | NOT NULL | - | - | 과제 제출 마감 일시 |
+### 2.12 order_product (수주받은 품목)
 
-#### 11) ASSIGNMENT_SUBMISSION (수강생 과제 제출 및 채점 테이블)
-- 테이블 설명: 수강생이 제출한 과제물과 강사의 평가 점수 및 피드백을 기록하는 테이블.
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 수주받은 품목 식별자 |
+| order_id | BIGINT | FK → order.id, NOT NULL | 수주 ID |
+| product_id | BIGINT | FK → product.id, NOT NULL | 품목 ID |
+| quantity | INT | NOT NULL, CHECK (quantity >= 1) | 수량, 1 이상 |
+| unit_price | INT | NOT NULL | 단가 |
+| vat_included | BOOLEAN | NOT NULL | `TRUE`이면 VAT 포함 (`quantity × unit_price`), `FALSE`이면 별도 10% (`round(quantity × unit_price × 1.1)`) |
+| created_at | DATETIME | NOT NULL | 등록된 시각 |
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 과제 제출 고유 식별자 |
-| assignment_id | BIGINT | NOT NULL, FK (ASSIGNMENT.id) | - | IDX_SUBMIT_ASSIGN | 대상 과제 식별자 |
-| student_id | BIGINT | NOT NULL, FK (MEMBER.id) | - | IDX_SUBMIT_STUDENT | 제출 수강생 식별자 |
-| submission_content | TEXT | NOT NULL | - | - | 제출 설명 텍스트 |
-| file_url | VARCHAR(500) | NOT NULL | - | - | S3 업로드된 과제물/소스코드 URL |
-| score | INT | NULL | - | - | 강사 평가 점수 (0~100) |
-| instructor_feedback | TEXT | NULL | - | - | 강사 평가 피드백 코멘트 |
-| status | VARCHAR(20) | NOT NULL | 'PENDING' | - | 평가 상태 (PENDING, PASSED, FAILED) |
-| submitted_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP | - | 과제 최초 제출 일시 |
-| graded_at | DATETIME | NULL | - | - | 강사 채점 완료 일시 |
+- UNIQUE(`order_id`, `product_id`)
+- 포함(`vat_included = TRUE`): 단가에 이미 세금이 들어 있음. 줄 금액 = `quantity × unit_price`
+- 별도(`vat_included = FALSE`): 단가는 공급가. 줄 금액 = `round(quantity × unit_price × 1.1)`
+- 수주 총액: 품목별 금액의 합. 선금 = 총액의 50%
 
-#### 12) QNA_QUESTION (강의 질의응답 질문 테이블)
-- 테이블 설명: 수강생이 강의를 들으며 특정 시점에 등록한 질문 테이블.
+### 2.13 order_allocations (일별 생산 계획)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | Q&A 질문 고유 식별자 |
-| lesson_id | BIGINT | NOT NULL, FK (LESSON.id) | - | IDX_QNA_LESSON | 소속 차시 식별자 |
-| student_id | BIGINT | NOT NULL, FK (MEMBER.id) | - | IDX_QNA_STUDENT | 질문 작성 수강생 식별자 |
-| title | VARCHAR(200) | NOT NULL | - | - | 질문 제목 |
-| content | TEXT | NOT NULL | - | - | 질문 본문 |
-| timestamp_second | INT | NULL | - | - | 동영상 타임스탬프 (초 단위) |
-| is_resolved | CHAR(1) | NOT NULL | 'N' | - | 질문 해결 여부 (Y/N) |
-| created_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP | - | 질문 등록 일시 |
+한 수주를 만들기 위해, 공장 하루 용량에서 날짜별로 몇 개씩 생산할지 적어 둔 계획 테이블이다.
 
-#### 13) QNA_ANSWER (강의 질의응답 답변 테이블)
-- 테이블 설명: 강사 또는 관리자가 질문에 대해 작성한 답변 테이블.
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 일별 생산 계획 식별자 |
+| order_id | BIGINT | FK → order.id, NOT NULL | 수주 ID |
+| work_date | DATETIME | NOT NULL | 생산 계획일 (주말·휴일 제외) |
+| quantity | INT | NOT NULL | 해당일 생산 계획 수량 |
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | Q&A 답변 고유 식별자 |
-| question_id | BIGINT | NOT NULL, FK (QNA_QUESTION.id) | - | IDX_ANSWER_QUESTION | 대상 질문 식별자 |
-| responder_id | BIGINT | NOT NULL, FK (MEMBER.id) | - | - | 답변 작성자 식별자 |
-| content | TEXT | NOT NULL | - | - | 답변 본문 |
-| is_accepted | CHAR(1) | NOT NULL | 'N' | - | 질문자 채택 여부 (Y/N) |
-| created_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP | - | 답변 등록 일시 |
+- UNIQUE(`order_id`, `work_date`)
+- 한 수주(`order_id`)의 `quantity` 합 = 해당 수주 `order_product.quantity` 합
+- 가장 이른 `work_date` = `order.planned_start_date`, 가장 늦은 날 = `order.planned_end_date`
 
-#### 14) COURSE_REVIEW (강좌 수강 후기 테이블)
-- 테이블 설명: 수강생이 강좌 수강 후 남기는 별점 및 평가 테이블.
+### 2.14 status_history (수주/작업지시 상태 변경 이력)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 수강 후기 고유 식별자 |
-| course_id | BIGINT | NOT NULL, FK (COURSE.id) | - | IDX_REVIEW_COURSE | 대상 강좌 식별자 |
-| student_id | BIGINT | NOT NULL, FK (MEMBER.id) | - | - | 작성 수강생 식별자 |
-| rating | INT | NOT NULL | 5 | - | 별점 (1~5점) |
-| content | TEXT | NOT NULL | - | - | 후기 본문 |
-| created_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP | - | 후기 등록 일시 |
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 이력 고유 ID |
+| entity | VARCHAR(20) | NOT NULL | `ORDER` 또는 `WORK_ORDER` |
+| entity_id | BIGINT | NOT NULL | 수주 ID 또는 작업지시 ID |
+| from_status | VARCHAR(20) | NOT NULL | 이전 상태. 등록 첫 이력은 `NONE` |
+| to_status | VARCHAR(20) | NOT NULL | 이후 상태. 단가·입금처럼 상태만 그대로면 `from_status`와 같음 |
+| user_id | BIGINT | FK → user.id, NULL | 처리한 직원 ID(상태 변경 이벤트 버튼을 누른 직원). PG 웹훅·시스템은 `NULL` |
+| user_name | VARCHAR(50) | NOT NULL | 처리자 이름. 웹훅이면 `SYSTEM` |
+| note | VARCHAR(255) | NULL | 입금 금액, 선금 확인, 중지·취소 사유, 배송지 변경 등 |
+| created_at | DATETIME | NOT NULL | 처리 시각 |
 
----
+### 2.15 payment (결제)
 
-### 1.2.6 배치 및 AI 지식 베이스 도메인 (SETTLEMENT, ADMIN_FAQ)
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 결제 고유 식별자 |
+| order_id | BIGINT | FK → order.id, NOT NULL | 해당 결제가 속한 수주 ID |
+| payment_id | VARCHAR(100) | NOT NULL, UNIQUE | ProdFlow에서 생성하는 PortOne 연동용 결제 고유 ID |
+| payment_type | VARCHAR(20) | NOT NULL | 결제 구분 (`DEPOSIT`(계약금), `BALANCE`(잔금)) |
+| amount | DECIMAL(15,2) | NOT NULL | 해당 결제 건에서 납부받아야 하는 금액 |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'READY' | 결제 진행 상태. `READY`(결제건생성), `WAITING`(대기), `PAID`(입금완료), `FAILED`(결제실패), `CANCELLED`(결제취소) |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 결제 건 생성 일시 |
 
-#### 15) SETTLEMENT (강사 월간 정산 집계 테이블)
-- 테이블 설명: Spring Batch가 매월 1일 자정에 강사별 수강료 매출을 집계하여 영속화하는 정산 테이블.
+### 2.16 virtual_account (가상계좌)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | 정산 고유 식별자 |
-| instructor_id | BIGINT | NOT NULL, FK (MEMBER.id) | - | IDX_SETTLE_INSTRUCTOR | 정산 대상 강사 식별자 |
-| settlement_month | VARCHAR(7) | NOT NULL | - | IDX_SETTLE_MONTH | 정산 대상 연월 (예: '2026-09') |
-| total_sales | INT | NOT NULL | 0 | - | 해당 월 총 수강료 매출 |
-| platform_fee | INT | NOT NULL | 0 | - | 플랫폼 수수료 공제액 (예: 20%) |
-| net_settlement_amount | INT | NOT NULL | 0 | - | 강사 실수령 최종 정산금 |
-| status | VARCHAR(20) | NOT NULL | 'PENDING' | - | 지급 상태 (PENDING, PAID) |
-| executed_at | DATETIME | NOT NULL | CURRENT_TIMESTAMP | - | 배치 정산 실행 일시 |
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 가상계좌 고유 식별자 |
+| payment_id | BIGINT | FK → payment.id, UNIQUE, NOT NULL | 결제건 ID (`payment.id`) |
+| bank_code | VARCHAR(30) | NOT NULL | PG에서 전달받은 발급 은행 코드 |
+| account_number | VARCHAR(50) | NOT NULL | 토스페이먼츠/은행에서 발급된 가상계좌 번호 |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'ACTIVE' | 가상계좌 사용 상태. `ACTIVE`(입금가능), `EXPIRED`(기한만료), `CANCELLED`(사용취소) |
+| account_name | VARCHAR(100) | NULL | 가상계좌 예금주명 |
+| expires_at | DATETIME | NOT NULL | 해당 가상계좌의 입금 가능 만료 일시 |
 
-#### 16) ADMIN_FAQ (AI 학사 행정 지원 지식 베이스 테이블)
-- 테이블 설명: 과정 운영자의 반복 행정 업무를 무인화하기 위해 AI 챗봇의 프롬프트와 RAG 질의에 활용되는 행정 FAQ 지식 베이스 테이블.
+### 2.17 payment_histories (입금내역)
 
-| 컬럼명 | 데이터 타입 | 제약조건 | 기본값 | 인덱스 | 설명 |
-|---|---|---|---|---|---|
-| id | BIGINT | PK, AUTO_INCREMENT | - | PK | FAQ 지식 고유 식별자 |
-| category | VARCHAR(50) | NOT NULL | - | IDX_FAQ_CATEGORY | 카테고리 (COURSE, PAYMENT, REFUND, COMPLETION) |
-| question_pattern | VARCHAR(300) | NOT NULL | - | - | 대표 질문 패턴 및 유사 질문 키워드 |
-| answer_content | TEXT | NOT NULL | - | - | 검증된 공식 학사 행정 표준 답변 |
-| reference_link | VARCHAR(500) | NULL | - | - | 관련 규정 또는 신청 바로가기 URL |
-| is_active | CHAR(1) | NOT NULL | 'Y' | - | AI 질의 사용 활성 여부 (Y/N) |
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 입금 내역 ID |
+| payment_id | BIGINT | FK → payment.id, NOT NULL | 결제건 ID (`payment.id`) |
+| transaction_id | VARCHAR(100) | UNIQUE | PortOne에서 생성된 실제 결제 시도/거래 식별값 |
+| received_amount | DECIMAL(15,2) | NOT NULL | 실제 입금 금액 |
+| received_at | DATETIME | NOT NULL | 실제 입금 완료 일시 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 입금내역 DB 저장 일시 |
+
+### 2.18 carrier (택배사)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| code | VARCHAR(50) | PK | 조회할 때 보내는 택배사 코드. 예: CJ대한통운 `04` |
+| name | VARCHAR(50) | NOT NULL | 택배사 이름 |
+| international | VARCHAR(1) | NULL | 국제택배 여부 |
+
+### 2.19 shipment (운송장)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 운송장 고유 식별자 |
+| order_id | BIGINT | UK, FK → order.id, NOT NULL | 어느 수주의 택배인지 |
+| carrier_code | VARCHAR(50) | FK → carrier.code, NOT NULL | 택배사 코드. 예: `04` |
+| tracking_number | VARCHAR(50) | NOT NULL | 운송장 번호 |
+| level | INT | NULL | 현재 진행단계. 0 기록 없음, 1 배송준비중, 2 집화완료, 3 배송중, 4 지점도착, 5 배송출발, 6 배송완료 |
+| result | VARCHAR(1) | NULL | 조회결과. `Y` 또는 `N` |
+| complete | TINYINT | NULL | 배송완료 여부 |
+| estimate | VARCHAR(50) | NULL | 배송예정시간 |
+| started_at | DATETIME | NULL | 배송이 시작된 시각 |
+| delivered_at | DATETIME | NULL | 배송이 완료된 시각 |
+
+- UNIQUE(`carrier_code`, `tracking_number`)
+
+### 2.20 shipment_message (배송 문자)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 발송 한 건의 ID |
+| shipment_id | BIGINT | FK → shipment.id, NOT NULL | 어느 운송장 때문에 보냈는지 |
+| message_type | VARCHAR(20) | NOT NULL | 출발, 완료 |
+| phone_number | VARCHAR(20) | NOT NULL | 실제로 보낸 전화번호 |
+| status | VARCHAR(20) | NOT NULL | 성공, 실패 |
+| failure_reason | VARCHAR(255) | NOT NULL | 실패했을 때 사유. 성공이면 빈 문자열 |
+| sent_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 문자를 보낸 시각 |
+
+### 2.21 line (라인 테이블)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 생산라인 식별자 |
+| line_name | VARCHAR(50) | NOT NULL, UNIQUE | 생산라인명 |
+| production_capacity | INT | NOT NULL, CHECK (production_capacity >= 0) | 일일 생산 가능 수량 |
+| status | VARCHAR(20) | NOT NULL, DEFAULT '가동 가능' | 라인 상태 (가동 가능, 가동 중, 점검, 고장) |
+| updated_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 수정 일시 |
+| introduced_date | DATE | NOT NULL, DEFAULT (CURRENT_DATE) | 생산라인 도입일 |
+
+### 2.22 risk_alert (대시보드 알림)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 알림 고유 식별자 |
+| order_id | BIGINT | FK → order.id, NOT NULL | 납기 위험 대상 수주 ID |
+| alert_type | VARCHAR(30) | NOT NULL | 납기 임박 / 납기 지연 |
+| message | VARCHAR(500) | NOT NULL | 알림 내용 |
+| send_status | VARCHAR(20) | NOT NULL | 발송 대기 / 성공 / 실패 |
+| sent_at | DATETIME | NULL | 알림 발송 일시 |
+| created_at | DATETIME | NOT NULL | 알림 생성 일시 |
+
+### 2.23 ai_conversation (AI 채팅방)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 채팅방 고유 식별자 |
+| user_id | BIGINT | FK → user.id, NOT NULL | 대화한 회원 ID |
+| title | VARCHAR(200) | NULL | 채팅방 제목 |
+| created_at | DATETIME | NOT NULL | 대화방 생성 일시 |
+| updated_at | DATETIME | NOT NULL | 마지막 대화 일시 |
+
+### 2.24 ai_message (AI 대화 메시지)
+
+`ai_conversation`과 `ai_message`는 1:N 관계이다.
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 메시지 고유 식별자 |
+| conversation_id | BIGINT | FK → ai_conversation.id, NOT NULL | 대화방 ID |
+| role | VARCHAR(20) | NOT NULL | 메시지 발신자 구분. `AI` / `USER` |
+| content | TEXT | NOT NULL | 질문 또는 AI 응답 내용 |
+| intent | VARCHAR(50) | NULL | 검색 의도 (예: `SEARCH_UNPAID` 미입금 조회) |
+| created_at | DATETIME | NOT NULL | 메시지 생성 일시 |
