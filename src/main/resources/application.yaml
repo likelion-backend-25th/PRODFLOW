@@ -1,3 +1,51 @@
 spring:
   application:
     name: PRODFLOW
+
+  # 데이터베이스 접속 정보
+  #  datasource:
+  #    driver-class-name: com.mysql.cj.jdbc.Driver
+  #    url: 'jdbc:mysql://localhost:3306/jpa_db?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true'
+  #    username: jpa-app
+  #    password: 'Jpa1234!'
+
+  # 데이터베이스 초기화 설정
+  sql:
+    init:
+      mode: always
+
+  # JPA 및 하이버네이트 설정
+  jpa:
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+        use_sql_comments: true
+    # Hibernate가 스키마(ddl)를 생성한 다음 SQL 초기화 스크립트 로드 및 실행
+    defer-datasource-initialization: true
+
+# Springdoc OpenAPI 및 Swagger UI 설정
+springdoc:
+  # 기본 응답 미디어 타입을 application/json으로 지정
+  default-produces-media-type: application/json
+  swagger-ui:
+    # Swagger UI 엔드포인트 커스텀 경로 설정
+    path: /swagger-ui.html
+    # 태그 그룹 정렬 기준 (옵션: alpha - 태그명 알파벳/가나다 사전순)
+    tags-sorter: alpha
+    # 개별 API 엔드포인트 정렬 기준 (옵션: alpha - URI 경로 사전순, method - HTTP 메서드명 알파벳순)
+    operations-sorter: alpha
+  api-docs:
+    # OpenAPI 문서 자동 생성 활성화 및 엔드포인트 경로
+    enabled: true
+    path: /v3/api-docs
+
+logging:
+  level:
+    # 스프링 시큐리티 전체 로그를 디버그 레벨로 활성화
+    org.springframework.security: DEBUG
+
+    # 더 세부적인 필터 체인 통과 흐름을 보려면 TRACE 지정 가능
+    # org.springframework.security.web.FilterChainProxy: TRACE
