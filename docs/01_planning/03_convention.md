@@ -1,6 +1,7 @@
 # PRODFLOW 코드 컨벤션 정의서
 
 ## 목차
+
 - [1. 개요 및 기본 원칙](#1-개요-및-기본-원칙)
 - [2. Java 및 Spring Boot 표준 스타일](#2-java-및-spring-boot-표준-스타일)
 - [3. 식별자 명명 규칙](#3-식별자-명명-규칙)
@@ -78,6 +79,7 @@ if (isExpired) throw new CourseEnrollmentExpiredException("수강 기간이 만�
     - 주문 도메인: `net.likelion.bebc25.prodflow.domain.order`
     - 제품 도메인: `net.likelion.bebc25.prodflow.domain.product`
     - 결제 도메인: `net.likelion.bebc25.prodflow.domain.payment`
+    - 대시보드 도메인: `net.likelion.bebc25.prodflow.domain.dashboard`
 
 ### 3.2 클래스 및 인터페이스 명명 규칙
 
@@ -117,8 +119,8 @@ if (isExpired) throw new CourseEnrollmentExpiredException("수강 기간이 만�
 
 - 소문자 스네이크 케이스(snake_case)를 적용함.
 - 테이블명: 단수형 명사 또는 도메인 명사 사용 (예: `member`, `client`, `product`, `order`).
-- 기본키(PK): `[테이블단수명]_id` 형태로 일관되게 부여 (예: `client_id`, `member_id`).
-- 외래키(FK): 연관 테이블의 PK 명칭과 완전히 일치시킴 (예: `product.client_id`).
+- 기본키(PK): 모든 테이블에서 `id`를 사용함.
+- 외래키(FK): 연관 테이블명_PK 명칭을 사용 (예: `product.client_id`).
 - 날짜 컬럼: 접미사 `_at` 적용 (예: `created_at`, `updated_at`, `completed_at`).
 - 여부 컬럼: 접두사 `is_` 적용 (예: `is_deleted`, `is_free`).
 
