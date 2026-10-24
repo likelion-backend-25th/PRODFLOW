@@ -9,43 +9,55 @@
 
 ## 1. ERD 다이어그램
 
-PRODFLOW의 핵심 엔티티 간 관계도이며, 직원·인증, 거래처, 품목, 수주·작업지시·생산라인, 결제·가상계좌, 배송·알림, AI 대화 테이블 간의 외래키(FK) 연관관계를 도식화한다.
+PRODFLOW의 핵심 엔티티 간 관계도이며, 직원·인증, 거래처, 품목·기종, 수주·견적·작업지시·생산라인, 결제·가상계좌, 배송·알림, AI 대화 테이블 간의 외래키(FK) 연관관계를 도식화한다.
 
 ```mermaid
 erDiagram
-    users ||--o{ refresh_token: "1:N"
-    users ||--o{ attendance: "1:N"
-    users ||--o{ client_detail: "1:N"
-    users ||--o{ ai_conversation: "1:N"
+    users ||--o| refresh_token: "1:0-1"
+    users ||--o{ client: "1:N"
+    users ||--o{ orders: "1:N"
+    users ||--o{ work_order: "1:N"
     users ||--o{ status_history: "1:N"
-    client ||--|| client_detail: "1:1"
+    users ||--o{ quotes: "1:N"
+    users ||--o{ line_capacity_log: "1:N"
+    users ||--o{ notification: "sender"
+    users ||--o{ notification: "recipient"
+    users ||--o{ client_noti_log: "1:N"
+    users ||--o{ ai_conversation: "1:N"
+    users ||--o{ work_order_line_change_history: "1:N"
     client ||--o{ orders: "1:N"
-    product ||--o{ order_product: "1:N"
-    product ||--o{ product_histories: "1:N"
+    device ||--o{ product: "1:N"
     product ||--o{ product_drawing: "1:N"
-    product ||--o{ work_order_product: "1:N"
+    product ||--o{ order_product: "1:N"
+    product ||--o{ quotes_item: "1:N"
     orders ||--|{ order_product: "1:N"
-    orders ||--|{ order_allocations: "1:N"
     orders ||--o{ work_order: "1:N"
+    orders ||--o{ quotes: "1:N"
     orders ||--o| shipment: "1:0-1"
     orders ||--o{ payment: "1:N"
-    orders ||--o{ risk_alert: "1:N"
+    orders ||--o{ notification: "1:N"
+    orders ||--o{ client_noti_log: "1:N"
+    order_product ||--o{ work_order_product: "1:N"
+    quotes ||--|{ quotes_item: "1:N"
+    quotes ||--o{ client_noti_log: "1:N"
     line ||--o{ work_order: "1:N"
+    line ||--o{ line_capacity_log: "1:N"
     work_order ||--|{ work_order_product: "1:N"
+    work_order ||--o{ work_order_line_change_history: "1:N"
+    work_order ||--o{ notification: "1:N"
     carrier ||--o{ shipment: "1:N"
-    shipment ||--o{ shipment_message: "1:N"
-    payment ||--o| virtual_account: "1:0-1"
-    payment ||--o{ payment_histories: "1:N"
+    payment ||--o{ virtual_account: "1:N"
+    payment ||--o| payment_history: "1:0-1"
+    virtual_account ||--o{ payment_history: "1:N"
     ai_conversation ||--o{ ai_message: "1:N"
 
     users {
         bigint id PK "사용자 고유 ID"
-        varchar login_id UK "로그인 ID"
         varchar password "BCrypt 암호화 비밀번호"
         varchar name "사용자 이름"
-        varchar email UK "사용자 이메일"
-        varchar phone UK "사용자 연락처"
-        varchar role "사용자 권한 역할"
+        varchar email UK "이메일"
+        varchar phone "연락처"
+        varchar role "권한 역할"
         varchar status "계정 상태"
         datetime last_login_at "마지막 로그인 일시"
         datetime created_at "생성 일시"
@@ -55,71 +67,38 @@ erDiagram
 
     refresh_token {
         bigint id PK "Refresh Token 고유 ID"
-        bigint user_id FK "사용자 고유 ID"
+        bigint user_id UK "사용자 ID"
         varchar token_hash UK "Refresh Token 해시값"
         datetime expires_at "토큰 만료 일시"
-        datetime revoked_at "토큰 무효화 일시"
-        datetime created_at "토큰 생성 일시"
-    }
-
-    attendance {
-        bigint id PK "출퇴근 기록 ID"
-        bigint user_id FK "직원 ID"
-        datetime started_at "출근 시각"
-        datetime ended_at "퇴근 시각"
+        datetime created_at "발급 일시"
     }
 
     client {
         bigint id PK "거래처 고유 ID"
-        varchar company "거래처 회사 이름"
-        varchar employee "거래처 직원 이름"
-        varchar email "거래처 이메일"
-        varchar phone "거래처 연락처"
-        int total_order "누적 수주량"
-        int total_amount "누적 거래액"
-        datetime recent_ordered_at "최근 수주 일자"
+        varchar company "회사 이름"
+        varchar employee "대표자 이름"
+        varchar email "이메일"
+        varchar phone "연락처"
+        varchar address "주소"
+        bigint user_id FK "수주 관리자 ID"
         datetime created_at "생성 일시"
         datetime updated_at "수정 일시"
     }
 
-    client_detail {
-        bigint id PK "거래처 고유 ID"
-        varchar address "거래처 주소"
-        bigint user_id FK "담당 직원 ID"
-    }
-
-    work_order {
-        bigint id PK "작업지시서 ID"
-        bigint order_id FK "수주 ID"
-        bigint line_id FK "담당 라인 ID"
-        varchar work_no UK "작업 지시 번호"
-        varchar supervisor "담당자"
-        date work_order_date "작업 지시일"
-        date work_start_date "작업 시작 예정일"
-        date work_end_date "작업 완료 예정일"
-        varchar status "작업 상태"
-        varchar production_stage "생산 진행 현황"
-        varchar working_content "작업 내용"
-        varchar working_conditions "작업 조건"
-        datetime created_at "생성 일시"
-        datetime updated_at "수정 일시"
-    }
-
-    work_order_product {
-        bigint id PK "지시 품목 ID"
-        bigint work_order_id FK "작업지시 ID"
-        bigint product_id FK "생산 품목 ID"
-        int quantity "해당 품목 수량"
-        datetime created_at "등록 일시"
+    device {
+        bigint id PK "기종 ID"
+        varchar name UK "기종 이름"
+        varchar status "사용 또는 미사용"
+        datetime created_at "등록 시각"
     }
 
     product {
         bigint id PK "품목 고유 ID"
         varchar model_code UK "모델 코드"
         varchar product_name "제품명"
-        varchar device_name "기종"
+        bigint device_id FK "기종 ID"
         varchar product_description "제품 설명"
-        int current_price "기준 단가"
+        bigint current_price "기준 단가"
         varchar status "생산가능 또는 생산중단"
         datetime created_at "등록 시각"
         datetime updated_at "수정 시각"
@@ -128,23 +107,21 @@ erDiagram
     product_drawing {
         bigint id PK "도면 ID"
         bigint product_id FK "품목 ID"
-        varchar object_key UK "S3 객체 키"
-        varchar file_name "PDF 파일 이름"
+        varchar object_key "S3 객체 키"
+        varchar file_name "파일 이름"
         datetime created_at "도면 등록 시각"
-    }
-
-    product_histories {
-        bigint id PK "단가 변경 ID"
-        bigint product_id FK "품목 ID"
-        int previous_price "변경 전 단가"
-        int new_price "변경 후 단가"
-        datetime created_at "변경 시각"
+        datetime replaced_at "교체 시각"
     }
 
     orders {
         bigint id PK "수주 고유 ID"
         varchar order_no UK "수주번호"
         bigint client_id FK "거래처 ID"
+        varchar employee "거래처 대표자"
+        varchar email "거래처 이메일"
+        varchar phone "거래처 연락처"
+        varchar address "거래처 주소"
+        bigint user_id FK "등록 직원 ID"
         datetime requested_due_date "납기일"
         datetime planned_start_date "생산 시작 예정일"
         datetime planned_end_date "생산 완료 예정일"
@@ -153,8 +130,8 @@ erDiagram
         varchar notify_channel "SMS 또는 EMAIL"
         varchar memo "업무 메모"
         varchar status "수주 진행 상태"
-        varchar payment_status "UNPAID PARTIAL PAID"
-        int total_amount "품목 금액 합"
+        int vat_included "VAT 포함 여부"
+        int total_amount "수주 총액"
         int covered_quantity "작업지시 수량"
         int produced_quantity "생산 완료 수량"
         datetime completed_at "배송 완료 시각"
@@ -172,16 +149,68 @@ erDiagram
         datetime created_at "등록 시각"
     }
 
-    order_allocations {
-        bigint id PK "일별 생산 계획 ID"
+    quotes {
+        bigint id PK "견적서 ID"
         bigint order_id FK "수주 ID"
-        datetime work_date "생산 계획일"
-        int quantity "해당일 생산 계획 수량"
+        date deposit_due_date "계약금 입금 마감일"
+        date planned_start_date "생산 시작 예정일"
+        date planned_end_date "생산 완료 예정일"
+        date requested_due_date "희망 납기일"
+        varchar shipping_address "배송지"
+        bigint created_by FK "작성 직원 ID"
+        datetime created_at "발행 시각"
+    }
+
+    quotes_item {
+        bigint id PK "견적 품목 ID"
+        bigint quotes_id FK "견적서 ID"
+        bigint product_id FK "품목 ID"
+        varchar product_name "발행 시점 제품명"
+        varchar device_name "발행 시점 기종"
+        int quantity "수량"
+        int unit_price "단가"
+        int vat_included "VAT 포함 여부"
+        int line_amount "줄 금액"
+        datetime created_at "등록 시각"
+    }
+
+    work_order {
+        bigint id PK "작업지시서 ID"
+        bigint order_id FK "수주 ID"
+        bigint line_id FK "담당 라인 ID"
+        bigint user_id FK "담당자 ID"
+        int total_quantity "총 생산량"
+        varchar work_no UK "작업 지시 번호"
+        date work_order_date "작업 지시일"
+        date work_start_date "작업 시작 예정일"
+        date work_end_date "작업 완료 예정일"
+        varchar status "작업 상태"
+        varchar working_content "작업 내용"
+        datetime created_at "생성 일시"
+        datetime updated_at "수정 일시"
+    }
+
+    work_order_product {
+        bigint id PK "지시 품목 ID"
+        bigint work_order_id FK "작업지시 ID"
+        bigint order_product_id FK "수주 품목 ID"
+        int quantity "해당 품목 수량"
+        datetime created_at "등록 일시"
+    }
+
+    work_order_line_change_history {
+        bigint id PK "라인 변경 이력 ID"
+        bigint work_order_id FK "작업지시 ID"
+        bigint user_id FK "담당 직원 ID"
+        int before_line "변경 전 라인"
+        int after_line "변경 후 라인"
+        varchar note "변경 사유"
+        datetime created_at "등록 일시"
     }
 
     status_history {
         bigint id PK "이력 ID"
-        varchar entity "ORDER 또는 WORK_ORDER"
+        varchar entity "ORDER WORK_ORDER LINE"
         bigint entity_id "대상 ID"
         varchar from_status "이전 상태"
         varchar to_status "이후 상태"
@@ -194,7 +223,7 @@ erDiagram
     payment {
         bigint id PK "결제건 ID"
         bigint order_id FK "수주 ID"
-        varchar payment_id UK "PortOne 연동 결제 ID"
+        varchar portone_payment_id "PortOne 결제 ID"
         varchar payment_type "DEPOSIT 또는 BALANCE"
         float amount "납부 금액"
         varchar status "결제 진행 상태"
@@ -211,11 +240,11 @@ erDiagram
         datetime expires_at "입금 만료 일시"
     }
 
-    payment_histories {
+    payment_history {
         bigint id PK "입금내역 ID"
-        bigint payment_id FK "결제건 ID"
+        bigint payment_id UK "결제건 ID"
+        bigint virtual_account_id FK "가상계좌 ID"
         varchar transaction_id UK "PortOne 거래 식별값"
-        float received_amount "실제 입금 금액"
         datetime received_at "입금 완료 일시"
         datetime created_at "저장 일시"
     }
@@ -239,16 +268,6 @@ erDiagram
         datetime delivered_at "배송 완료 시각"
     }
 
-    shipment_message {
-        bigint id PK "발송 ID"
-        bigint shipment_id FK "운송장 ID"
-        varchar message_type "출발 또는 완료"
-        varchar phone_number "수신 전화번호"
-        varchar status "성공 또는 실패"
-        varchar failure_reason "실패 사유"
-        datetime sent_at "발송 시각"
-    }
-
     line {
         bigint id PK "생산라인 ID"
         varchar line_name UK "생산라인명"
@@ -258,33 +277,68 @@ erDiagram
         datetime updated_at "수정 시각"
     }
 
-    risk_alert {
+    line_capacity_log {
+        bigint id PK "용량 변경 이력 ID"
+        bigint line_id FK "생산라인 ID"
+        int before_capacity "변경 전 일일 생산량"
+        int after_capacity "변경 후 일일 생산량"
+        varchar reason "변경 사유"
+        bigint changed_by FK "변경 직원 ID"
+        datetime changed_at "변경 시각"
+    }
+
+    notification {
         bigint id PK "알림 ID"
-        bigint order_id FK "대상 수주 ID"
-        varchar alert_type "알림 타입"
+        bigint order_id FK "관련 수주 ID"
+        bigint work_order_id FK "관련 작업지시 ID"
+        bigint sender_id FK "발신자 ID"
+        bigint recipient_id FK "수신자 ID"
+        varchar notification_type "알림 타입"
         varchar message "알림 내용"
         varchar send_status "발송 상태"
-        datetime sent_at "발송 일시"
+        int is_read "읽음 여부"
+        datetime sent_at "발송 시간"
+        datetime read_at "읽은 시간"
         datetime created_at "생성 일시"
+    }
+
+    client_noti_log {
+        bigint id PK "발송 이력 ID"
+        bigint order_id FK "수주 ID"
+        varchar kind "QUOTE 또는 BALANCE"
+        varchar channel "SMS 또는 EMAIL"
+        varchar recipient "수신 연락처"
+        bigint quotation_id FK "견적 ID"
+        varchar status "SENT 또는 FAILED"
+        datetime sent_at "발송 시각"
+        bigint sent_by FK "발송 직원 ID"
+        varchar error_message "실패 사유"
     }
 
     ai_conversation {
         bigint id PK "AI 대화방 ID"
         bigint user_id FK "사용자 ID"
         varchar title "대화 제목"
+        int is_closed "종료 여부"
         datetime created_at "생성 일시"
-        datetime updated_at "수정 일시"
+        datetime updated_at "마지막 대화 일시"
+        datetime closed_at "종료 일시"
     }
 
     ai_message {
         bigint id PK "AI 메시지 ID"
         bigint conversation_id FK "대화방 ID"
-        varchar role "AI 또는 USER"
+        int sequence_no "메시지 순서"
+        varchar role "ASSISTANT 또는 USER"
         varchar content "질문 및 답변"
         varchar intent "검색 의도"
+        varchar generated_sql "생성 SQL"
         datetime created_at "생성 일시"
     }
 ```
+
+> Mermaid 관계 표기용으로 `users`·`orders`를 사용한다. 실제 테이블명은 `user`·`order`이다.  
+> `notification`의 `sender_id` / `recipient_id`는 모두 `user`를 참조한다.
 
 ---
 
@@ -295,13 +349,12 @@ erDiagram
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 사용자 고유 ID |
-| login_id | VARCHAR(50) | NOT NULL, UNIQUE | 로그인 ID |
 | password | VARCHAR(255) | NOT NULL | BCrypt 암호화 비밀번호 |
-| name | VARCHAR(50) | NOT NULL | 사용자 이름 |
-| email | VARCHAR(100) | NOT NULL, UNIQUE | 이메일 |
-| phone | VARCHAR(20) | NOT NULL, UNIQUE | 연락처 |
-| role | VARCHAR(30) | NOT NULL | 사용자 권한 역할. `SUPER_ADMIN`(최고관리자), `ORDER_MANAGER`(수주관리자), `PRODUCTION_MANAGER`(생산현장관리자), `INQUIRY_MANAGER`(업무조회담당자) |
-| status | VARCHAR(20) | NOT NULL, DEFAULT 'ACTIVE' | 계정 상태(활성화, 비활성화) |
+| name | VARCHAR(255) | NOT NULL | 사용자 이름 |
+| email | VARCHAR(255) | NOT NULL, UNIQUE | 이메일 (로그인 ID) |
+| phone | VARCHAR(255) | NOT NULL | 연락처 |
+| role | VARCHAR(255) | NOT NULL | 사용자 권한 역할. `SUPER_ADMIN`(최고관리자), `ORDER_MANAGER`(수주관리자), `PRODUCTION_MANAGER`(생산현장관리자), `INQUIRY_MANAGER`(업무조회담당자) |
+| status | VARCHAR(255) | NOT NULL, DEFAULT 'ACTIVE' | 계정 상태(활성화, 비활성화) |
 | last_login_at | DATETIME | NULL | 마지막 로그인 일시 |
 | created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 생성일시 |
 | updated_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 수정일시 |
@@ -312,45 +365,26 @@ erDiagram
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | Refresh Token 고유 ID |
-| user_id | BIGINT | FK → user.id, NOT NULL | 토큰을 발급받은 사용자 ID |
+| user_id | BIGINT | FK → user.id, UNIQUE, NOT NULL | 토큰을 발급받은 사용자 ID (사용자당 1개) |
 | token_hash | VARCHAR(255) | NOT NULL, UNIQUE | Refresh Token 원문 대신 저장하는 해시값 |
 | expires_at | DATETIME | NOT NULL | Refresh Token 만료 일시 |
-| revoked_at | DATETIME | NULL | 로그아웃·재발급 등으로 토큰을 무효화한 일시 |
 | created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Refresh Token 발급 일시 |
-
-### 2.3 attendance (현장 담당자 직원 출퇴근)
-
-작업지시서에 현장 담당자 자동 배정 시 출근 중인 직원 중에서 업무가 적은 직원에게 배정한다.
-
-| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
-| --- | --- | --- | --- |
-| id | BIGINT | PK, AUTO_INCREMENT | 출퇴근 기록 ID |
-| user_id | BIGINT | FK → user.id, NOT NULL | 직원 ID |
-| started_at | DATETIME | NOT NULL | 출근 시각 |
-| ended_at | DATETIME | NULL | 퇴근 시각. 출근 중이면 NULL |
 
 ### 2.4 client (거래처 테이블)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 거래처 고유 ID |
-| company | VARCHAR(100) | NOT NULL | 거래처 회사 이름 |
-| employee | VARCHAR(50) | NOT NULL | 거래처 직원 이름 |
-| email | VARCHAR(100) | NOT NULL | 거래처 이메일 |
-| phone | VARCHAR(50) | NOT NULL | 거래처 연락처 |
-| total_order | INT | NOT NULL, DEFAULT 0 | 누적 수주량 |
-| total_amount | INT | NOT NULL, DEFAULT 0 | 누적 거래액 |
-| recent_ordered_at | DATETIME | NULL | 최근 수주 날짜 |
+| company | VARCHAR(255) | NOT NULL | 거래처 회사 이름 |
+| employee | VARCHAR(255) | NOT NULL | 거래처 대표자 이름 |
+| email | VARCHAR(255) | NOT NULL | 거래처 이메일 |
+| phone | VARCHAR(255) | NOT NULL | 거래처 연락처 |
+| address | VARCHAR(255) | NOT NULL | 거래처 주소 (주소 API 연동 Address 객체 값) |
+| user_id | BIGINT | FK → user.id, NOT NULL | 수주 관리자 ID |
 | created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 계정 생성 일시 |
 | updated_at | DATETIME | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 계정 수정 일시 |
 
-### 2.5 client_detail (거래처 상세 테이블)
-
-| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
-| --- | --- | --- | --- |
-| id | BIGINT | PK, FK → client.id | 거래처 고유 ID (1:1) |
-| address | VARCHAR(255) | NOT NULL | 거래처 주소 (주소 API 연동 Address 객체 값) |
-| user_id | BIGINT | FK → user.id, NOT NULL | 담당 직원 ID |
+- `total_order`(누적 수주량), `total_amount`(누적 거래액), `recent_ordered_at`(최근 수주 날짜)는 컬럼으로 두지 않고 쿼리로 조회한다.
 
 ### 2.6 work_order (작업지시서)
 
@@ -359,19 +393,35 @@ erDiagram
 | id | BIGINT | PK, AUTO_INCREMENT | 작업지시서 고유 식별자 |
 | order_id | BIGINT | FK → order.id, NOT NULL | 수주 ID |
 | line_id | BIGINT | FK → line.id, NOT NULL | 담당 라인 ID |
-| work_no | VARCHAR(50) | NOT NULL, UNIQUE | 작업 지시 번호 |
-| supervisor | VARCHAR(10) | NOT NULL | 담당자 |
+| user_id | BIGINT | FK → user.id, NOT NULL | 담당자 (직원 ID) |
+| total_quantity | INT | NOT NULL | 총 생산량 |
+| work_no | VARCHAR(255) | NOT NULL, UNIQUE | 작업 지시 번호 |
 | work_order_date | DATE | NOT NULL, DEFAULT (CURRENT_DATE) | 작업 지시일 |
 | work_start_date | DATE | NOT NULL | 작업 시작 예정일 |
 | work_end_date | DATE | NOT NULL | 작업 완료 예정일 |
-| status | VARCHAR(20) | NOT NULL, DEFAULT '작업 대기' | 작업 상태 (작업 대기, 진행중, 작업 중지, 작업 완료, 작업 취소) |
-| production_stage | VARCHAR(20) | NOT NULL, DEFAULT '준비' | 생산 진행 현황 (준비, 생산, 포장, 포장 완료) |
+| status | VARCHAR(255) | NOT NULL, DEFAULT 'READY' | 이 라인 지시의 생산 작업 상태. `READY`(작업 대기), `IN_PRODUCTION`(진행중), `PAUSED`(작업 중지), `COMPLETED`(작업 완료), `CANCELLED`(작업 취소). 포장·출고·배송은 `order.status` |
 | working_content | TEXT | NULL | 작업 내용 작성 (품목, 수량) |
-| working_conditions | TEXT | NULL | 작업 조건 작성 |
 | created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 작업지시서 생성 일시 |
 | updated_at | DATETIME | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 작업지시서 수정 일시 |
 
-### 2.7 work_order_product (작업지시 품목)
+### 2.7 work_order_line_change_history (작업지시서 라인 변경 이력)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 라인 변경 이력 고유 ID |
+| work_order_id | BIGINT | FK → work_order.id, NOT NULL | 작업지시 ID |
+| user_id | BIGINT | FK → user.id, NOT NULL | 담당 직원 ID |
+| before_line | INT | NULL | 변경 전 라인. 최초 배정이면 NULL |
+| after_line | INT | NOT NULL | 변경 후 라인 또는 처음 배정한 라인 |
+| note | VARCHAR(255) | NOT NULL | 라인 변경 사유 |
+| created_at | DATETIME | NOT NULL | 등록된 일시 |
+
+예시:
+
+- 현장 담당자가 작업지시에 라인을 처음 등록: `before_line = NULL`, `after_line = 2`
+- 2번 라인 고장 후 3번으로 이전: `before_line = 2`, `after_line = 3`
+
+### 2.8 work_order_product (작업지시 품목)
 
 이 지시가 맡은 품목을 저장한다.
 
@@ -379,63 +429,68 @@ erDiagram
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 지시가 맡은 품목 고유 ID |
 | work_order_id | BIGINT | FK → work_order.id, NOT NULL | 작업지시 ID |
-| product_id | BIGINT | FK → product.id, NOT NULL | 해당 작업지시에 배정된 생산 품목 |
+| order_product_id | BIGINT | FK → order_product.id, NOT NULL | 해당 작업지시에 배정된 수주 품목 ID |
 | quantity | INT | NOT NULL, CHECK (quantity > 0) | 이 지시에 있는 해당 품목 수량 |
 | created_at | DATETIME | NOT NULL | 등록된 일시 |
 
-- UNIQUE(`work_order_id`, `product_id`)
+- UNIQUE(`work_order_id`, `order_product_id`)
 
-### 2.8 product (품목)
+### 2.9 product (품목)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 품목 고유 식별자 |
-| model_code | VARCHAR(50) | NOT NULL, UNIQUE | 모델코드 |
-| product_name | VARCHAR(100) | NOT NULL | 제품명 (예: 헬로키티케이스) |
-| device_name | VARCHAR(50) | NOT NULL | 기종 (예: 아이폰, 갤럭시) |
-| product_description | VARCHAR(500) | NULL | 제품 설명 |
-| current_price | INT | NOT NULL | 기준 단가 |
-| status | VARCHAR(20) | NOT NULL, DEFAULT '생산가능' | 생산가능, 생산중단 여부 |
+| model_code | VARCHAR(255) | NOT NULL, UNIQUE | 모델코드 |
+| product_name | VARCHAR(255) | NOT NULL | 제품명 (예: 헬로키티케이스) |
+| device_id | BIGINT | FK → device.id, NOT NULL | 기종 |
+| product_description | VARCHAR(255) | NULL | 제품 설명 |
+| current_price | BIGINT | NOT NULL | 기준 단가 |
+| status | VARCHAR(255) | NOT NULL, DEFAULT '생산가능' | 생산가능, 생산중단 여부 |
 | created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 등록시각 |
 | updated_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 수정시각 |
 
-### 2.9 product_drawing (도면)
+### 2.10 device (기종코드)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
-| id | BIGINT | PK, AUTO_INCREMENT | 도면 한 개의 ID |
+| id | BIGINT | PK, AUTO_INCREMENT | 기종 한 개의 식별자 |
+| name | VARCHAR(255) | NOT NULL, UNIQUE | 기종 이름 |
+| status | VARCHAR(255) | NOT NULL, DEFAULT '사용' | 사용, 미사용. 미사용은 새 품목 선택 목록에서 제외 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 등록시각 |
+
+### 2.11 product_drawing (도면)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 도면 한 개의 식별자 |
 | product_id | BIGINT | FK → product.id, NOT NULL | 어떤 제품의 도면인지 |
-| object_key | VARCHAR(1024) | NOT NULL, UNIQUE | S3 객체 키 |
-| file_name | VARCHAR(255) | NOT NULL | 올린 PDF 파일 이름 |
+| object_key | VARCHAR(255) | NOT NULL | S3 객체 키 |
+| file_name | VARCHAR(255) | NOT NULL | 올린 파일 이름 |
 | created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 도면 등록 시각 |
+| replaced_at | DATETIME | NULL | 다른 파일로 바꾼 시각. 현재 도면이면 NULL |
 
-### 2.10 product_histories (제품 가격 기록)
-
-| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
-| --- | --- | --- | --- |
-| id | BIGINT | PK, AUTO_INCREMENT | 변경 한 건의 고유 식별자 |
-| product_id | BIGINT | FK → product.id, NOT NULL | 어떤 품목의 단가가 바뀌는지 |
-| previous_price | INT | NOT NULL | 바꾸기 전 `current_price` |
-| new_price | INT | NOT NULL | 바꾼 후 단가 |
-| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 단가를 바꾼 시각 |
-
-### 2.11 order (수주)
+### 2.12 order (수주)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 수주 고유 식별자 |
-| order_no | VARCHAR(20) | NOT NULL, UNIQUE | 수주번호. 예: `PF-2026-001` |
+| order_no | VARCHAR(255) | NOT NULL, UNIQUE | 수주번호. 예: `PF-2026-001` |
 | client_id | BIGINT | FK → client.id, NOT NULL | 거래처 ID |
+| employee | VARCHAR(255) | NOT NULL | 거래처 대표자 이름 (수주 시점 스냅샷) |
+| email | VARCHAR(255) | NOT NULL | 거래처 이메일 (수주 시점 스냅샷) |
+| phone | VARCHAR(255) | NOT NULL | 거래처 연락처 (수주 시점 스냅샷) |
+| address | VARCHAR(255) | NOT NULL | 거래처 주소 (수주 시점 스냅샷) |
+| user_id | BIGINT | FK → user.id, NOT NULL | 이 수주를 등록한 직원 (수주 관리자) |
 | requested_due_date | DATETIME | NOT NULL | 납기일 |
 | planned_start_date | DATETIME | NOT NULL | 생산 시작 예정일 |
 | planned_end_date | DATETIME | NOT NULL | 생산 완료 예정일 |
-| shipping_address | VARCHAR(255) | NOT NULL | 배송지. 주소 검색으로 고른 값만 |
-| receiver_phone | VARCHAR(20) | NOT NULL | 배송 수신 연락처 |
-| notify_channel | VARCHAR(10) | NOT NULL | `SMS` 또는 `EMAIL` |
-| memo | VARCHAR(200) | NULL | 업무 메모 |
-| status | VARCHAR(20) | NOT NULL | 수주 진행 상태. `WAITING`(대기), `CONFIRMED`(생산대기), `IN_PRODUCTION`(생산중), `PACKING`(포장중), `PACKED`(포장완료), `SHIPPING`(배송중), `COMPLETED`(완료), `ON_HOLD`(생산보류), `CANCELLED`(취소) |
-| payment_status | VARCHAR(20) | NOT NULL | 입금 결제 상태. `UNPAID` / `PARTIAL` / `PAID`. 수주 `status`와 별개 |
-| total_amount | INT | NOT NULL | 수주 총액(원). 품목별 금액의 합. 선금 = 총액의 50% |
+| shipping_address | VARCHAR(255) | NOT NULL | 배송지 |
+| receiver_phone | VARCHAR(255) | NOT NULL | 배송 수신 연락처 |
+| notify_channel | VARCHAR(255) | NOT NULL | `SMS` 또는 `EMAIL` |
+| memo | VARCHAR(255) | NULL | 업무 메모 |
+| status | VARCHAR(255) | NOT NULL | 수주 진행 상태. `WAITING`(대기) → `CONFIRMED`(생산대기) → `IN_PRODUCTION`(생산중) → `PACKING`(포장중) → `READY_TO_SHIP`(출고대기) → `SHIPPING`(배송중) → `COMPLETED`(완료), `ON_HOLD`(생산보류), `CANCELLED`(취소) |
+| vat_included | BOOLEAN | NOT NULL | `TRUE`이면 VAT 포함, `FALSE`이면 별도 10% |
+| total_amount | INT | NOT NULL | 수주 총액(원). 품목별 금액의 합 |
 | covered_quantity | INT | NOT NULL, DEFAULT 0 | 작업지시 수량. 선금 전이면 0. 선금 확인 후에는 품목 수량 합과 같음 |
 | produced_quantity | INT | NOT NULL, DEFAULT 0 | 생산 완료 수량. 완료 전이면 0. 완료면 작업지시 수량과 같음 |
 | completed_at | DATETIME | NULL | 배송 완료 시각. `COMPLETED`일 때만 |
@@ -447,9 +502,14 @@ erDiagram
 - 예정: 수주 등록 후 선금 전. `WAITING`(대기)
 - 확정: 선금(총액 50%) 확인 이후. `CONFIRMED`(생산대기)
 
+입금 결제 상태는 `payment` 테이블을 JOIN하여 조회한다.
+
+- `payment.payment_type`: 계약금(`DEPOSIT`), 잔금(`BALANCE`)
+- `payment.status`: `PAID`이면 입금, 그 외는 미입금
+
 택배사·운송장 정보는 `shipment` 테이블에서 관리한다. (`carrier`, `tracking_no`는 order에 두지 않음)
 
-### 2.12 order_product (수주받은 품목)
+### 2.13 order_product (수주받은 품목)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
@@ -466,149 +526,194 @@ erDiagram
 - 별도(`vat_included = FALSE`): 단가는 공급가. 줄 금액 = `round(quantity × unit_price × 1.1)`
 - 수주 총액: 품목별 금액의 합. 선금 = 총액의 50%
 
-### 2.13 order_allocations (일별 생산 계획)
-
-한 수주를 만들기 위해, 공장 하루 용량에서 날짜별로 몇 개씩 생산할지 적어 둔 계획 테이블이다.
+### 2.14 quotes (견적서)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
-| id | BIGINT | PK, AUTO_INCREMENT | 일별 생산 계획 식별자 |
-| order_id | BIGINT | FK → order.id, NOT NULL | 수주 ID |
-| work_date | DATETIME | NOT NULL | 생산 계획일 (주말·휴일 제외) |
-| quantity | INT | NOT NULL | 해당일 생산 계획 수량 |
+| id | BIGINT | PK, AUTO_INCREMENT | 견적서 식별자 |
+| order_id | BIGINT | FK → order.id, NOT NULL | 수주 ID. 다시 만들면 새 행 |
+| deposit_due_date | DATE | NOT NULL | 발행 시점 계약금 입금 마감일 |
+| planned_start_date | DATE | NOT NULL | 발행 시점 생산 시작 예정일 |
+| planned_end_date | DATE | NOT NULL | 발행 시점 생산 완료 예정일 |
+| requested_due_date | DATE | NOT NULL | 발행 시점 희망 납기일 |
+| shipping_address | VARCHAR(255) | NOT NULL | 발행 시점 배송지 |
+| created_by | BIGINT | FK → user.id, NOT NULL | 만든 직원 |
+| created_at | DATETIME | NOT NULL | 발행 시각 |
 
-- UNIQUE(`order_id`, `work_date`)
-- 한 수주(`order_id`)의 `quantity` 합 = 해당 수주 `order_product.quantity` 합
-- 가장 이른 `work_date` = `order.planned_start_date`, 가장 늦은 날 = `order.planned_end_date`
+문서에 넣는 값:
 
-### 2.14 status_history (수주/작업지시 상태 변경 이력)
+- 수주번호, 발행일, 거래처명, 대표자, 담당자, 연락처
+- 품목(제품명·기종), 수량, 단가, VAT 포함/별도, 줄 금액
+- 공급가액, 부가세, 총액, 계약금(총액의 50%), 잔금
+- 계약금 입금 마감일(생산 시작 예정일 - 1), 생산 시작 예정일, 생산 완료 예정일, 희망 납기일, 배송지
+
+### 2.15 quotes_item (견적 품목)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 견적 품목 식별자 |
+| quotes_id | BIGINT | FK → quotes.id, NOT NULL | 견적서 ID |
+| product_id | BIGINT | FK → product.id, NOT NULL | 품목 ID |
+| product_name | VARCHAR(255) | NOT NULL | 발행 시점 제품명 |
+| device_name | VARCHAR(255) | NOT NULL | 발행 시점 기종 |
+| quantity | INT | NOT NULL | 발행 시점 수량 |
+| unit_price | INT | NOT NULL | 발행 시점 단가 |
+| vat_included | BOOLEAN | NOT NULL | 발행 시점 VAT 포함 여부 |
+| line_amount | INT | NOT NULL | 발행 시점 줄 금액 |
+| created_at | DATETIME | NOT NULL | 등록 시각 |
+
+### 2.16 status_history (수주/작업지시/라인 상태 변경 이력)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 이력 고유 ID |
-| entity | VARCHAR(20) | NOT NULL | `ORDER` 또는 `WORK_ORDER` |
-| entity_id | BIGINT | NOT NULL | 수주 ID 또는 작업지시 ID |
-| from_status | VARCHAR(20) | NOT NULL | 이전 상태. 등록 첫 이력은 `NONE` |
-| to_status | VARCHAR(20) | NOT NULL | 이후 상태. 단가·입금처럼 상태만 그대로면 `from_status`와 같음 |
-| user_id | BIGINT | FK → user.id, NULL | 처리한 직원 ID(상태 변경 이벤트 버튼을 누른 직원). PG 웹훅·시스템은 `NULL` |
-| user_name | VARCHAR(50) | NOT NULL | 처리자 이름. 웹훅이면 `SYSTEM` |
+| entity | VARCHAR(255) | NOT NULL | `ORDER`, `WORK_ORDER`, `LINE` |
+| entity_id | BIGINT | NOT NULL | 수주 ID, 작업지시 ID, 또는 라인 ID |
+| from_status | VARCHAR(255) | NOT NULL | 이전 상태. 등록 첫 이력은 `NONE` |
+| to_status | VARCHAR(255) | NOT NULL | 이후 상태. 단가·입금처럼 상태만 그대로면 `from_status`와 같음 |
+| user_id | BIGINT | FK → user.id, NULL | 처리한 직원 ID. PG 웹훅·시스템은 `NULL` |
+| user_name | VARCHAR(255) | NOT NULL | 처리자 이름. 웹훅이면 `SYSTEM` |
 | note | VARCHAR(255) | NULL | 입금 금액, 선금 확인, 중지·취소 사유, 배송지 변경 등 |
 | created_at | DATETIME | NOT NULL | 처리 시각 |
 
-### 2.15 payment (결제)
+### 2.17 payment (결제)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 결제 고유 식별자 |
 | order_id | BIGINT | FK → order.id, NOT NULL | 해당 결제가 속한 수주 ID |
-| payment_id | VARCHAR(100) | NOT NULL, UNIQUE | ProdFlow에서 생성하는 PortOne 연동용 결제 고유 ID |
-| payment_type | VARCHAR(20) | NOT NULL | 결제 구분 (`DEPOSIT`(계약금), `BALANCE`(잔금)) |
+| portone_payment_id | VARCHAR(255) | NOT NULL | ProdFlow에서 생성하는 PortOne 연동용 결제 고유 ID |
+| payment_type | VARCHAR(255) | NOT NULL | 결제 구분 (`DEPOSIT`(계약금), `BALANCE`(잔금)) |
 | amount | DECIMAL(15,2) | NOT NULL | 해당 결제 건에서 납부받아야 하는 금액 |
-| status | VARCHAR(20) | NOT NULL, DEFAULT 'READY' | 결제 진행 상태. `READY`(결제건생성), `WAITING`(대기), `PAID`(입금완료), `FAILED`(결제실패), `CANCELLED`(결제취소) |
+| status | VARCHAR(255) | NOT NULL, DEFAULT 'READY' | 결제 진행 상태. `READY`(결제건생성), `WAITING`(대기), `PAID`(입금완료), `FAILED`(결제실패), `CANCELLED`(결제취소) |
 | created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 결제 건 생성 일시 |
 
-### 2.16 virtual_account (가상계좌)
+- UNIQUE(`order_id`, `payment_type`)
+
+### 2.18 virtual_account (가상계좌)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 가상계좌 고유 식별자 |
-| payment_id | BIGINT | FK → payment.id, UNIQUE, NOT NULL | 결제건 ID (`payment.id`) |
-| bank_code | VARCHAR(30) | NOT NULL | PG에서 전달받은 발급 은행 코드 |
-| account_number | VARCHAR(50) | NOT NULL | 토스페이먼츠/은행에서 발급된 가상계좌 번호 |
-| status | VARCHAR(20) | NOT NULL, DEFAULT 'ACTIVE' | 가상계좌 사용 상태. `ACTIVE`(입금가능), `EXPIRED`(기한만료), `CANCELLED`(사용취소) |
-| account_name | VARCHAR(100) | NULL | 가상계좌 예금주명 |
+| payment_id | BIGINT | FK → payment.id, NOT NULL | 결제건 ID (`payment.id`) |
+| bank_code | VARCHAR(255) | NOT NULL | PG에서 전달받은 발급 은행 코드 |
+| account_number | VARCHAR(255) | NOT NULL | 토스페이먼츠/은행에서 발급된 가상계좌 번호 |
+| status | VARCHAR(255) | NOT NULL, DEFAULT 'ACTIVE' | 가상계좌 사용 상태. `ACTIVE`(정상), `EXPIRED`(만료), `CANCELLED`(취소) |
+| account_name | VARCHAR(255) | NULL | 가상계좌 예금주명 |
 | expires_at | DATETIME | NOT NULL | 해당 가상계좌의 입금 가능 만료 일시 |
 
-### 2.17 payment_histories (입금내역)
+### 2.19 payment_history (입금내역)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 입금 내역 ID |
-| payment_id | BIGINT | FK → payment.id, NOT NULL | 결제건 ID (`payment.id`) |
-| transaction_id | VARCHAR(100) | UNIQUE | PortOne에서 생성된 실제 결제 시도/거래 식별값 |
-| received_amount | DECIMAL(15,2) | NOT NULL | 실제 입금 금액 |
+| payment_id | BIGINT | FK → payment.id, UNIQUE, NOT NULL | 결제건 ID (`payment.id`). 결제건당 입금 1건 |
+| virtual_account_id | BIGINT | FK → virtual_account.id, NOT NULL | 가상계좌 ID |
+| transaction_id | VARCHAR(255) | UNIQUE | PortOne에서 생성된 실제 결제 시도/거래 식별값 |
 | received_at | DATETIME | NOT NULL | 실제 입금 완료 일시 |
 | created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 입금내역 DB 저장 일시 |
 
-### 2.18 carrier (택배사)
+### 2.20 carrier (택배사)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
-| code | VARCHAR(50) | PK | 조회할 때 보내는 택배사 코드. 예: CJ대한통운 `04` |
-| name | VARCHAR(50) | NOT NULL | 택배사 이름 |
+| code | VARCHAR(255) | PK | 조회할 때 보내는 택배사 코드. 예: CJ대한통운 `04` |
+| name | VARCHAR(255) | NOT NULL | 택배사 이름 |
 | international | VARCHAR(1) | NULL | 국제택배 여부 |
 
-### 2.19 shipment (운송장)
+### 2.21 shipment (운송장)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 운송장 고유 식별자 |
 | order_id | BIGINT | UK, FK → order.id, NOT NULL | 어느 수주의 택배인지 |
-| carrier_code | VARCHAR(50) | FK → carrier.code, NOT NULL | 택배사 코드. 예: `04` |
-| tracking_number | VARCHAR(50) | NOT NULL | 운송장 번호 |
+| carrier_code | VARCHAR(255) | FK → carrier.code, NOT NULL | 택배사 코드. 예: `04` |
+| tracking_number | VARCHAR(255) | NOT NULL | 운송장 번호 |
 | level | INT | NULL | 현재 진행단계. 0 기록 없음, 1 배송준비중, 2 집화완료, 3 배송중, 4 지점도착, 5 배송출발, 6 배송완료 |
 | result | VARCHAR(1) | NULL | 조회결과. `Y` 또는 `N` |
 | complete | TINYINT | NULL | 배송완료 여부 |
-| estimate | VARCHAR(50) | NULL | 배송예정시간 |
+| estimate | VARCHAR(255) | NULL | 배송예정시간 |
 | started_at | DATETIME | NULL | 배송이 시작된 시각 |
 | delivered_at | DATETIME | NULL | 배송이 완료된 시각 |
 
 - UNIQUE(`carrier_code`, `tracking_number`)
 
-### 2.20 shipment_message (배송 문자)
-
-| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
-| --- | --- | --- | --- |
-| id | BIGINT | PK, AUTO_INCREMENT | 발송 한 건의 ID |
-| shipment_id | BIGINT | FK → shipment.id, NOT NULL | 어느 운송장 때문에 보냈는지 |
-| message_type | VARCHAR(20) | NOT NULL | 출발, 완료 |
-| phone_number | VARCHAR(20) | NOT NULL | 실제로 보낸 전화번호 |
-| status | VARCHAR(20) | NOT NULL | 성공, 실패 |
-| failure_reason | VARCHAR(255) | NOT NULL | 실패했을 때 사유. 성공이면 빈 문자열 |
-| sent_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 문자를 보낸 시각 |
-
-### 2.21 line (라인 테이블)
+### 2.22 line (라인 테이블)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 생산라인 식별자 |
-| line_name | VARCHAR(50) | NOT NULL, UNIQUE | 생산라인명 |
+| line_name | VARCHAR(255) | NOT NULL, UNIQUE | 생산라인명 |
 | production_capacity | INT | NOT NULL, CHECK (production_capacity >= 0) | 일일 생산 가능 수량 |
-| status | VARCHAR(20) | NOT NULL, DEFAULT '가동 가능' | 라인 상태 (가동 가능, 가동 중, 점검, 고장) |
+| status | VARCHAR(255) | NOT NULL, DEFAULT '가동 가능' | 라인 상태 (가동 가능, 가동 중, 점검, 고장) |
 | updated_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 수정 일시 |
 | introduced_date | DATE | NOT NULL, DEFAULT (CURRENT_DATE) | 생산라인 도입일 |
 
-### 2.22 risk_alert (대시보드 알림)
+### 2.23 line_capacity_log (라인 일일 생산량 변경 이력)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 이력 고유 식별자 |
+| line_id | BIGINT | FK → line.id, NOT NULL | 생산라인 ID |
+| before_capacity | INT | NOT NULL | 변경 전 일일 생산량 |
+| after_capacity | INT | NOT NULL | 변경 후 일일 생산량 |
+| reason | VARCHAR(255) | NOT NULL | 변경 사유. 설비 증설, 인원 감소, 일부 고장 등 |
+| changed_by | BIGINT | FK → user.id, NOT NULL | 변경한 직원 ID |
+| changed_at | DATETIME | NOT NULL | 변경 시각 |
+
+### 2.24 notification (대시보드 알림)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 알림 고유 식별자 |
-| order_id | BIGINT | FK → order.id, NOT NULL | 납기 위험 대상 수주 ID |
-| alert_type | VARCHAR(30) | NOT NULL | 납기 임박 / 납기 지연 |
+| order_id | BIGINT | FK → order.id, NOT NULL | 관련 수주 ID |
+| work_order_id | BIGINT | FK → work_order.id, NOT NULL | 관련 작업지시서 ID |
+| sender_id | BIGINT | FK → user.id, NULL | 발신자 ID |
+| recipient_id | BIGINT | FK → user.id, NOT NULL | 수신자 ID |
+| notification_type | VARCHAR(255) | NOT NULL | 납기 임박 / 납기 지연 |
 | message | VARCHAR(500) | NOT NULL | 알림 내용 |
-| send_status | VARCHAR(20) | NOT NULL | 발송 대기 / 성공 / 실패 |
-| sent_at | DATETIME | NULL | 알림 발송 일시 |
+| send_status | VARCHAR(255) | NOT NULL | 발송 상태 (`PENDING` / `SUCCESS` / `FAILED`) |
+| is_read | BOOLEAN | NOT NULL, DEFAULT FALSE | 읽음 여부 |
+| sent_at | DATETIME | NULL | 발송 시간 |
+| read_at | DATETIME | NULL | 읽은 시간 |
 | created_at | DATETIME | NOT NULL | 알림 생성 일시 |
 
-### 2.23 ai_conversation (AI 채팅방)
+### 2.25 client_noti_log (거래처 발송 이력)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
-| id | BIGINT | PK, AUTO_INCREMENT | 채팅방 고유 식별자 |
+| id | BIGINT | PK, AUTO_INCREMENT | 발송 고유 식별자 |
+| order_id | BIGINT | FK → order.id, NOT NULL | 수주 ID |
+| kind | VARCHAR(20) | NOT NULL | 발송 종류. `QUOTE`(견적서·계약금 가상계좌), `BALANCE`(잔금 가상계좌) |
+| channel | VARCHAR(10) | NOT NULL | 발송 채널. `SMS` 또는 `EMAIL` |
+| recipient | VARCHAR(100) | NOT NULL | 실제로 보낸 전화번호 또는 이메일 |
+| quotation_id | BIGINT | FK → quotes.id, NULL | 견적 ID. `kind`가 `QUOTE`일 때만 값 |
+| status | VARCHAR(20) | NOT NULL | 발송 결과. `SENT`(성공), `FAILED`(실패) |
+| sent_at | DATETIME | NOT NULL | 보낸 시각 |
+| sent_by | BIGINT | FK → user.id, NOT NULL | 보낸 직원 ID |
+| error_message | VARCHAR(255) | NULL | 실패 사유. `SENT`이면 NULL |
+
+### 2.26 ai_conversation (AI 대화방)
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| id | BIGINT | PK, AUTO_INCREMENT | 대화방 고유 식별자 |
 | user_id | BIGINT | FK → user.id, NOT NULL | 대화한 회원 ID |
-| title | VARCHAR(200) | NULL | 채팅방 제목 |
+| title | VARCHAR(255) | NULL | 대화방 제목 |
+| is_closed | BOOLEAN | NOT NULL, DEFAULT FALSE | 대화방 종료 여부 |
 | created_at | DATETIME | NOT NULL | 대화방 생성 일시 |
 | updated_at | DATETIME | NOT NULL | 마지막 대화 일시 |
+| closed_at | DATETIME | NULL | 대화방 종료 일시 |
 
-### 2.24 ai_message (AI 대화 메시지)
-
-`ai_conversation`과 `ai_message`는 1:N 관계이다.
+### 2.27 ai_message (AI 대화 메시지)
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 메시지 고유 식별자 |
 | conversation_id | BIGINT | FK → ai_conversation.id, NOT NULL | 대화방 ID |
-| role | VARCHAR(20) | NOT NULL | 메시지 발신자 구분. `AI` / `USER` |
+| sequence_no | INT | NOT NULL | 대화방 내 메시지 순서 |
+| role | VARCHAR(255) | NOT NULL | 메시지 발신자 구분. `ASSISTANT` / `USER` |
 | content | TEXT | NOT NULL | 질문 또는 AI 응답 내용 |
-| intent | VARCHAR(50) | NULL | 검색 의도 (예: `SEARCH_UNPAID` 미입금 조회) |
+| intent | VARCHAR(255) | NULL | 검색 의도 (예: `SEARCH_UNPAID` 미입금 조회) |
+| generated_sql | TEXT | NULL | AI가 생성한 SQL 쿼리문 |
 | created_at | DATETIME | NOT NULL | 메시지 생성 일시 |
