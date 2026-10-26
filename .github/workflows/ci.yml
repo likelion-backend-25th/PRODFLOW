@@ -24,4 +24,4 @@ jobs:
         run: chmod +x gradlew
 
       - name: Gradle 빌드 및 테스트 수행
-        run: ./gradlew test
+        run: ./gradlew test --no-daemon --info --stacktrace --scan
