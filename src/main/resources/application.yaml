@@ -8,11 +8,6 @@ spring:
     username: prodflow-app
     password: 'prodflow1234!'
 
-  # 데이터베이스 초기화설정
-  sql:
-    init:
-      mode: always
-
   # JPA 및 하이버네이트 설정
   jpa:
     hibernate:
@@ -24,6 +19,12 @@ spring:
         use_sql_comments: true
     # Hibernate가 스키마(ddl)를 생성한 다음 SQL 초기화 스크립트 로드 및 실행
     defer-datasource-initialization: true
+      
+  # 데이터베이스 초기화설정
+  sql:
+    init:
+      mode: always
+
 
 # Springdoc OpenAPI 및 Swagger UI 설정
 springdoc:
