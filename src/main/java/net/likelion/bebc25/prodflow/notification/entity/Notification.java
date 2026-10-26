@@ -13,6 +13,8 @@ import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.notification.enums.NotificationType;
+import net.likelion.bebc25.prodflow.notification.enums.SendStatus;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.workorder.entity.WorkOrder;
@@ -66,17 +68,6 @@ public class Notification {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
-
-    public enum NotificationType {
-        DELIVERY_IMMINENT,
-        DELIVERY_DELAYED
-    }
-
-    public enum SendStatus {
-        PENDING,
-        SUCCESS,
-        FAILED
-    }
 
     public Notification(
             CustomerOrder order,
