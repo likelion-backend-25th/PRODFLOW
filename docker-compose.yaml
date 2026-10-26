@@ -1,0 +1,30 @@
+services:
+  #  prodflow-app:
+  #    image: dltmddjs98/prodflow:latest
+  #    container_name: prodflow-app
+  #    restart: always
+  #    env_file:
+  #      - .env
+  #    expose:
+  #      - "8080"
+
+  mysql:
+    image: mysql:9.7
+    container_name: prodflow-db
+    restart: always
+    ports:
+      - "3306:3306"
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Seoul
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - mysql-data:/var/lib/mysql
+volumes:
+  mysql-data:
