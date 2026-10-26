@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.user.entity;
+package net.likelion.bebc25.prodflow.user.enums;
 
 public enum UserStatus {
 
