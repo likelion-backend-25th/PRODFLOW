@@ -11,6 +11,8 @@ import jakarta.persistence.ManyToOne;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.likelion.bebc25.prodflow.user.entity.User;
+import org.hibernate.annotations.CreationTimestamp;
+
 
 import java.time.LocalDateTime;
 
@@ -44,8 +46,16 @@ public class LineCapacityLog {
     @JoinColumn(name = "user_id", nullable = false)
     private User changedBy;
 
-    // 변경 일시
+    // 변경 일시, 수정하는것이 아닌 이력을 생성
+    @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime changedAt;
 
+    public LineCapacityLog(Line line, int beforeCapacity, int afterCapacity, String reason, User changedBy) {
+        this.line = line;
+        this.beforeCapacity = beforeCapacity;
+        this.afterCapacity = afterCapacity;
+        this.reason = reason;
+        this.changedBy = changedBy;
+    }
 }
