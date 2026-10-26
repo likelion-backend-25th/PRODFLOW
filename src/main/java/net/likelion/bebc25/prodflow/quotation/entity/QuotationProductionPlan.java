@@ -15,7 +15,7 @@ import jakarta.persistence.PreUpdate;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import net.likelion.bebc25.prodflow.domain.Line;
+import net.likelion.bebc25.prodflow.productionline.entity.Line;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationProductionPlanStatus;
 
 import java.time.LocalDate;
