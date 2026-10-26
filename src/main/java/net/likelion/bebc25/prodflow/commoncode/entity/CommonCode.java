@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.code.entity;
+package net.likelion.bebc25.prodflow.commoncode.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,12 +13,12 @@ import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import net.likelion.bebc25.prodflow.code.enums.CodeStatus;
+import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Code {
+public class CommonCode {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

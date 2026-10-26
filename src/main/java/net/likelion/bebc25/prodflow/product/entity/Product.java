@@ -13,7 +13,7 @@ import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import net.likelion.bebc25.prodflow.code.entity.Code;
+import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 
 import java.time.LocalDateTime;
@@ -34,7 +34,7 @@ public class Product {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "device_code", nullable = false)
-    private Code device;
+    private CommonCode device;
 
     @Column
     private String productDescription;
