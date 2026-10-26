@@ -5,6 +5,8 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
