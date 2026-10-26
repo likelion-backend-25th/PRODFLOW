@@ -13,8 +13,8 @@ import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.domain.WorkOrder;
-import net.likelion.bebc25.prodflow.order.entity.Order;
 import net.likelion.bebc25.prodflow.user.entity.User;
 
 import java.time.LocalDateTime;
@@ -30,7 +30,7 @@ public class Notification {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "order_id", nullable = false)
-    private Order order;
+    private CustomerOrder customerOrder;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "work_order_id", nullable = false)
@@ -79,14 +79,14 @@ public class Notification {
     }
 
     public Notification(
-            Order order,
+            CustomerOrder customerOrder,
             WorkOrder workOrder,
             User sender,
             User recipient,
             NotificationType notificationType,
             String message
     ) {
-        this.order = order;
+        this.customerOrder = customerOrder;
         this.workOrder = workOrder;
         this.sender = sender;
         this.recipient = recipient;

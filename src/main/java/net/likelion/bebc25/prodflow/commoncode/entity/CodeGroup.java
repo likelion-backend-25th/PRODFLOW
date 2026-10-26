@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.code.entity;
+package net.likelion.bebc25.prodflow.commoncode.entity;
 
 
 import jakarta.persistence.Column;
@@ -11,7 +11,7 @@ import jakarta.persistence.Id;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import net.likelion.bebc25.prodflow.code.enums.GroupCode;
+import net.likelion.bebc25.prodflow.commoncode.enums.GroupCode;
 
 @Entity
 @Getter
