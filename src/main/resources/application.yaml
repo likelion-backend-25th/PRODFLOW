@@ -8,7 +8,7 @@ spring:
   #    username:
   #    password:
 
-  # 데이터베이스 초기화 설정
+  # 데이터베이스 초기화설정
   sql:
     init:
       mode: always
