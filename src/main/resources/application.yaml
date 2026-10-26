@@ -1,7 +1,6 @@
 spring:
   application:
     name: PRODFLOW
-
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: 'jdbc:mysql://localhost:3306/prodflow_db?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true'
@@ -19,7 +18,7 @@ spring:
         use_sql_comments: true
     # Hibernate가 스키마(ddl)를 생성한 다음 SQL 초기화 스크립트 로드 및 실행
     defer-datasource-initialization: true
-      
+
   # 데이터베이스 초기화설정
   sql:
     init:
@@ -49,3 +48,7 @@ logging:
 
     # 더 세부적인 필터 체인 통과 흐름을 보려면 TRACE 지정 가능
     # org.springframework.security.web.FilterChainProxy: TRACE
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
+  refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}
