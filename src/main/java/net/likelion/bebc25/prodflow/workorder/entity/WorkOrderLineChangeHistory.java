@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.domain;
+package net.likelion.bebc25.prodflow.workorder.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,28 +14,26 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor
-public class AiMessage {
+public class WorkOrderLineChangeHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
     private Long id;
 
-    @Column(name = "conversation_id", nullable = false)
-    private Long conversationId;
+    @Column(name = "work_order_id", nullable = false)
+    private Long workOrderId;
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    @Column(nullable = true)
+    private int beforeLine;
 
     @Column(nullable = false)
-    private int sequenceNo;
+    private int afterLine;
 
     @Column(nullable = false)
-    private String role;
-
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String content;
-
-    private String intent;
-
-    @Column(columnDefinition = "TEXT")
-    private String generatedSql;
+    private String note;
 
     @CreatedDate // Entity 최초 저장될 때 생성일시를 자동으로 주입
     @Column(updatable = false, nullable = false)
