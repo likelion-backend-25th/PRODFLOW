@@ -1,5 +1,4 @@
-package net.likelion.bebc25.prodflow.domain;
-
+package net.likelion.bebc25.prodflow.workorder.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -9,35 +8,28 @@ import jakarta.persistence.Id;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor
-public class AiConversation {
+public class WorkOrderProduct {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "work_order_id", nullable = false)
+    private Long workOrderId;
 
-    @Column(nullable = true)
-    private String title;
+    @Column(name = "order_product_id", nullable = false)
+    private Long orderProductId;
 
-    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
-    private Boolean is_closed;
+    @Column(nullable = false)
+    private int quantity;
 
     @CreatedDate // Entity 최초 저장될 때 생성일시를 자동으로 주입
     @Column(updatable = false, nullable = false)
     private LocalDateTime createdAt;
-
-    @LastModifiedDate // Entity 마지막으로 저장될 때 수정일시를 자동으로 주입
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
-
-    private LocalDateTime closedAt;
 }
