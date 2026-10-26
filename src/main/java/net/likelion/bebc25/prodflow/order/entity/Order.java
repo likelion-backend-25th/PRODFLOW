@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.domain;
+package net.likelion.bebc25.prodflow.order.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

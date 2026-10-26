@@ -13,8 +13,8 @@ import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import net.likelion.bebc25.prodflow.domain.Order;
 import net.likelion.bebc25.prodflow.domain.WorkOrder;
+import net.likelion.bebc25.prodflow.order.entity.Order;
 import net.likelion.bebc25.prodflow.user.entity.User;
 
 import java.time.LocalDateTime;
