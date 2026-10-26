@@ -79,14 +79,14 @@ public class Notification {
     }
 
     public Notification(
-            Order order,
+            CustomerOrder order,
             WorkOrder workOrder,
             User sender,
             User recipient,
             NotificationType notificationType,
             String message
     ) {
-        this.order = order;
+        this.customerOrder = order;
         this.workOrder = workOrder;
         this.sender = sender;
         this.recipient = recipient;
