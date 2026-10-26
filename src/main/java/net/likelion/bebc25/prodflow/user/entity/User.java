@@ -1,12 +1,6 @@
 package net.likelion.bebc25.prodflow.user.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -99,21 +93,25 @@ public class User {
 
     // 비밀번호 변경
     public void changePassword(String encodedPassword) {
+
         this.password = encodedPassword;
     }
 
     // 마지막 로그인 시간 갱신
     public void updateLastLoginAt() {
+
         this.lastLoginAt = LocalDateTime.now();
     }
 
     // 계정 활성화
     public void activate() {
+
         this.status = UserStatus.ACTIVE;
     }
 
     // 계정 비활성화
     public void deactivate() {
+
         this.status = UserStatus.INACTIVE;
     }
 

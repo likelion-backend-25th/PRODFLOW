@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.payment.entity;
+package net.likelion.bebc25.prodflow.payment.enums;
 
 public enum VirtualAccountStatus {
 
