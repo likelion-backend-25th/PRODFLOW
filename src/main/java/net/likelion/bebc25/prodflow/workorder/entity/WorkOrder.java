@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.domain;
+package net.likelion.bebc25.prodflow.workorder.entity;
 
 
 import jakarta.persistence.Column;
