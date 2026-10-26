@@ -10,15 +10,16 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.productionline.enums.LineStatus;
+import org.springframework.data.annotation.LastModifiedDate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor
-public class Line extends BaseTimeEntity {
+public class Line {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
@@ -35,6 +36,9 @@ public class Line extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     private LineStatus status = LineStatus.AVAILABLE;
 
+    @LastModifiedDate
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
 
     // 도입일 직접 지정
     @Column(nullable = false)

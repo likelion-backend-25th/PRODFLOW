@@ -3,60 +3,86 @@ package net.likelion.bebc25.prodflow.workorder.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
+import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
+import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
+import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
+import net.likelion.bebc25.prodflow.productionline.entity.Line;
+import net.likelion.bebc25.prodflow.user.entity.User;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 
 @Entity
 @Getter
 @NoArgsConstructor
-public class WorkOrder {
+public class WorkOrder extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
     private Long id;
 
-    @Column(name = "order_id", nullable = false)
-    private Long orderId;
+    @Column(nullable = false, unique = true)
+    private String workNo;
 
-    @Column(name = "line_id", nullable = false)
-    private Long lineId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "order_product_id", nullable = false)
+    private OrderProduct orderProduct;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "line_id", nullable = false)
+    private Line line;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     // 작업지시서 하나에 담당 품목은 1개
     @Column(nullable = false)
     private int quantity;
 
-    @Column(nullable = false, unique = true)
-    private String workNo;
-
-    @Column(name = "work_order_date", nullable = false)
+    @Column(nullable = false)
+    @ColumnDefault("(CURRENT_DATE)")
     private LocalDate workOrderDate;
 
     @Column(nullable = false)
-    private LocalDate workStartDate;
+    private LocalDate plannedStartDate;
 
     @Column(nullable = false)
-    private LocalDate workEndDate;
+    private LocalDate plannedEndDate;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "common_code_id", nullable = false)
+    private CommonCode commonCode;
 
     @Column(columnDefinition = "TEXT")
-    private String workingContent;
+    private String note;
 
-    @CreatedDate // Entity 최초 저장될 때 생성일시를 자동으로 주입
-    @Column(updatable = false, nullable = false)
-    private LocalDateTime createdAt;
+    public WorkOrder(String workNo,
+                     OrderProduct orderProduct,
+                     Line line,
+                     User user,
+                     int quantity,
+                     LocalDate plannedStartDate,
+                     LocalDate plannedEndDate) {
+        this.workNo = workNo;
+        this.orderProduct = orderProduct;
+        this.line = line;
+        this.user = user;
+        this.quantity = quantity;
+        this.plannedStartDate = plannedStartDate;
+        this.plannedEndDate = plannedEndDate;
+    }
 
-    @LastModifiedDate // Entity 마지막으로 저장될 때 수정일시를 자동으로 주입
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    public void changeStatus(CommonCode commonCode) {
+        this.commonCode = commonCode;
+    }
 }
