@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
 
 import java.time.LocalDateTime;
 

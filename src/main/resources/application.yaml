@@ -2,11 +2,11 @@ spring:
   application:
     name: PRODFLOW
 
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: 'jdbc:mysql://localhost:3306/prodflow_db?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true'
-    username: prodflow-app
-    password: 'prodflow1234!'
+  #  datasource:
+  #    driver-class-name: com.mysql.cj.jdbc.Driver
+  #    url: 'jdbc:mysql://localhost:3306/prodflow_db?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true'
+  #    username:
+  #    password:
 
   # 데이터베이스 초기화설정
   sql:
