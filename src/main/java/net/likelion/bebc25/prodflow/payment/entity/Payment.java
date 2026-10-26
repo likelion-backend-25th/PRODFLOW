@@ -1,10 +1,22 @@
 package net.likelion.bebc25.prodflow.payment.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
 import org.hibernate.annotations.CreationTimestamp;
@@ -29,11 +41,11 @@ public class Payment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(
-//            name = "order_id",
-//            nullable = false)
-//    private Order order;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "order_id",
+            nullable = false)
+    private CustomerOrder order;
 
     @Column(nullable = false)
     private String portonePaymentId;
@@ -62,12 +74,12 @@ public class Payment {
 
     @Builder
     private Payment(
-//            Order order,
+            CustomerOrder order,
             String portonePaymentId,
             PaymentType paymentType,
             BigDecimal amount
     ) {
-//        this.order = order;
+        this.order = order;
         this.portonePaymentId = portonePaymentId;
         this.paymentType = paymentType;
         this.amount = amount;
