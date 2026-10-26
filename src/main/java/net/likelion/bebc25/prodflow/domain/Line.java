@@ -3,8 +3,6 @@ package net.likelion.bebc25.prodflow.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -31,7 +29,6 @@ public class Line {
     private int productionCapacity;
 
     @Column(nullable = false, columnDefinition = "AVAILABLE")
-    @Enumerated(EnumType.STRING)
     private String status;
 
     @LastModifiedDate // Entity 마지막으로 저장될 때 수정일시를 자동으로 주입

@@ -2,8 +2,6 @@ package net.likelion.bebc25.prodflow.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -29,7 +27,6 @@ public class AiMessage {
     private int sequenceNo;
 
     @Column(nullable = false)
-    @Enumerated(EnumType.STRING) // enum 생성 후 타입 변경할것
     private String role;
 
     @Column(nullable = false, columnDefinition = "TEXT")
