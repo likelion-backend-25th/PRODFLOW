@@ -1,0 +1,26 @@
+info:
+  name: PRODUCT-01 등록 copy
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: http://localhost:8080/api/v1/products
+  body:
+    type: json
+    data: |-
+      {
+        "modelCode": "MDL-001",
+        "productName": "테스트 품목",
+        "deviceCode": 1,
+        "productDescription": "설명",
+        "currentPrice": 10000
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

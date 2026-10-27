@@ -13,15 +13,14 @@ import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Product {
+public class Product extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -46,10 +45,21 @@ public class Product {
     @Column(nullable = false)
     private ProductStatus status = ProductStatus.AVAILABLE;
 
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    public static Product create(
+            String modelCode,
+            String productName,
+            CommonCode device,
+            String productDescription,
+            Long currentPrice
+    ) {
+        Product product = new Product();
+        product.modelCode = modelCode;
+        product.productName = productName;
+        product.device = device;
+        product.productDescription = productDescription;
+        product.currentPrice = currentPrice;
+        product.status = ProductStatus.AVAILABLE;
+        return product;
+    }
 
-
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
 }
