@@ -68,8 +68,7 @@ VALUES (1, 1, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 -- ---------------------------------------------------------------------------
 INSERT INTO code_group (id, group_code, group_name)
 VALUES (1, 'DEVICE', '기종'),
-       (2, 'ORDER_STATUS', '수주 진행 상태'),
-       (3, 'WORK_STATUS', '작업 진행 상태');
+       (2, 'ORDER_STATUS', '수주 진행 상태');
 
 INSERT INTO common_code (id, code_group_id, code, name, sort_order, status)
 VALUES (1, 1, 'IP16', 'iPhone 16', 1, 'ACTIVE'),
@@ -87,12 +86,12 @@ VALUES (1, 1, 'IP16', 'iPhone 16', 1, 'ACTIVE'),
        (13, 2, 'ON_HOLD', '생산보류', 8, 'ACTIVE'),
        (14, 2, 'PAUSE', '중지', 9, 'ACTIVE'),
        (15, 2, 'CANCELLED', '취소', 1, 'ACTIVE'),
-       (16, 3, 'PREPARE', '준비', 2, 'ACTIVE'),
-       (17, 3, 'PRODUCE', '생산', 3, 'ACTIVE'),
-       (18, 3, 'PACK', '포장', 4, 'ACTIVE'),
-       (19, 3, 'PACK_DONE', '포장완료', 5, 'ACTIVE'),
-       (20, 3, 'SUSPEND', '일시정지', 6, 'ACTIVE'),
-       (21, 3, 'HALT', '생산중지', 7, 'ACTIVE');
+       (16, 2, 'PREPARE', '준비', 2, 'ACTIVE'),
+       (17, 2, 'PRODUCE', '생산', 3, 'ACTIVE'),
+       (18, 2, 'PACK', '포장', 4, 'ACTIVE'),
+       (19, 2, 'PACK_DONE', '포장완료', 5, 'ACTIVE'),
+       (20, 2, 'SUSPEND', '일시정지', 6, 'ACTIVE'),
+       (21, 2, 'HALT', '생산중지', 7, 'ACTIVE');
 ;
 
 
