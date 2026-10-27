@@ -3,9 +3,9 @@ spring:
     name: PRODFLOW
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: 'jdbc:mysql://localhost:3306/prodflow_db?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true'
-    username: prodflow-app
-    password: 'prodflow1234!'
+    url: jdbc:mysql://${MYSQL_DB_HOST}:${MYSQL_DB_PORT}/${MYSQL_DB}?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASSWORD}
 
   # JPA 및 하이버네이트 설정
   jpa:
