@@ -38,8 +38,8 @@ jobs:
       - name: Gradle 빌드 및 테스트 수행
         run: ./gradlew test --no-daemon --info --stacktrace --scan
         env:
-          MYSQL_DB_HOST: localhost
-          MYSQL_DB_PORT: 3306
+          MYSQL_DB_HOST: ${{ secrets.MYSQL_DB_HOST }}
+          MYSQL_DB_PORT: ${{ secrets.MYSQL_DB_PORT }}
           MYSQL_DB: ${{ secrets.MYSQL_DATABASE }}
           MYSQL_USER: ${{ secrets.MYSQL_USER }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
