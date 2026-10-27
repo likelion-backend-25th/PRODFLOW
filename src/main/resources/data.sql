@@ -80,12 +80,20 @@ VALUES (1, 1, 'IP16', 'iPhone 16', 1, 'ACTIVE'),
        (7, 2, 'PRODUCTION_READY', '생산대기', 2, 'ACTIVE'),
        (8, 2, 'IN_PRODUCTION', '생산중', 3, 'ACTIVE'),
        (9, 2, 'PACKING', '포장중', 4, 'ACTIVE'),
-       (10, 2, 'PACKED', '포장완료', 5, 'ACTIVE'),
-       (11, 2, 'READY_TO_SHIP', '출고대기', 6, 'ACTIVE'),
-       (12, 2, 'SHIPPING', '배송중', 7, 'ACTIVE'),
-       (13, 2, 'COMPLETED', '완료', 8, 'ACTIVE'),
-       (14, 2, 'ON_HOLD', '생산보류', 9, 'ACTIVE'),
-       (15, 2, 'CANCELLED', '취소', 10, 'ACTIVE');
+       (10, 2, 'READY_TO_SHIP', '출고대기', 5, 'ACTIVE'),
+       (11, 2, 'SHIPPING', '배송중', 6, 'ACTIVE'),
+       (12, 2, 'COMPLETED', '완료', 7, 'ACTIVE'),
+       (13, 2, 'ON_HOLD', '생산보류', 8, 'ACTIVE'),
+       (14, 2, 'PAUSE', '중지', 9, 'ACTIVE'),
+       (15, 2, 'CANCELLED', '취소', 1, 'ACTIVE'),
+       (16, 2, 'PREPARE', '준비', 2, 'ACTIVE'),
+       (17, 2, 'PRODUCE', '생산', 3, 'ACTIVE'),
+       (18, 2, 'PACK', '포장', 4, 'ACTIVE'),
+       (19, 2, 'PACK_DONE', '포장완료', 5, 'ACTIVE'),
+       (20, 2, 'SUSPEND', '일시정지', 6, 'ACTIVE'),
+       (21, 2, 'HALT', '생산중지', 7, 'ACTIVE');
+;
+
 
 -- ---------------------------------------------------------------------------
 -- 거래처. 케이스 발주 브랜드. user_id 는 담당 수주 관리자
@@ -495,21 +503,25 @@ VALUES (1, 5, '04', '530012345671', 1, 'Y', 0, '2026-10-27 18:00', NULL, NULL),
        (3, 7, '04', '530076543210', 6, 'Y', 1, NULL, '2026-09-24 09:00:00', '2026-09-25 16:40:00'),
        (4, 8, '08', '230011122233', 6, 'Y', 1, NULL, '2026-10-01 11:00:00', '2026-10-02 15:10:00');
 
--- 알림은 수주와 작업지시가 모두 있어야 한다. 읽음은 발송 성공 이후에만
-INSERT INTO notification (id, customer_order_id, work_order_id, sender_id, recipient_id, notification_type,
-                          message, send_status, is_read, sent_at, read_at, created_at)
-VALUES (1, 3, 8, 1, 3, 'DELIVERY_DELAYED',
-        'PF-2026-003 납기 2026-10-24가 지났으나 포장 중입니다.',
-        'SUCCESS', 1, '2026-10-25 09:00:00', '2026-10-25 09:40:00', '2026-10-25 09:00:00'),
-       (2, 5, 10, 6, 2, 'DELIVERY_IMMINENT',
-        'PF-2026-005 납기 2026-10-27, 현재 출고대기입니다.',
-        'SUCCESS', 0, '2026-10-26 08:00:00', NULL, '2026-10-26 08:00:00'),
-       (3, 12, 14, 1, 3, 'DELIVERY_DELAYED',
-        'PF-2026-012 D라인 고장으로 완료 예정이 2026-10-30으로 밀려 희망 납기 2026-10-28을 초과합니다.',
-        'FAILED', 0, NULL, NULL, '2026-10-24 11:30:00'),
-       (4, 4, 9, 4, 3, 'DELIVERY_IMMINENT',
-        'PF-2026-004 포장 완료. 납기 2026-10-31이 임박했습니다.',
-        'PENDING', 0, NULL, NULL, '2026-10-26 08:30:00');
+
+-- 생산라인 상태 알림 데이터
+-- 생산라인 정보는 필수이며, 납기 알림은 별도 테이블에서 관리한다.
+INSERT INTO line_notification (id, line_id, notification_type, message, created_at)
+VALUES (1, 1, 'LINE_FAILURE', 'A라인 설비 이상으로 생산라인 가동이 중단되었습니다.', '2026-10-24 09:30:00'),
+       (2, 2, 'LINE_INSPECTION', 'B라인 정기 점검이 시작되었습니다.', '2026-10-24 10:00:00'),
+       (3, 4, 'LINE_FAILURE', 'D라인 상태가 가동 중에서 고장 상태로 변경되었습니다.', '2026-10-24 11:00:00'),
+       (4, 1, 'LINE_INSPECTION_COMPLETE', 'A라인 설비 점검이 완료되어 생산을 재개할 수 있습니다.', '2026-10-24 13:00:00');
+
+
+-- 납기 알림 데이터
+-- 수주 정보는 필수이며, 생산라인 상태 알림은 별도 테이블에서 관리한다.
+INSERT INTO order_notification (id, customer_order_id, notification_type, message, created_at)
+VALUES (3, 3, 'DELIVERY_DELAYED', 'PF-2026-003 납기 2026-10-24가 지났으나 포장 중입니다.', '2026-10-25 09:00:00'),
+       (5, 5, 'DELIVERY_IMMINENT', 'PF-2026-005 납기 2026-10-27, 현재 출고대기입니다.', '2026-10-26 08:00:00'),
+       (12, 12, 'DELIVERY_DELAYED', 'PF-2026-012 D라인 고장으로 완료 예정이 2026-10-30으로 밀려 희망 납기 2026-10-28을 초과합니다.',
+        '2026-10-24 11:30:00'),
+       (4, 4, 'DELIVERY_IMMINENT', 'PF-2026-004 포장 완료. 납기 2026-10-31이 임박했습니다.', '2026-10-26 08:30:00');
+
 
 -- ---------------------------------------------------------------------------
 -- AI 조회 대화. 종료된 방은 is_closed = 1 이고 closed_at 이 있다
