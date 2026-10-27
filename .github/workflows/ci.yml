@@ -37,3 +37,9 @@ jobs:
 
       - name: Gradle 빌드 및 테스트 수행
         run: ./gradlew test --no-daemon --info --stacktrace --scan
+        env:
+          DB_HOST: localhost
+          DB_PORT: 3306
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SPRING_DATASOURCE_USERNAME: ${{ secrets.MYSQL_USER }}
+          SPRING_DATASOURCE_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
