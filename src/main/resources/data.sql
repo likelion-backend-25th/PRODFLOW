@@ -68,7 +68,8 @@ VALUES (1, 1, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 -- ---------------------------------------------------------------------------
 INSERT INTO code_group (id, group_code, group_name)
 VALUES (1, 'DEVICE', '기종'),
-       (2, 'ORDER_STATUS', '수주 진행 상태');
+       (2, 'ORDER_STATUS', '수주 진행 상태'),
+       (3, 'WORK_STATUS', '작업 진행 상태');
 
 INSERT INTO common_code (id, code_group_id, code, name, sort_order, status)
 VALUES (1, 1, 'IP16', 'iPhone 16', 1, 'ACTIVE'),
@@ -80,12 +81,20 @@ VALUES (1, 1, 'IP16', 'iPhone 16', 1, 'ACTIVE'),
        (7, 2, 'PRODUCTION_READY', '생산대기', 2, 'ACTIVE'),
        (8, 2, 'IN_PRODUCTION', '생산중', 3, 'ACTIVE'),
        (9, 2, 'PACKING', '포장중', 4, 'ACTIVE'),
-       (10, 2, 'PACKED', '포장완료', 5, 'ACTIVE'),
-       (11, 2, 'READY_TO_SHIP', '출고대기', 6, 'ACTIVE'),
-       (12, 2, 'SHIPPING', '배송중', 7, 'ACTIVE'),
-       (13, 2, 'COMPLETED', '완료', 8, 'ACTIVE'),
-       (14, 2, 'ON_HOLD', '생산보류', 9, 'ACTIVE'),
-       (15, 2, 'CANCELLED', '취소', 10, 'ACTIVE');
+       (10, 2, 'READY_TO_SHIP', '출고대기', 5, 'ACTIVE'),
+       (11, 2, 'SHIPPING', '배송중', 6, 'ACTIVE'),
+       (12, 2, 'COMPLETED', '완료', 7, 'ACTIVE'),
+       (13, 2, 'ON_HOLD', '생산보류', 8, 'ACTIVE'),
+       (14, 2, 'PAUSE', '중지', 9, 'ACTIVE'),
+       (15, 2, 'CANCELLED', '취소', 1, 'ACTIVE'),
+       (16, 3, 'PREPARE', '준비', 2, 'ACTIVE'),
+       (17, 3, 'PRODUCE', '생산', 3, 'ACTIVE'),
+       (18, 3, 'PACK', '포장', 4, 'ACTIVE'),
+       (19, 3, 'PACK_DONE', '포장완료', 5, 'ACTIVE'),
+       (20, 3, 'SUSPEND', '일시정지', 6, 'ACTIVE'),
+       (21, 3, 'HALT', '생산중지', 7, 'ACTIVE');
+;
+
 
 -- ---------------------------------------------------------------------------
 -- 거래처. 케이스 발주 브랜드. user_id 는 담당 수주 관리자
