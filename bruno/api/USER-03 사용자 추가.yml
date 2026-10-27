@@ -1,0 +1,32 @@
+info:
+  name: USER-03 사용자 추가
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: http://localhost:8080/api/v1/users
+  body:
+    type: json
+    data: |-
+      {
+        "password": "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+        "name": "김민준",
+        "email": "minjun.lhm@prodflow.local",
+        "phone": "010-2000-0002",
+        "role": "ORDER_MANAGER",
+        "status": "ACTIVE",
+        "lastLoginAt": "2026-10-27T10:30:00",
+        "createdAt": "2026-03-15T14:20:00",
+        "updatedAt": "2026-10-27T10:30:00",
+        "deletedAt": null,
+        "mustChangePassword": false
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
