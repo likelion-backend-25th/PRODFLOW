@@ -40,7 +40,7 @@ jobs:
         env:
           MYSQL_DB_HOST: ${{ secrets.MYSQL_DB_HOST }}
           MYSQL_DB_PORT: ${{ secrets.MYSQL_DB_PORT }}
-          MYSQL_DB: ${{ secrets.MYSQL_DATABASE }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
           MYSQL_USER: ${{ secrets.MYSQL_USER }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
 
