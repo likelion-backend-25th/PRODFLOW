@@ -60,6 +60,8 @@ public class User {
     @Column
     private LocalDateTime deletedAt;
 
+    @Column(nullable = false)
+    private boolean mustChangePassword = true;
 
     @Builder
     private User(
@@ -91,21 +93,25 @@ public class User {
         this.role = role;
     }
 
-    // 비밀번호 변경
-    public void changePassword(String encodedPassword) {
-
+    // 임시 비밀번호 발급
+    public void updatePassword(String encodedPassword) {
         this.password = encodedPassword;
+        this.mustChangePassword = true;
+    }
+
+    // 비밀번호 변경
+    public void changePassword(String password) {
+        this.password = password;
+        this.mustChangePassword = false;
     }
 
     // 마지막 로그인 시간 갱신
     public void updateLastLoginAt() {
-
         this.lastLoginAt = LocalDateTime.now();
     }
 
     // 계정 활성화
     public void activate() {
-
         this.status = UserStatus.ACTIVE;
     }
 
@@ -121,3 +127,4 @@ public class User {
         this.deletedAt = LocalDateTime.now();
     }
 }
+
