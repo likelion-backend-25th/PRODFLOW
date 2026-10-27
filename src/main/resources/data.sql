@@ -505,20 +505,13 @@ VALUES (1, 5, '04', '530012345671', 1, 'Y', 0, '2026-10-27 18:00', NULL, NULL),
        (4, 8, '08', '230011122233', 6, 'Y', 1, NULL, '2026-10-01 11:00:00', '2026-10-02 15:10:00');
 
 -- 알림은 수주와 작업지시가 모두 있어야 한다. 읽음은 발송 성공 이후에만
-INSERT INTO notification (id, customer_order_id, work_order_id, sender_id, recipient_id, notification_type,
-                          message, send_status, is_read, sent_at, read_at, created_at)
-VALUES (1, 3, 8, 1, 3, 'DELIVERY_DELAYED',
-        'PF-2026-003 납기 2026-10-24가 지났으나 포장 중입니다.',
-        'SUCCESS', 1, '2026-10-25 09:00:00', '2026-10-25 09:40:00', '2026-10-25 09:00:00'),
-       (2, 5, 10, 6, 2, 'DELIVERY_IMMINENT',
-        'PF-2026-005 납기 2026-10-27, 현재 출고대기입니다.',
-        'SUCCESS', 0, '2026-10-26 08:00:00', NULL, '2026-10-26 08:00:00'),
-       (3, 12, 14, 1, 3, 'DELIVERY_DELAYED',
-        'PF-2026-012 D라인 고장으로 완료 예정이 2026-10-30으로 밀려 희망 납기 2026-10-28을 초과합니다.',
-        'FAILED', 0, NULL, NULL, '2026-10-24 11:30:00'),
-       (4, 4, 9, 4, 3, 'DELIVERY_IMMINENT',
-        'PF-2026-004 포장 완료. 납기 2026-10-31이 임박했습니다.',
-        'PENDING', 0, NULL, NULL, '2026-10-26 08:30:00');
+INSERT INTO notification (id, customer_order_id, line_id, notification_type, message, created_at)
+VALUES (3, 3, NULL, 'DELIVERY_DELAYED', 'PF-2026-003 납기 2026-10-24가 지났으나 포장 중입니다.', '2026-10-25 09:00:00'),
+       (5, 5, NULL, 'DELIVERY_IMMINENT', 'PF-2026-005 납기 2026-10-27, 현재 출고대기입니다.', '2026-10-26 08:00:00'),
+       (12, 12, NULL, 'DELIVERY_DELAYED', 'PF-2026-012 D라인 고장으로 완료 예정이 2026-10-30으로 밀려 희망 납기 2026-10-28을 초과합니다.',
+        '2026-10-24 11:30:00'),
+       (4, 4, NULL, 'DELIVERY_IMMINENT', 'PF-2026-004 포장 완료. 납기 2026-10-31이 임박했습니다.', '2026-10-26 08:30:00');
+
 
 -- ---------------------------------------------------------------------------
 -- AI 조회 대화. 종료된 방은 is_closed = 1 이고 closed_at 이 있다
