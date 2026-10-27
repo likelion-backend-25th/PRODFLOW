@@ -18,34 +18,35 @@
 -- ---------------------------------------------------------------------------
 -- 사용자
 -- ---------------------------------------------------------------------------
-INSERT INTO `user` (id, password, name, email, phone, role, status, last_login_at, created_at, updated_at, deleted_at)
+INSERT INTO `user` (id, password, name, email, phone, role, status, last_login_at, created_at, updated_at, deleted_at,
+                    must_change_password)
 VALUES (1, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '서도윤', 'admin@prodflow.local',
         '010-1000-0001', 'SUPER_ADMIN', 'ACTIVE', '2026-10-26 08:02:00', '2026-01-06 09:00:00', '2026-10-26 08:02:00',
-        NULL),
+        NULL, FALSE),
        (2, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '이서준', 'order.lee@prodflow.local',
         '010-2000-0002', 'ORDER_MANAGER', 'ACTIVE', '2026-10-26 08:05:00', '2026-01-06 09:00:00', '2026-10-26 08:05:00',
-        NULL),
+        NULL, TRUE),
        (3, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '박하은', 'order.park@prodflow.local',
         '010-3000-0003', 'ORDER_MANAGER', 'ACTIVE', '2026-10-26 08:06:00', '2026-01-06 09:00:00', '2026-10-26 08:06:00',
-        NULL),
+        NULL, FALSE),
        (4, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '김태호', 'prod.kim@prodflow.local',
         '010-4000-0004', 'PRODUCTION_MANAGER', 'ACTIVE', '2026-10-26 07:50:00', '2026-01-06 09:00:00',
-        '2026-10-26 07:50:00', NULL),
+        '2026-10-26 07:50:00', NULL, TRUE),
        (5, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '이재원', 'prod.lee@prodflow.local',
         '010-5000-0005', 'PRODUCTION_MANAGER', 'ACTIVE', '2026-10-26 07:51:00', '2026-01-06 09:00:00',
-        '2026-10-26 07:51:00', NULL),
+        '2026-10-26 07:51:00', NULL, TRUE),
        (6, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '박시우', 'prod.park@prodflow.local',
         '010-6000-0006', 'PRODUCTION_MANAGER', 'ACTIVE', '2026-10-26 07:52:00', '2026-01-06 09:00:00',
-        '2026-10-26 07:52:00', NULL),
+        '2026-10-26 07:52:00', NULL, FALSE),
        (7, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '최유나', 'inquiry.choi@prodflow.local',
         '010-7000-0007', 'INQUIRY_MANAGER', 'ACTIVE', '2026-10-26 10:00:00', '2026-01-06 09:00:00',
-        '2026-10-26 10:00:00', NULL),
+        '2026-10-26 10:00:00', NULL, FALSE),
        (8, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '정민석', 'prod.jung@prodflow.local',
         '010-8000-0008', 'PRODUCTION_MANAGER', 'INACTIVE', '2026-09-01 17:40:00', '2026-01-06 09:00:00',
-        '2026-09-02 18:00:00', NULL),
+        '2026-09-02 18:00:00', NULL, FALSE),
        (9, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '한예진', 'former.han@prodflow.local',
         '010-9000-0009', 'ORDER_MANAGER', 'DELETED', '2026-07-28 15:00:00', '2026-01-06 09:00:00',
-        '2026-08-01 10:00:00', '2026-08-01 10:00:00');
+        '2026-08-01 10:00:00', '2026-08-01 10:00:00', FALSE);
 
 INSERT INTO refresh_token (id, user_id, token_hash, expires_at, created_at)
 VALUES (1, 1, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '2026-11-25 08:10:00',
