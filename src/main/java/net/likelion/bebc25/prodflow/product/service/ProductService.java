@@ -75,4 +75,18 @@ public class ProductService {
         // 2) Response 로 변환해서 return
         return Response.from(product);
     }
+
+
+    public List<Response> productSearch(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return getList();
+        }
+
+        List<Product> products = productRepository.search(keyword);
+        List<Response> responses = new ArrayList<>();
+        for (Product product : products) {
+            responses.add(Response.from(product));
+        }
+        return responses;
+    }
 }
