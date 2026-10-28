@@ -7,6 +7,7 @@ import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto.Response;
 import net.likelion.bebc25.prodflow.product.entity.Product;
+import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.product.repository.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,13 +54,20 @@ public class ProductService {
     }
 
     //목록 조회
-    public List<Response> getList() {
-        List<Product> products = productRepository.findAll();
+    public List<Response> getList(ProductStatus status) {
+        List<Product> products;
 
+        if (status == null) {
+            products = productRepository.findAll();
+        } else {
+            products = productRepository.findByStatus(status);
+        }
         List<Response> responses = new ArrayList<>();
         for (Product product : products) {
             responses.add(Response.from(product));
         }
+
+
         return responses;
     }
 
@@ -77,12 +85,12 @@ public class ProductService {
     }
 
 
-    public List<Response> productSearch(String keyword) {
+    public List<Response> productSearch(String keyword, ProductStatus status) {
         if (keyword == null || keyword.isBlank()) {
-            return getList();
+            return getList(status);
         }
 
-        List<Product> products = productRepository.search(keyword);
+        List<Product> products = productRepository.search(keyword, status);
         List<Response> responses = new ArrayList<>();
         for (Product product : products) {
             responses.add(Response.from(product));
