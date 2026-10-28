@@ -1,6 +1,7 @@
 package net.likelion.bebc25.prodflow.product.repository;
 
 import net.likelion.bebc25.prodflow.product.entity.Product;
+import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,15 +12,25 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // 중복 확인메서드.
     boolean existsByModelCode(String modelCode);
 
+    List<Product> findByStatus(ProductStatus status);
+
+
     @Query("""
             SELECT p FROM Product p
             JOIN FETCH p.device d
-            WHERE :keyword IS NULL
-               OR p.modelCode LIKE CONCAT('%', :keyword, '%')
-               OR p.productName LIKE CONCAT('%', :keyword, '%')
-               OR d.name LIKE CONCAT('%', :keyword, '%')
-               OR p.productDescription LIKE CONCAT('%', :keyword, '%')
+            WHERE (:status IS NULL OR p.status = :status)
+              AND (
+                    :keyword IS NULL
+                 OR p.modelCode LIKE CONCAT('%', :keyword, '%')
+                 OR p.productName LIKE CONCAT('%', :keyword, '%')
+                 OR d.name LIKE CONCAT('%', :keyword, '%')
+                 OR p.productDescription LIKE CONCAT('%', :keyword, '%')
+              )
             """)
-    List<Product> search(@Param("keyword") String keyword);
+    List<Product> search(
+            @Param("keyword") String keyword,
+            @Param("status") ProductStatus status
+    );
+
 }
 

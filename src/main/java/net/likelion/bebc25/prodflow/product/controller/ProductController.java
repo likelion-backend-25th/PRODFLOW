@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.product.controller;
 
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto;
+import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.product.service.ProductService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,8 +34,10 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProductDto.Response>> getList() {
-        List<ProductDto.Response> response = productService.getList();
+    public ResponseEntity<List<ProductDto.Response>> getList(
+            @RequestParam(required = false) ProductStatus status
+    ) {
+        List<ProductDto.Response> response = productService.getList(status);
         return ResponseEntity.ok(response);
     }
 
@@ -46,9 +49,10 @@ public class ProductController {
 
     @GetMapping("/search")
     public ResponseEntity<List<ProductDto.Response>> search(
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) ProductStatus status
     ) {
-        List<ProductDto.Response> response = productService.productSearch(keyword);
+        List<ProductDto.Response> response = productService.productSearch(keyword, status);
         return ResponseEntity.ok(response);
     }
 
