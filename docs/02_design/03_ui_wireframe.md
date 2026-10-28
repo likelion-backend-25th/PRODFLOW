@@ -176,7 +176,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 3.1 대시보드 : 생산 일정 상세
 
-<img src="../images/img_03_01.png" width="500" alt="대시보드 : 생산 일정 상세">
+<img src="../images/img_03_1.png" width="500" alt="대시보드 : 생산 일정 상세">
 
 - 출력 데이터 항목 (Output Data):
     - 헤더 영역
@@ -210,7 +210,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ## 5. 계정 관리 화면
 
-<img src="../images/img_05.png" width="500" alt="계정 관리 화면">
+<img src="../images/img_5.png" width="500" alt="계정 관리 화면">
 
 - 출력 데이터 항목 (Output Data)
     - 계정 현황 요약
@@ -259,7 +259,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 5.1 직원 계정 등록 모달
 
-<img src="../images/img_05_01.png" width="500" alt="직원 계정 등록 모달">
+<img src="../images/img_5_1.png" width="500" alt="직원 계정 등록 모달">
 
 - 입력 데이터 및 검증 규칙 (Input Data & Validation)
     - 이름
@@ -292,7 +292,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 5.2 직원 계정 수정 모달
 
-<img src="../images/img_05_02.png" width="500" alt="직원 계정 수정 모달">
+<img src="../images/img_5_2.png" width="500" alt="직원 계정 수정 모달">
 
 - 출력 및 입력 데이터 항목
     - 이름
@@ -331,7 +331,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 6.1 거래처 목록 화면 (`/clients`)
 
-<img src="../images/img_06_01.png" width="500" alt="거래처 목록 화면">
+<img src="../images/img_6_1.png" width="500" alt="거래처 목록 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 전체 거래처 수, 이번 달 거래처 계약 수, 이번 달 신규 거래처 수
@@ -353,7 +353,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 6.2 거래처 상세 화면 (`/clients/{id}`)
 
-<img src="../images/img_06_02.png" width="500" alt="거래처 상세 화면">
+<img src="../images/img_6_2.png" width="500" alt="거래처 상세 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 누적 수주 세션: 누적 수주, 생산중, 대기, 완료 수
@@ -370,7 +370,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 6.3 거래처 등록 페이지 (`/clients/new`)
 
-<img src="../images/img_06_03.png" width="500" alt="거래처 등록 페이지">
+<img src="../images/img_6_3.png" width="500" alt="거래처 등록 페이지">
 
 - 입력 데이터 및 검증 규칙 (Input Data & Validation):
     - 회사명, 대표자명, 연락처, 이메일: 필수 입력 영역
@@ -385,7 +385,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 7.1 생산품목 목록 화면 (`/products` )
 
-<img src="../images/img_07_01.png" width="500" alt="생산품목 목록 화면">
+<img src="../images/img_7_1.png" width="500" alt="생산품목 목록 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 검색 영역: 품목명, 설명 검색창
@@ -397,7 +397,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 7.2 생산품목 등록 화면 (`/products/new` )
 
-<img src="../images/img_07_02.png" width="500" alt="생산품목 등록 화면">
+<img src="../images/img_7_2.png" width="500" alt="생산품목 등록 화면">
 
 <img src="../images/img_07_02_2.png" width="500" alt="생산품목 등록 화면 2">
 
@@ -423,7 +423,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 7.3 생산품목 상세 화면 (`/products/{productId}` )
 
-<img src="../images/img_07_03.png" width="500" alt="생산품목 상세 화면">
+<img src="../images/img_7_3.png" width="500" alt="생산품목 상세 화면">
 
 품목의 기준 정보와 연결된 생산·수주 이력을 확인하는 화면이다.
 
@@ -447,7 +447,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 8.1 견적서 목록 화면(`/quotations`)
 
-<img src="../images/img_08_01.png" width="500" alt="견적서 목록 화면">
+<img src="../images/img_8_1.png" width="500" alt="견적서 목록 화면">
 
 견적의 가격, 납기, 상태, 수주 연결 여부를 찾는 화면이다.
 
@@ -468,7 +468,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 8.2 견적서 등록 화면(`/quotations/new`)
 
-<img src="../images/img_08_02.png" width="500" alt="견적서 등록 화면">
+<img src="../images/img_8_2.png" width="500" alt="견적서 등록 화면">
 
 거래처, 품목, 희망 납기, 유효기간을 입력해 견적을 발송하는 화면이다. 배송지는 입력하지 않는다.
 
@@ -494,7 +494,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 8.3 견적서 상세 화면(`/quotations/{quotationId}`)
 
-<img src="../images/img_08_03.png" width="500" alt="견적서 상세 화면">
+<img src="../images/img_8_3.png" width="500" alt="견적서 상세 화면">
 
 발송한 견적의 거래처, 품목, 금액, 납기를 보고 승인, 거절, 취소하거나 수주 등록으로 이동하는 화면이다.
 
@@ -518,7 +518,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 9.1 수주 목록 화면(`/orders`)
 
-<img src="../images/img_09_01.png" width="500" alt="수주 목록 화면">
+<img src="../images/img_9_1.png" width="500" alt="수주 목록 화면">
 
 진행 중인 수주와 완료된 생산 기록을 한 목록에서 찾는 화면이다.
 
@@ -541,7 +541,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 9.2 수주 등록 화면(`/orders/new`)
 
-<img src="../images/img_09_02.png" width="500" alt="수주 등록 화면">
+<img src="../images/img_9_2.png" width="500" alt="수주 등록 화면">
 
 승인된 견적의 단가는 유지하고, 수량·납기·배송지·계약금 입금 마감을 확인한 뒤 수주를 만드는 화면이다.
 
@@ -572,7 +572,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 9.3 수주 상세 화면(`/orders/{customerOrderId}`)
 
-<img src="../images/img_09_03.png" width="500" alt="수주 상세 화면">
+<img src="../images/img_9_3.png" width="500" alt="수주 상세 화면">
 
 수주의 거래처, 품목, 납기, 배송, 계약금과 잔금, 상태 변경 이력을 보고 다음 작업을 처리하는 화면이다.
 
@@ -602,7 +602,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ## 10. 입금 관리 화면 (`/payments`)
 
-<img src="../images/img_10.png" width="500" alt="입금 관리 화면">
+<img src="../images/img_10_1.png" width="500" alt="입금 관리 화면">
 
 - 출력 데이터 항목 (Output Data)
   -
@@ -673,7 +673,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 11.1 작업지시서 관리 화면(`/work-orders`)
 
-<img src="../images/img_11_01.png" width="500" alt="작업지시서 관리 화면">
+<img src="../images/img_11_1.png" width="500" alt="작업지시서 관리 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 작업지시서 목록: 작업 지시 번호, 수주번호, 거래처명, 품목, 수량, 생산 라인, 담당자, 지시일, 완료 예정일, 작업 상태
@@ -692,7 +692,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 12.1 생산라인 관리 화면(`/lines`)
 
-<img src="../images/img_12_01.png" width="500" alt="생산라인 관리 화면">
+<img src="../images/img_12_11.png" width="500" alt="생산라인 관리 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 전체 라인 현황 카드: 라인명, 상태 뱃지(가동 가능/가동 중/점검/고장), 일일 생산 가능 수량, 현재 작업 중인 수주
@@ -707,7 +707,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 12.2 생산 라인 등록 화면(`/lines/new)`
 
-<img src="../images/img_12_02.png" width="500" alt="생산 라인 등록 화면">
+<img src="../images/img_12_2.png" width="500" alt="생산 라인 등록 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 라인 이름: 빈 값, 텍스트 입력
@@ -721,7 +721,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 12.3 생산 라인 수정 화면(`/lines/edit)`
 
-<img src="../images/img_12_03.png" width="500" alt="생산 라인 수정 화면">
+<img src="../images/img_12_3.png" width="500" alt="생산 라인 수정 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 라인 이름: 현재 이름, 텍스트 입력
@@ -737,7 +737,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 12.4. 생산 라인 상세 화면 (`/lines/{id}`)
 
-<img src="../images/img_12_04.png" width="500" alt="생산 라인 상세 화면">
+<img src="../images/img_12_4.png" width="500" alt="생산 라인 상세 화면">
 
 - **출력 데이터 항목 (Output Data):**
     - 라인 기본 정보: 라인명, 일일 생산 가능 수량, 현재 작업 여부
@@ -753,7 +753,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 13.1 생산 일정 캘린더 화면(`/production/calendar`)
 
-<img src="../images/img_13_01.png" width="500" alt="생산 일정 캘린더 화면">
+<img src="../images/img_13_1.png" width="500" alt="생산 일정 캘린더 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 라인별 일정 막대(WBS): 작업지시서 시작 예정일부터 완료 예정일까지
@@ -766,7 +766,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ## 14. 배송 관리 화면 (`/shipments`)
 
-<img src="../images/img_14.png" width="500" alt="배송 관리 화면">
+<img src="../images/img_14_1.png" width="500" alt="배송 관리 화면">
 
 <img src="../images/img_14_2.png" width="500" alt="배송 관리 화면 2">
 
@@ -804,7 +804,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 15.1 AI 챗봇 화면 (`/ai`)
 
-<img src="../images/img_15_01.png" width="500" alt="AI 챗봇 화면">
+<img src="../images/img_15.png" width="500" alt="AI 챗봇 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 왼쪽 대화 목록: 새 대화 버튼, 대화 검색, 대화 제목과 시간, 대화 제목(수정·삭제)
@@ -824,7 +824,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 16.1 전체 화면 와이어프레임 배치도
 
-<img src="../images/전체 화면 와이어프레임 배치도.png" width="500" alt="전체 화면 와이어프레임 배치도">
+<img src="../images/PRODFLOW_FRAME.png" width="500" alt="전체 화면 와이어프레임 배치도">
 
 ### 16.2 전체 화면 흐름도 및 내비게이션 구조
 
@@ -848,7 +848,6 @@ flowchart TD
     AiChat["AI 챗봇"]
     PG["PG 웹훅"]
     Tracker["스마트택배 배송조회 API"]
-
     Login -->|로그인 성공| Dashboard
     Dashboard --> Me
     Dashboard -->|최고 관리자| Users
@@ -861,24 +860,19 @@ flowchart TD
     Dashboard --> Stats
     Dashboard --> AiChat
     Dashboard -->|납기 위험 클릭| OrderDetail
-
     Orders -->|수주 등록 클릭| OrderNew
     Orders -->|행 클릭| OrderDetail
     OrderNew -->|거래처·품목 자동완성| Clients
     OrderNew -->|거래처·품목 자동완성| Products
     OrderNew -->|저장, 가상계좌 발급| OrderDetail
-
     OrderDetail --> Payments
     PG -.->|계약금 입금 확인| Payments
     Payments -->|생산대기 전환, 작업지시서 자동 생성| WorkOrders
-
     WorkOrders -->|라인 배정| Lines
     WorkOrders --> Calendar
     WorkOrders -->|생산 완료, 포장| Shipments
-
     Shipments -->|출고, 배송 출발 문자| OrderDetail
     Tracker -.->|배송 진행단계 갱신| Shipments
-
     Stats -->|위험 수주 클릭| OrderDetail
     AiChat -->|조회 결과 클릭| OrderDetail
 ```
