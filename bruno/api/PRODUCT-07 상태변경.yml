@@ -1,0 +1,16 @@
+info:
+  name: PRODUCT-07 상태변경
+  type: http
+  seq: 6
+
+http:
+  method: PATCH
+  url: http://localhost:8080/api/v1/products/1/status
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.product;
 
+import net.likelion.bebc25.prodflow.product.dto.ProductDto;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto.CreateRequest;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto.Response;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
@@ -61,5 +62,19 @@ class ProductServiceTest {
         List<Response> byKeyword = productService.productSearch("맥세이프");
         assertThat(byKeyword).hasSize(2);
 
+    }
+
+    @Test
+    @DisplayName("품목 상태 변경")
+    void updateProductStatus() {
+        // 1. 시드 id=1 을 DISCONTINUED 로
+        Response updated = productService.updateStatus(
+                1L, new ProductDto.UpdateStatusRequest(ProductStatus.DISCONTINUED)
+        );
+        assertThat(updated.status()).isEqualTo(ProductStatus.DISCONTINUED);
+
+        // 2. 상세 조회해도 유지되는지
+        Response detail = productService.getDetail(1L);
+        assertThat(detail.status()).isEqualTo(ProductStatus.DISCONTINUED);
     }
 }

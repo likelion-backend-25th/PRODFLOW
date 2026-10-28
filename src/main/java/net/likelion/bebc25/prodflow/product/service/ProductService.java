@@ -89,4 +89,17 @@ public class ProductService {
         }
         return responses;
     }
+
+    public Response updateStatus(Long id, ProductDto.UpdateStatusRequest request) {
+        Optional<Product> optionalProduct = productRepository.findById(id);
+        if (optionalProduct.isEmpty()) {
+            throw new EntityNotFoundException("품목을 찾을 수 없습니다.");
+        }
+        Product product = optionalProduct.get();
+
+        product.changeStatus(request.status());
+        return Response.from(product);
+
+
+    }
 }

@@ -6,6 +6,7 @@ import net.likelion.bebc25.prodflow.product.dto.ProductDto;
 import net.likelion.bebc25.prodflow.product.service.ProductService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,5 +52,12 @@ public class ProductController {
         return ResponseEntity.ok(response);
     }
 
-
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ProductDto.Response> updateStatus(
+            @PathVariable Long id,
+            @RequestBody ProductDto.UpdateStatusRequest request
+    ) {
+        ProductDto.Response response = productService.updateStatus(id, request);
+        return ResponseEntity.ok(response);
+    }
 }

@@ -7,6 +7,13 @@ import java.time.LocalDateTime;
 
 public class ProductDto {
 
+
+    public record UpdateStatusRequest(
+            ProductStatus status
+    ){
+
+    }
+
     public record CreateRequest(
             String modelCode,
             String productName,
