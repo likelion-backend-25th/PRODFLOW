@@ -48,4 +48,18 @@ class ProductServiceTest {
         List<Response> list = productService.getList();
         assertThat(list).hasSize(6);
     }
+
+    @Test
+    @DisplayName("검색테스트")
+    void searchProduct() {
+        List<Response> all = productService.productSearch(null);
+        assertThat(all).hasSize(5);
+
+        List<Response> byName = productService.productSearch("디자인 A");
+        assertThat(byName).hasSize(1);
+        assertThat(byName.getFirst().modelCode()).isEqualTo("PF-CS-A100");
+        List<Response> byKeyword = productService.productSearch("맥세이프");
+        assertThat(byKeyword).hasSize(2);
+
+    }
 }
