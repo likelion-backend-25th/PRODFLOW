@@ -372,6 +372,7 @@ erDiagram
       bigint id PK "대화방 고유 식별자"
       bigint user_id FK "대화한 회원 ID"
       varchar title "대화방 제목"
+      boolean title_edited "대화방 제목 수정 여부"
       boolean is_closed "대화방 종료 여부"
       datetime created_at "대화방 생성 일시"
       datetime updated_at "마지막 대화 일시"
@@ -677,11 +678,11 @@ erDiagram
 - `UNIQUE(quotation_production_plan_id, plan_date)`
 - 예시
 
-    | 임시 계획 ID | 생산 라인 | 생산 예정일 | 예상 생산량 |
-    | --- | --- | --- | --- |
-    | 1 | A라인 | 2026-10-27 | 1,000 |
-    | 1 | A라인 | 2026-10-28 | 1,000 |
-    | 2 | B라인 | 2026-10-27 | 500 |
+  | 임시 계획 ID | 생산 라인 | 생산 예정일 | 예상 생산량 |
+      | --- | --- | --- | --- |
+  | 1 | A라인 | 2026-10-27 | 1,000 |
+  | 1 | A라인 | 2026-10-28 | 1,000 |
+  | 2 | B라인 | 2026-10-27 | 500 |
 
 - 기존 확정 작업의 날짜별 생산량과 비교해 각 라인의 잔여 생산 능력을 계산하는 데 활용.
 
