@@ -527,9 +527,9 @@ VALUES (3, 3, 'DELIVERY_DELAYED', 'PF-2026-003 납기 2026-10-24가 지났으나
 -- ---------------------------------------------------------------------------
 -- AI 조회 대화. 종료된 방은 is_closed = 1 이고 closed_at 이 있다
 -- ---------------------------------------------------------------------------
-INSERT INTO ai_conversation (id, user_id, title, is_closed, closed_at, created_at, updated_at)
-VALUES (1, 7, '미입금 수주 조회', 0, NULL, '2026-10-26 10:00:00', '2026-10-26 10:01:00'),
-       (2, 2, '납기 임박 수주', 1, '2026-10-26 11:05:00', '2026-10-26 11:00:00', '2026-10-26 11:05:00');
+INSERT INTO ai_conversation (id, user_id, title, title_edited, is_closed, closed_at, created_at, updated_at)
+VALUES (1, 7, '미입금 수주 조회', 0, 0, NULL, '2026-10-26 10:00:00', '2026-10-26 10:01:00'),
+       (2, 2, '납기 임박 수주', 0, 1, '2026-10-26 11:05:00', '2026-10-26 11:00:00', '2026-10-26 11:05:00');
 
 INSERT INTO ai_message (id, ai_conversation_id, sequence_no, role, content, intent, generated_sql, created_at)
 VALUES (1, 1, 1, 'USER', '계약금이 아직 안 들어온 수주를 보여 줘.', NULL, NULL, '2026-10-26 10:00:00'),
