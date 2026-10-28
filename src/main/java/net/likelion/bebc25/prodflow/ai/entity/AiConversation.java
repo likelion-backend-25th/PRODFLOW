@@ -34,7 +34,10 @@ public class AiConversation extends BaseTimeEntity {
     private String title;
 
     @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
-    private Boolean is_closed;
+    private Boolean titleEdited;
+
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean isClosed;
 
     private LocalDateTime closedAt;
 
@@ -42,21 +45,23 @@ public class AiConversation extends BaseTimeEntity {
     public AiConversation(User user, String title) {
         this.user = user;
         this.title = title;
-        this.is_closed = false;
+        this.titleEdited = false;
+        this.isClosed = false;
     }
 
     // 대화방 종료 (종료 상태가 아닌경우 종료하고, 종료시간을 갱신)
     public void close() {
-        if (Boolean.TRUE.equals(this.is_closed)) {
+        if (Boolean.TRUE.equals(this.isClosed)) {
             throw new IllegalArgumentException("종료된 대화방입니다.");
         }
-        this.is_closed = true;
+        this.isClosed = true;
         this.closedAt = LocalDateTime.now();
     }
 
     // 대화방 제목 변경
     public void changeTitle(String title) {
         this.title = title;
+        this.titleEdited = true;
     }
 
 
