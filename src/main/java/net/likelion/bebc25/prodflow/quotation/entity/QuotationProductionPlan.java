@@ -71,4 +71,21 @@ public class QuotationProductionPlan {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    public QuotationProductionPlan(
+            Quotation quotation,
+            QuotationItem quotationItem,
+            Line line,
+            int plannedQuantity,
+            LocalDate plannedStartDate,
+            LocalDate plannedEndDate
+    ) {
+        this.quotation = quotation;
+        this.quotationItem = quotationItem;
+        this.line = line;
+        this.plannedQuantity = plannedQuantity;
+        this.plannedStartDate = plannedStartDate;
+        this.plannedEndDate = plannedEndDate;
+        this.status = QuotationProductionPlanStatus.ACTIVE;
+    }
 }
