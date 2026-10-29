@@ -62,4 +62,8 @@ public class Product extends BaseTimeEntity {
         return product;
     }
 
+    public void changeStatus(ProductStatus status) {
+        this.status = status;
+    }
+
 }
