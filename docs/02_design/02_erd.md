@@ -409,7 +409,7 @@ erDiagram
       bigint conversation_id FK "대화방 ID"
       int sequence_no "대화방 내 메세지 순서"
       varchar role "메시지 발신자 구분 ASSISTANT / USER"
-      text content "질문 또는 AI 응답 내용"
+      text content "질문 또는 AI 응답 내용"   
       text generated_sql "AI가 생성한 SQL 쿼리문"
       datetime created_at "메시지 생성 일시"
   }
@@ -881,8 +881,8 @@ erDiagram
 | id                     | BIGINT       | PK, AUTO_INCREMENT | 알림 고유 식별자                |
 | customer_order_id      | BIGINT       | FK, NULL           | 관련 수주 ID                 |
 | target_id              | BIGINT       | FK                 | 수신자 ID                   |
-| notification_type      | VARCHAR(255) | NOT NULL           | DELIVERY_IMMINENT 납기 임박, |
-| DELIVERY_DELAYED 납기 지연 |              |                    |                          |
+| notification_type      | VARCHAR(255) | NOT NULL           | DELIVERY_IMMINENT 납기 임박, 
+ DELIVERY_DELAYED 납기 지연 |
 | message                | VARCHAR(500) | NOT NULL           | 알림 내용                    |
 | read_at                | DATETIME     | NULL               | 읽은 시각                    |
 | created_at             | DATETIME     | NOT NULL           | 알림 발송 시각                 |
