@@ -149,7 +149,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ## 3. 대시보드 화면 (`/dashboard`)
 
-<img src="../images/img_03.png" width="500" alt="대시보드 화면">
+<img src="../images/img_3.png" width="500" alt="대시보드 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 상태별 파이프라인 카드: 대기, 생산대기,생산중, 포장중, 포장완료, 배송중, 완료 건수
@@ -331,7 +331,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 6.1 거래처 목록 화면 (`/clients`)
 
-<img src="../images/img_6_1.png" width="500" alt="거래처 목록 화면">
+<img src="../images/img_06_1.png" width="500" alt="거래처 목록 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 전체 거래처 수, 이번 달 거래처 계약 수, 이번 달 신규 거래처 수
@@ -353,7 +353,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 6.2 거래처 상세 화면 (`/clients/{id}`)
 
-<img src="../images/img_6_2.png" width="500" alt="거래처 상세 화면">
+<img src="../images/img_06_2.png" width="500" alt="거래처 상세 화면">
 
 - 출력 데이터 항목 (Output Data):
     - 누적 수주 세션: 누적 수주, 생산중, 대기, 완료 수
@@ -399,8 +399,6 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 <img src="../images/img_7_2.png" width="500" alt="생산품목 등록 화면">
 
-<img src="../images/img_07_02_2.png" width="500" alt="생산품목 등록 화면 2">
-
 생산 가능한 품목의 기본 정보를 등록하고, 수주 등록 시 사용할 기준 단가를 설정하는 화면이다.
 
 - 출력 데이터 항목 (Output Data):
@@ -423,7 +421,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 7.3 생산품목 상세 화면 (`/products/{productId}` )
 
-<img src="../images/img_7_3.png" width="500" alt="생산품목 상세 화면">
+<img src="../images/img_07_3.png" width="500" alt="생산품목 상세 화면">
 
 품목의 기준 정보와 연결된 생산·수주 이력을 확인하는 화면이다.
 
@@ -447,7 +445,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 8.1 견적서 목록 화면(`/quotations`)
 
-<img src="../images/img_8_1.png" width="500" alt="견적서 목록 화면">
+<img src="../images/img_08_1.png" width="500" alt="견적서 목록 화면">
 
 견적의 가격, 납기, 상태, 수주 연결 여부를 찾는 화면이다.
 
@@ -468,7 +466,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 8.2 견적서 등록 화면(`/quotations/new`)
 
-<img src="../images/img_8_2.png" width="500" alt="견적서 등록 화면">
+<img src="../images/img_08_2.png" width="500" alt="견적서 등록 화면">
 
 거래처, 품목, 희망 납기, 유효기간을 입력해 견적을 발송하는 화면이다. 배송지는 입력하지 않는다.
 
@@ -494,7 +492,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 8.3 견적서 상세 화면(`/quotations/{quotationId}`)
 
-<img src="../images/img_8_3.png" width="500" alt="견적서 상세 화면">
+<img src="../images/img_08_03.png" width="500" alt="견적서 상세 화면">
 
 발송한 견적의 거래처, 품목, 금액, 납기를 보고 승인, 거절, 취소하거나 수주 등록으로 이동하는 화면이다.
 
@@ -518,7 +516,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 9.1 수주 목록 화면(`/orders`)
 
-<img src="../images/img_9_1.png" width="500" alt="수주 목록 화면">
+<img src="../images/img_09_1.png" width="500" alt="수주 목록 화면">
 
 진행 중인 수주와 완료된 생산 기록을 한 목록에서 찾는 화면이다.
 
@@ -541,7 +539,7 @@ ProdFlow는 생산시설의 수주, 생산, 입금, 포장, 출고, 배송 조�
 
 ### 9.2 수주 등록 화면(`/orders/new`)
 
-<img src="../images/img_9_2.png" width="500" alt="수주 등록 화면">
+<img src="../images/img_09_02.png" width="500" alt="수주 등록 화면">
 
 승인된 견적의 단가는 유지하고, 수량·납기·배송지·계약금 입금 마감을 확인한 뒤 수주를 만드는 화면이다.
 
