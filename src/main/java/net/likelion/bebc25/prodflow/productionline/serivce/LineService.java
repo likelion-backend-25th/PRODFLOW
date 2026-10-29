@@ -25,8 +25,7 @@ public class LineService {
     public LineDto.Response create(LineDto.CreateRequest request) {
         Line line = new Line(
                 request.lineName(),
-                request.productionCapacity(),
-                request.introducedDate()
+                request.productionCapacity()
         );
         return LineDto.Response.from(lineRepository.save(line));
     }
