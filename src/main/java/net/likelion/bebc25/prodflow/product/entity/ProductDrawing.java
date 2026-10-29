@@ -11,14 +11,14 @@ import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
+import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ProductDrawing {
+public class ProductDrawing extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,11 +34,7 @@ public class ProductDrawing {
     @Column(nullable = false)
     private String fileName;
 
-    @CreationTimestamp
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    //null이면 현재 도면
+    // null이면 현재 도면
     @Column
     private LocalDateTime replacedAt;
 }
