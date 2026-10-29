@@ -138,12 +138,13 @@ VALUES (1, 1, 'drawings/PF-CS-A100/v1.pdf', 'PF-CS-A100-v1.pdf', '2026-01-20 10:
 -- 생산 라인. 오늘(10-26) A·B 는 가동 중, D 는 고장, E 는 점검이라 신규 배정 제외
 -- 능력 변경 이력의 마지막 after_capacity 가 현재 production_capacity 와 같다
 -- ---------------------------------------------------------------------------
-INSERT INTO `line` (id, line_name, production_capacity, status, introduced_date, updated_at)
-VALUES (1, 'A라인', 1000, 'OPERATING', '2024-01-15', '2026-10-26 08:05:00'),
-       (2, 'B라인', 1000, 'OPERATING', '2024-06-01', '2026-10-26 08:05:00'),
-       (3, 'C라인', 1000, 'AVAILABLE', '2024-09-01', '2026-08-10 14:00:00'),
-       (4, 'D라인', 1000, 'BROKEN', '2023-11-01', '2026-10-24 08:40:00'),
-       (5, 'E라인', 1000, 'INSPECTION', '2025-12-01', '2026-10-20 09:00:00');
+INSERT INTO `line` (id, line_name, production_capacity, status,
+                    created_at, updated_at, created_by, updated_by)
+VALUES (1, 'A라인', 1000, 'OPERATING', '2024-01-15 00:00:00', '2026-10-26 08:05:00', 'system', 'system'),
+       (2, 'B라인', 1000, 'OPERATING', '2024-06-01 00:00:00', '2026-10-26 08:05:00', 'system', 'system'),
+       (3, 'C라인', 1000, 'AVAILABLE', '2024-09-01 00:00:00', '2026-08-10 14:00:00', 'system', 'system'),
+       (4, 'D라인', 1000, 'BROKEN', '2023-11-01 00:00:00', '2026-10-24 08:40:00', 'system', 'system'),
+       (5, 'E라인', 1000, 'INSPECTION', '2025-12-01 00:00:00', '2026-10-20 09:00:00', 'system', 'system');
 
 INSERT INTO line_capacity_log (id, line_id, before_capacity, after_capacity, reason, user_id, changed_at)
 VALUES (1, 1, 800, 1000, '설비 증설로 일일 생산 능력을 800개에서 1,000개로 조정', 4, '2026-03-02 09:00:00'),

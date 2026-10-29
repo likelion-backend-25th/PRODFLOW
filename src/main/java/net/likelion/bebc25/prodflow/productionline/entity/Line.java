@@ -11,16 +11,13 @@ import jakarta.persistence.Id;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.productionline.enums.LineStatus;
-import org.springframework.data.annotation.LastModifiedDate;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Line {
+public class Line extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
@@ -36,25 +33,17 @@ public class Line {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private LineStatus status = LineStatus.AVAILABLE;
-    
-    @LastModifiedDate
-    private LocalDateTime updatedAt;
 
-    // 도입일 직접 지정
-    @Column(nullable = false)
-    private LocalDate introducedDate;
 
     // 처음 라인 생성시
-    public Line(String lineName, int productionCapacity, LocalDate introducedDate) {
+    public Line(String lineName, int productionCapacity) {
         this.lineName = lineName;
         this.productionCapacity = productionCapacity;
-        this.introducedDate = introducedDate;
     }
 
     // 라인 생산량 수정
     public void editProduction(int productionCapacity) {
         this.productionCapacity = productionCapacity;
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 라인 상태 변경
