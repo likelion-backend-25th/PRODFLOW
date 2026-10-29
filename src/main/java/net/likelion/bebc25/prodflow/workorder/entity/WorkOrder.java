@@ -60,6 +60,8 @@ public class WorkOrder extends BaseTimeEntity {
     @Column(nullable = false)
     private LocalDate plannedEndDate;
 
+    private LocalDate completedAt;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "common_code_id", nullable = false)
     private CommonCode commonCode;
@@ -79,11 +81,16 @@ public class WorkOrder extends BaseTimeEntity {
         this.line = line;
         this.user = user;
         this.quantity = quantity;
+        this.workOrderDate = LocalDate.now();
         this.plannedStartDate = plannedStartDate;
         this.plannedEndDate = plannedEndDate;
+        this.completedAt = null;
     }
 
     public void changeStatus(CommonCode commonCode) {
         this.commonCode = commonCode;
+        if ("PACK_DONE".equals(commonCode.getCode())) {
+            this.completedAt = LocalDate.now();
+        }
     }
 }

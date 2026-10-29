@@ -126,6 +126,7 @@ erDiagram
       date work_order_date "작업 지시일"
       date planned_start_date "작업 시작 예정일"
       date planned_end_date "작업 완료 예정일"
+      date completedAt "작업 완료 날짜"
       bigint status_code FK "이 라인 지시의 생산 작업 상태 (생산대기, 생산중, 포장중, 출고대기, 일시 정지, 취소)"
       text note "작업 내용 작성 (품목, 수량)"
       datetime created_at "작업지시서 생성 일시"
@@ -457,21 +458,21 @@ erDiagram
 
 ### 2.6  work_order (작업지시서)
 
-| 컬럼명                | 데이터 타입       | 제약 조건                                                  | 설명                                                  |
-|--------------------|--------------|--------------------------------------------------------|-----------------------------------------------------|
-| id                 | BIGINT       | PK, AUTO_INCREMENT                                     | 작업지시서 고유 식별자                                        |
-| work_order_no      | VARCHAR(255) | NOT NULL, UNIQUE                                       | 작업 지시 번호 (WO-001)                                   |
-| order_product_id   | BIGINT       | FK, NOT NULL                                           | 수주 품목 ID                                            |
-| line_id            | BIGINT       | FK, NOT NULL                                           | 담당 생산 라인 ID                                         |
-| user_id            | BIGINT       | FK, NOT NULL                                           | 생산 담당자                                              |
-| quantity           | INT          | NOT NULL                                               | 라인에 배정된 수량                                          |
-| work_order_date    | DATE         | NOT NULL, DEFAULT  (CURRENT_DATE)                      | 작업 지시일                                              |
-| planned_start_date | DATE         | DATE, NOT NULL                                         | 작업 시작 예정일                                           |
-| planned_end_date   | DATE         | DATE, NOT NULL                                         | 작업 완료 예정일                                           |
-| status_code        | BIGINT       | FK→common_code.id, NOT NULL                            | 이 라인 지시의 생산 작업 상태 (생산대기, 생산중, 포장중, 출고대기, 일시 정지, 취소) |
-| note               | TEXT         |                                                        | 작업 내용 작성 (품목, 수량)                                   |
-| created_at         | DATETIME     | DEFAULT CURRENT_TIMESTAMP                              | 작업지시서 생성 일시                                         |
-| updated_at         | DATETIME     | DEFAULT CURRENT_TIMESTAMP, ON UPDATE CURRENT_TIMESTAMP | 작업지시서 수정 일시                                         |
+| 컬럼명                | 데이터 타입       | 제약 조건                                                  | 설명                                                                           |
+|--------------------|--------------|--------------------------------------------------------|------------------------------------------------------------------------------|
+| id                 | BIGINT       | PK, AUTO_INCREMENT                                     | 작업지시서 고유 식별자                                                                 |
+| work_order_no      | VARCHAR(255) | NOT NULL, UNIQUE                                       | 작업 지시 번호 (WO-001)                                                            |
+| order_product_id   | BIGINT       | FK, NOT NULL                                           | 수주 품목 ID                                                                     |
+| line_id            | BIGINT       | FK, NOT NULL                                           | 담당 생산 라인 ID                                                                  |
+| user_id            | BIGINT       | FK, NOT NULL                                           | 생산 담당자                                                                       |
+| quantity           | INT          | NOT NULL                                               | 라인에 배정된 수량                                                                   |
+| work_order_date    | DATE         | NOT NULL, DEFAULT  (CURRENT_DATE)                      | 작업 지시일                                                                       |
+| planned_start_date | DATE         | DATE, NOT NULL                                         | 작업 시작 예정일                                                                    |
+| planned_end_date   | DATE         | DATE, NOT NULL                                         | 작업 완료 예정일                                                                    |
+| status_code        | BIGINT       | FK→common_code.id, NOT NULL                            | 이 라인 지시의 생산 작업 상태('PREPARE','PRODUCE','PACK','PACK_DONE', 'SUSPEND', 'HALT') |
+| note               | TEXT         |                                                        | 작업 내용 작성 (품목, 수량)                                                            |
+| created_at         | DATETIME     | DEFAULT CURRENT_TIMESTAMP                              | 작업지시서 생성 일시                                                                  |
+| updated_at         | DATETIME     | DEFAULT CURRENT_TIMESTAMP, ON UPDATE CURRENT_TIMESTAMP | 작업지시서 수정 일시                                                                  |
 
 **작업 지시 상태 (status_code)**
 
@@ -679,7 +680,7 @@ erDiagram
 - 예시
 
   | 임시 계획 ID | 생산 라인 | 생산 예정일 | 예상 생산량 |
-      | --- | --- | --- | --- |
+              | --- | --- | --- | --- |
   | 1 | A라인 | 2026-10-27 | 1,000 |
   | 1 | A라인 | 2026-10-28 | 1,000 |
   | 2 | B라인 | 2026-10-27 | 500 |
@@ -844,15 +845,14 @@ erDiagram
 
 ### 2.29 ai_message (ai대화 메시지)
 
-| 컬럼명             | 데이터 타입       | 제약 조건              | 설명                              |
-|-----------------|--------------|--------------------|---------------------------------|
-| id              | BIGINT       | PK, AUTO_INCREMENT | 메시지 고유 식별자                      |
-| conversation_id | BIGINT       | FK, NOT NULL       | 대화방 ID                          |
-| sequence_no     | INT          | NOT NULL           | 대화방 내 메세지 순서                    |
-| role            | VARCHAR(255) | NOT NULL           | 메시지 발신자 구분 ASSISTANT / USER     |
-| content         | TEXT         | NOT NULL           | 질문 또는 AI 응답 내용                  |
-| intent          | VARCHAR(255) | NULL               | 검색 의도 (예: SEARCH_UNPAID) 미입금 조회 |
-| generated_sql   | TEXT         | NULL               | AI가 생성한 SQL 쿼리문                 |
-| created_at      | DATETIME     | NOT NULL           | 메시지 생성 일시                       |
+| 컬럼명             | 데이터 타입       | 제약 조건              | 설명                          |
+|-----------------|--------------|--------------------|-----------------------------|
+| id              | BIGINT       | PK, AUTO_INCREMENT | 메시지 고유 식별자                  |
+| conversation_id | BIGINT       | FK, NOT NULL       | 대화방 ID                      |
+| sequence_no     | INT          | NOT NULL           | 대화방 내 메세지 순서                |
+| role            | VARCHAR(255) | NOT NULL           | 메시지 발신자 구분 ASSISTANT / USER |
+| content         | TEXT         | NOT NULL           | 질문 또는 AI 응답 내용              |
+| generated_sql   | TEXT         | NULL               | AI가 생성한 SQL 쿼리문             |
+| created_at      | DATETIME     | NOT NULL           | 메시지 생성 일시                   |
 
 - `UNIQUE(conversation_id, sequence_no)`

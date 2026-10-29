@@ -36,9 +36,8 @@ public class Line {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private LineStatus status = LineStatus.AVAILABLE;
-
+    
     @LastModifiedDate
-    @Column(nullable = false)
     private LocalDateTime updatedAt;
 
     // 도입일 직접 지정
@@ -55,6 +54,7 @@ public class Line {
     // 라인 생산량 수정
     public void editProduction(int productionCapacity) {
         this.productionCapacity = productionCapacity;
+        this.updatedAt = LocalDateTime.now();
     }
 
     // 라인 상태 변경
