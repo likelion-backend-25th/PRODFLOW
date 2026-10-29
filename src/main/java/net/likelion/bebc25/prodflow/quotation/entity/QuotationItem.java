@@ -38,17 +38,38 @@ public class QuotationItem {
     private String deviceName;
 
     @Column(nullable = false)
-    private Integer quantity;
+    private int quantity;
 
     @Column(name = "unit_price", nullable = false)
     private Long unitPrice;
-
-    @Column(name = "vat_included", nullable = false)
-    private boolean vatIncluded;
 
     @Column(name = "line_amount", nullable = false)
     private Long lineAmount;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public QuotationItem(
+            Quotation quotation,
+            Product product,
+            String productName,
+            String deviceName,
+            int quantity,
+            Long unitPrice
+    ) {
+        this.quotation = quotation;
+        this.product = product;
+        this.productName = productName;
+        this.deviceName = deviceName;
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+        this.lineAmount = unitPrice * quantity;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    public void changePrice(int quantity, Long unitPrice) {
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+        this.lineAmount = unitPrice * quantity;
+    }
 }

@@ -8,17 +8,22 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.product.entity.Product;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class OrderProduct {
+@Table(
+        name = "order_product",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"customer_order_id", "product_id"})
+)
+public class OrderProduct extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,14 +40,30 @@ public class OrderProduct {
     private String productName;
 
     @Column(nullable = false)
-    private Integer quantity;
+    private int quantity;
 
     @Column(name = "unit_price", nullable = false)
-    private Integer unitPrice;
+    private Long unitPrice;
 
-    @Column(name = "vat_included", nullable = false)
-    private boolean vatIncluded;
+    public OrderProduct(
+            CustomerOrder customerOrder,
+            Product product,
+            String productName,
+            int quantity,
+            Long unitPrice
+    ) {
+        this.customerOrder = customerOrder;
+        this.product = product;
+        this.productName = productName;
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+    }
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    public long lineAmount() {
+        long supply = unitPrice * quantity;
+        if (customerOrder.isVatIncluded()) {
+            return supply;
+        }
+        return Math.round(supply * 1.1d);
+    }
 }
