@@ -5,24 +5,29 @@ import java.util.List;
 
 public class DashboardDto {
 
-    // 대시보드 통합 통계 조회 조건
+    // 대시보드 통계 조회 조건
     public record Request(
             LocalDate startDate,
             LocalDate endDate
     ) {
-
     }
 
     // 대시보드 상단 요약 통계
     public record SummaryResponse(
-            long totalOrderCount,   // 전체 수주
-            long plannedQuantity,   // 계획 생산량
-            long completedQuantity, // 생산 완료량
-            double productionProgressRate,  // 생산 진행률 (%)
-            double onTimeDeliveryRate,  // 납기 준수율 (%)
-            long unpaidAmount   // 미수금? 미입금?
+            long totalOrderCount,
+            long plannedQuantity,
+            long completedQuantity,
+            double productionProgressRate,
+            double onTimeDeliveryRate,
+            long unpaidAmount
     ) {
+    }
 
+    // 수주 건수 통계 응답
+    public record OrderStatisticsResponse(
+            long totalOrderCount,
+            long periodOrderCount
+    ) {
     }
 
     // 수주 상태별 통계
@@ -30,7 +35,6 @@ public class DashboardDto {
             Long statusCode,
             long orderCount
     ) {
-
     }
 
     // 날짜별 생산 계획 통계
@@ -39,7 +43,6 @@ public class DashboardDto {
             long plannedQuantity,
             long completedQuantity
     ) {
-
     }
 
     // 제품별 생산 통계
@@ -48,7 +51,6 @@ public class DashboardDto {
             String productName,
             long completedQuantity
     ) {
-
     }
 
     // 납기 위험 수주 정보
@@ -59,7 +61,6 @@ public class DashboardDto {
             LocalDate plannedEndDate,
             Long statusCode
     ) {
-
     }
 
     // 대시보드 전체 응답
@@ -69,10 +70,6 @@ public class DashboardDto {
             List<ProductionResponse> productionStatistics,
             List<ProductProductionResponse> productStatistics,
             List<DeliveryRiskResponse> deliveryRisks
-
     ) {
-
     }
-
-
 }
