@@ -4,7 +4,9 @@ import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
 import lombok.Getter;
+import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -23,4 +25,11 @@ public abstract class BaseTimeEntity { // 추상 클래스 new 생성 안됨
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @CreatedBy // Entity 최초 저장될 때 사용자의 이름을 자동으로 주입
+    @Column(nullable = false)
+    private String createdBy;
+
+    @LastModifiedBy // Entity 마지막으로 저장될 때 사용자의 이름을 자동으로 주입
+    @Column(nullable = false)
+    private String updatedBy;
 }
