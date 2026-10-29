@@ -51,8 +51,6 @@ public class AiMessage {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    private String intent;
-
     @Column(columnDefinition = "TEXT")
     private String generatedSql;
 
@@ -69,8 +67,7 @@ public class AiMessage {
     }
 
     // ai가 의도를 어떻게 해석하고 sql을 생성하여 저장했는가
-    public void applyResult(String intent, String generatedSql) {
-        this.intent = intent;
+    public void applyResult(String generatedSql) {
         this.generatedSql = generatedSql;
     }
 }
