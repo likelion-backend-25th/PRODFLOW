@@ -47,7 +47,8 @@ public class UserDto {
             String phone,
             @NotNull(message = "권한을 설정해주세요.")
             UserRole role,
-
+            @NotNull(message = "계정 상태를 설정해주세요.")
+            UserStatus status,
             // 임시 비밀번호를 발급하지 않았다면 null
             String temporaryPassword
 

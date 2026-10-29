@@ -10,11 +10,11 @@ http:
     type: json
     data: |-
       {
-        "name": "김수",
+        "name": "김진수",
         "email": "kim123@test.com",
         "phone": "010-1234-5678",
         "role": "PRODUCTION_MANAGER",
-        "password": "Agi123?!"
+        "temporaryPassword": "dAgisfd123?!"
       }
   auth: inherit
 

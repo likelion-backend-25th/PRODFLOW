@@ -777,7 +777,7 @@ erDiagram
 |--------------------|--------------|-------------------------------------|---------------------------------------------------------------------------|
 | id                 | BIGINT       | PK, AUTO_INCREMENT                  | 결제 고유 식별자                                                                 |
 | customer_order_id  | BIGINT       | FK, NOT NULL                        | 해당 결제가 속한 수주 ID                                                           |
-| payment_method     | VARCHAR(255) | NOT NULL                            | VA(가상계좌 자동 입금), MD(수동 입금 처리)                                              |
+| payment_method     | VARCHAR(255) | NOT NULL, DEFAULT VA                | VA(가상계좌 자동 입금), MD(수동 입금 처리)                                              |
 | portone_payment_id | VARCHAR(255) | NULL, UNIQUE                        | ProdFlow에서 생성하는 portone 연동용 결제 고유 ID                                      |
 | payment_type       | VARCHAR(255) | NOT NULL                            | 결제 구분 (DEPOSIT(계약금), BALANCE(잔금))                                         |
 | amount             | BIGINT       | NOT NULL                            | 해당 결제 건에서 납부받아야 하는 금액                                                     |

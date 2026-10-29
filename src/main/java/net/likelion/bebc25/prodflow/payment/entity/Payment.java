@@ -1,27 +1,16 @@
 package net.likelion.bebc25.prodflow.payment.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentMethod;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -47,20 +36,19 @@ public class Payment {
             nullable = false)
     private CustomerOrder order;
 
+    @Enumerated(EnumType.STRING)
+    @Column
+    private PaymentMethod paymentMethod = PaymentMethod.VA;
+
     @Column(nullable = false)
     private String portonePaymentId;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            name = "payment_type",
-            nullable = false)
+    @Column(nullable = false)
     private PaymentType paymentType;
 
-    @Column(
-            nullable = false,
-            precision = 15,
-            scale = 2)
-    private BigDecimal amount;
+    @Column(nullable = false)
+    private Long amount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -72,18 +60,23 @@ public class Payment {
             updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(nullable = false)
+    private String createdBy;
+
     @Builder
     private Payment(
             CustomerOrder order,
             String portonePaymentId,
             PaymentType paymentType,
-            BigDecimal amount
+            Long amount,
+            String createdBy
     ) {
         this.order = order;
         this.portonePaymentId = portonePaymentId;
         this.paymentType = paymentType;
         this.amount = amount;
         this.status = PaymentStatus.READY;
+        this.createdBy = createdBy;
     }
 
     // 가상계좌 발급 성공
@@ -92,7 +85,7 @@ public class Payment {
     }
 
     // 입금 완료
-    public void paid() {
+    public void paidByVirtualAccount() {
         this.status = PaymentStatus.PAID;
     }
 
@@ -110,4 +103,14 @@ public class Payment {
     public void retry() {
         this.status = PaymentStatus.READY;
     }
+
+    // 수동입금 완료
+    public void paidManually() {
+
+        this.status = PaymentStatus.PAID;
+        this.paymentMethod = PaymentMethod.MD;
+    }
+
+
 }
+
