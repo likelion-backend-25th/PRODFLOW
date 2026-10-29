@@ -2,6 +2,8 @@ package net.likelion.bebc25.prodflow.customer_order.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -12,21 +14,25 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.likelion.bebc25.prodflow.client.entity.Client;
+import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
+import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
+import net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
 import net.likelion.bebc25.prodflow.user.entity.User;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CustomerOrder {
+public class CustomerOrder extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "order_no", nullable = false, unique = true, length = 255)
+    @Column(name = "order_no", nullable = false, unique = true)
     private String orderNo;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -40,13 +46,13 @@ public class CustomerOrder {
     @Column(name = "contact_name", nullable = false)
     private String contactName;
 
-    @Column(name = "email", nullable = false)
+    @Column(nullable = false)
     private String email;
 
-    @Column(name = "phone", nullable = false)
+    @Column(nullable = false)
     private String phone;
 
-    @Column(name = "address", nullable = false)
+    @Column(nullable = false)
     private String address;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -54,22 +60,35 @@ public class CustomerOrder {
     private User user;
 
     @Column(name = "requested_due_date", nullable = false)
-    private LocalDateTime requestedDueDate;
+    private LocalDate requestedDueDate;
+
+    @Column(name = "estimated_due_date", nullable = false)
+    private LocalDate estimatedDueDate;
 
     @Column(name = "planned_start_date", nullable = false)
-    private LocalDateTime plannedStartDate;
+    private LocalDate plannedStartDate;
 
     @Column(name = "planned_end_date", nullable = false)
-    private LocalDateTime plannedEndDate;
+    private LocalDate plannedEndDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
+    @Column(name = "deposit_due_date", nullable = false)
+    private LocalDate depositDueDate;
 
     @Column(name = "shipping_address", nullable = false)
     private String shippingAddress;
 
+    @Column(name = "receiver_name", nullable = false)
+    private String receiverName;
+
     @Column(name = "receiver_phone", nullable = false)
     private String receiverPhone;
 
-    @Column(name = "notify_channel", nullable = false)
-    private String notifyChannel;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "notify_channel", nullable = false, length = 10)
+    private NotifyChannel notifyChannel;
 
     @Column(length = 255)
     private String memo;
@@ -78,21 +97,118 @@ public class CustomerOrder {
     @JoinColumn(name = "status_code", nullable = false)
     private CommonCode statusCode;
 
-    @Column(name = "confirmation_status", nullable = false)
-    private String confirmationStatus;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "confirmation_status", nullable = false, length = 30)
+    private ConfirmationStatus confirmationStatus;
 
     @Column(name = "vat_included", nullable = false)
     private boolean vatIncluded;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", nullable = false, length = 30)
+    private OrderPaymentStatus paymentStatus;
+
     @Column(name = "total_amount", nullable = false)
-    private Integer totalAmount;
+    private Long totalAmount;
 
-    @Column(name = "completed_at")
-    private LocalDateTime completedAt;
+    // 수주 품목은 OrderProduct로 따로 조회한다.
+    public CustomerOrder(
+            String orderNo,
+            Quotation quotation,
+            Client client,
+            String contactName,
+            String email,
+            String phone,
+            String address,
+            User user,
+            LocalDate requestedDueDate,
+            LocalDate estimatedDueDate,
+            LocalDate plannedStartDate,
+            LocalDate plannedEndDate,
+            LocalDate depositDueDate,
+            String shippingAddress,
+            String receiverName,
+            String receiverPhone,
+            NotifyChannel notifyChannel,
+            String memo,
+            CommonCode statusCode,
+            boolean vatIncluded,
+            Long totalAmount
+    ) {
+        this.orderNo = orderNo;
+        this.quotation = quotation;
+        this.client = client;
+        this.contactName = contactName;
+        this.email = email;
+        this.phone = phone;
+        this.address = address;
+        this.user = user;
+        this.requestedDueDate = requestedDueDate;
+        this.estimatedDueDate = estimatedDueDate;
+        this.plannedStartDate = plannedStartDate;
+        this.plannedEndDate = plannedEndDate;
+        this.depositDueDate = depositDueDate;
+        this.shippingAddress = shippingAddress;
+        this.receiverName = receiverName;
+        this.receiverPhone = receiverPhone;
+        this.notifyChannel = notifyChannel;
+        this.memo = memo;
+        this.statusCode = statusCode;
+        this.vatIncluded = vatIncluded;
+        this.totalAmount = totalAmount;
+        this.confirmationStatus = ConfirmationStatus.PENDING;
+        this.paymentStatus = OrderPaymentStatus.UNPAID;
+        this.endDate = null;
+    }
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    public void changeSchedule(
+            LocalDate estimatedDueDate,
+            LocalDate plannedStartDate,
+            LocalDate plannedEndDate
+    ) {
+        this.estimatedDueDate = estimatedDueDate;
+        this.plannedStartDate = plannedStartDate;
+        this.plannedEndDate = plannedEndDate;
+    }
 
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    public void changeProgress(CommonCode statusCode) {
+        this.statusCode = statusCode;
+        this.confirmationStatus = switch (statusCode.getCode()) {
+            case "WAITING" -> ConfirmationStatus.PENDING;
+            case "CANCELLED" -> ConfirmationStatus.CANCELLED;
+            default -> ConfirmationStatus.CONFIRMED;
+        };
+    }
+
+    public void markUnpaid() {
+        this.paymentStatus = OrderPaymentStatus.UNPAID;
+    }
+
+    public void markPartiallyPaid() {
+        this.paymentStatus = OrderPaymentStatus.PARTIALLY_PAID;
+    }
+
+    public void markPaid() {
+        this.paymentStatus = OrderPaymentStatus.PAID;
+    }
+
+    public void completeProduction(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
+    public void changeShipping(
+            String shippingAddress,
+            String receiverName,
+            String receiverPhone,
+            NotifyChannel notifyChannel
+    ) {
+        this.shippingAddress = shippingAddress;
+        this.receiverName = receiverName;
+        this.receiverPhone = receiverPhone;
+        this.notifyChannel = notifyChannel;
+    }
+
+    public void changeMemo(String memo) {
+        this.memo = memo;
+    }
 }

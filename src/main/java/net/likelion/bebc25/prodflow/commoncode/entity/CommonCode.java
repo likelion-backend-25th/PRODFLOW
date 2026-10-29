@@ -28,10 +28,8 @@ public class CommonCode {
     @JoinColumn(name = "code_group_id", nullable = false)
     private CodeGroup codeGroup;
 
-
     @Column(nullable = false)
     private String code;
-
 
     @Column(nullable = false)
     private String name;
