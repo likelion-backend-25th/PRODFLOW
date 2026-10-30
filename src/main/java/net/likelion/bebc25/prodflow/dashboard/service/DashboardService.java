@@ -33,7 +33,7 @@ public class DashboardService {
         // 전체 수주 건수 조회
         long totalOrderCount = orderStatisticsRepository.countAllOrders();
 
-        // 조회 기간의 시작일, 종료일 설정
+        // 조회 기간 시작일, 종료일 설정
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
 
