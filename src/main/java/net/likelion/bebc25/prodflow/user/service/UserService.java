@@ -78,14 +78,6 @@ public class UserService {
             );
         }
 
-        // 임시 비밀번호 가져오기
-        String temporaryPassword = request.temporaryPassword();
-
-        // 임시 비밀번호가 전달되었다면 유효성 검사
-        if (temporaryPassword != null) {
-            validateTemporaryPassword(temporaryPassword);
-        }
-
         // 직원 정보 수정
         user.update(
                 request.name(),
@@ -94,8 +86,19 @@ public class UserService {
                 request.role()
         );
 
+        // 계정 상태 변경
+        if (request.status() == UserStatus.ACTIVE) {
+            user.activate();
+        } else if (request.status() == UserStatus.INACTIVE) {
+            user.deactivate();
+        }
+
+        // 임시 비밀번호 가져오기
+        String temporaryPassword = request.temporaryPassword();
         // 임시 비밀번호가 발급된 경우에만 변경
         if (temporaryPassword != null) {
+            // 유효성 검사
+            validateTemporaryPassword(temporaryPassword);
 
             String encodedPassword =
                     passwordEncoder.encode(temporaryPassword);
