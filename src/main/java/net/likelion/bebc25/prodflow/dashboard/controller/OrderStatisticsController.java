@@ -18,7 +18,7 @@ public class OrderStatisticsController {
 
     private final DashboardService dashboardService;
 
-    // 수주 통계 조회
+    // 수주 건수 통계 조회
     @GetMapping("/orders")
     public DashboardDto.OrderStatisticsResponse getOrderStatistics(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, // 조회 시작일

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Service
 @Transactional(readOnly = true)
@@ -31,6 +32,10 @@ public class DashboardService {
 
         // 전체 수주 건수 조회
         long totalOrderCount = orderStatisticsRepository.countAllOrders();
+
+        // 조회 기간 시작일, 종료일 설정
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
 
         // 조회 기간별 수주 건수 조회
         long periodOrderCount = orderStatisticsRepository.countOrdersByPeriod(
