@@ -12,7 +12,7 @@
 -- 직원 및 로그인
 INSERT INTO `user` (id, password, name, email, phone, role, status, last_login_at, created_at, updated_at, deleted_at,
                     must_change_password)
-VALUES (1, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '서도윤', 'admin@prodflow.local',
+VALUES (1, '$2a$10$8iq.VlszimKmoFxPOBA4kuMvZ/VXVGbjYmDxrqZo1l4/7d4/abaye', '서도윤', 'admin@prodflow.local',
         '010-1000-0001', 'SUPER_ADMIN', 'ACTIVE', '2026-10-26 08:02:00', '2026-01-06 09:00:00', '2026-10-26 08:02:00',
         NULL, FALSE),
        (2, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '이서준', 'order.lee@prodflow.local',
