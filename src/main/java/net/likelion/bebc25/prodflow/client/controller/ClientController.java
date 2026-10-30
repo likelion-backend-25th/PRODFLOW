@@ -9,14 +9,33 @@ import net.likelion.bebc25.prodflow.client.service.ClientService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
 
 @RestController
 @RequestMapping("api/v1/clients")
 @RequiredArgsConstructor
 public class ClientController {
     private final ClientService clientService;
+
+    @Operation(
+            summary = "거래처 정보 등록",
+            description = "RequestBody로 거래처 정보를 받아 등록한 뒤 상세 정보를 반환한다"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "등록 성공")
+    })
+    @PostMapping
+    public ResponseEntity<ClientDto.DetailResponse> createClient(
+            @RequestBody ClientDto.CreateRequest request
+    ) {
+        ClientDto.DetailResponse response = clientService.createClient(request);
+        return ResponseEntity.created(URI.create("/api/v1/clients/" + response.id())).body(response);
+    }
 
     @Operation(
             summary = "거래처 정보 상세 조회",
