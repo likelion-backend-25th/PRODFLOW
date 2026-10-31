@@ -2,6 +2,7 @@ package net.likelion.bebc25.prodflow.user.service;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.auth.repository.RefreshTokenRepository;
 import net.likelion.bebc25.prodflow.user.dto.UserDto;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
@@ -19,6 +20,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     // 직원 등록
     @Transactional
@@ -78,6 +80,11 @@ public class UserService {
             );
         }
 
+        boolean securityInfoChanged = !user.getEmail().equals(request.email())
+                || user.getRole() != request.role()
+                || user.getStatus() != request.status()
+                || request.temporaryPassword() != null;
+
         // 직원 정보 수정
         user.update(
                 request.name(),
@@ -104,6 +111,10 @@ public class UserService {
                     passwordEncoder.encode(temporaryPassword);
 
             user.updatePassword(encodedPassword);
+        }
+
+        if (securityInfoChanged) {
+            refreshTokenRepository.deleteByUserId(id);
         }
 
         // save()가 필요없는 이유 : @Transactional 내부에서 조회한 User는 영속 상태이므로,

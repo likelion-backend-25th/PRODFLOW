@@ -1,7 +1,6 @@
 package net.likelion.bebc25.prodflow.global.security.jwt;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -12,110 +11,88 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.UUID;
 
 @Slf4j
 @Component
 public class JwtProvider {
+    private static final String ISSUER = "prodflow";
     private final SecretKey secretKey;
     private final long accessTokenExpiration;
     private final long refreshTokenExpiration;
 
-    public JwtProvider(
-            @Value("${jwt.secret}") String secret,
-            @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
-            @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration) {
-        byte[] keyBytes = Decoders.BASE64.decode(secret);
-//        System.out.println(new String(keyBytes));
-        this.secretKey = Keys.hmacShaKeyFor(keyBytes);
+    public JwtProvider(@Value("${jwt.secret}") String secret,
+                       @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
+                       @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration) {
+        this.secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+        if (accessTokenExpiration <= 0 || refreshTokenExpiration <= 0) {
+            throw new IllegalArgumentException("JWT 만료시간은 0보다 커야 합니다.");
+        }
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
-    // Access Token 생성 메서드
     public String createAccessToken(Long userId, String email, String role) {
         Date now = new Date();
-        Date validity = new Date(now.getTime() + accessTokenExpiration);
-
         return Jwts.builder()
-                .issuer("prodflow")
+                .issuer(ISSUER)
+                .id(UUID.randomUUID().toString())
                 .subject(String.valueOf(userId))
                 .claim("email", email)
                 .claim("role", role)
                 .claim("type", "ACCESS")
                 .issuedAt(now)
-                .expiration(validity)
+                .expiration(new Date(now.getTime() + accessTokenExpiration))
                 .signWith(secretKey)
                 .compact();
     }
 
-    // Refresh Token 생성 메서드 (최소한의 식별 정보만 포함)
     public String createRefreshToken(Long userId) {
         Date now = new Date();
-        Date validity = new Date(now.getTime() + refreshTokenExpiration);
-
         return Jwts.builder()
-                .issuer("prodflow")
+                .issuer(ISSUER)
+                .id(UUID.randomUUID().toString()) // 재발급 시 항상 새 문자열로 교체
                 .subject(String.valueOf(userId))
                 .claim("type", "REFRESH")
                 .issuedAt(now)
-                .expiration(validity)
+                .expiration(new Date(now.getTime() + refreshTokenExpiration))
                 .signWith(secretKey)
                 .compact();
     }
 
-    // 토큰 서명 및 만료 유효성 검증
     public boolean validateToken(String token) {
         try {
-            Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token);
+            parseClaims(token); // 서명, issuer, 만료시간까지 확인
             return true;
-        } catch (ExpiredJwtException e) {
-            log.warn("만료된 JWT 토큰입니다: {}", e.getMessage());
         } catch (JwtException | IllegalArgumentException e) {
-            log.warn("유효하지 않은 JWT 서명 또는 형식입니다: {}", e.getMessage());
+            log.debug("JWT 검증 실패: {}", e.getClass().getSimpleName());
+            return false;
         }
-        return false;
     }
 
-    // 토큰에서 페이로드 Claims 추출
+    // 만료된 Claims를 반환하면 만료 JWT를 인증에 잘못 사용할 수 있으므로 예외를 그대로 전달한다.
     public Claims parseClaims(String token) {
-        try {
-            return Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-        } catch (ExpiredJwtException e) {
-            return e.getClaims(); // 만료된 토큰이라도 클레임 정보는 반환하여 갱신에 활용
-        }
+        return Jwts.parser()
+                .verifyWith(secretKey)
+                .requireIssuer(ISSUER)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
-    // 토큰의 주체(Subject)에서 회원 PK 추출
     public Long getUserId(String token) {
         return Long.valueOf(parseClaims(token).getSubject());
     }
 
-    // 토큰의 비공개 클레임에서 사용자 이메일 추출
-    public String getEmail(String token) {
-        return parseClaims(token).get(
-                "email", String.class);
-    }
-
-    // Access Token 확인
     public boolean isAccessToken(String token) {
-        return "ACCESS".equals(
-                parseClaims(token).get(
-                        "type", String.class)
-        );
+        return "ACCESS".equals(parseClaims(token).get("type", String.class));
     }
 
-    // Refresh Token 확인
     public boolean isRefreshToken(String token) {
-        return "REFRESH".equals(
-                parseClaims(token).get(
-                        "type", String.class)
-        );
+        return "REFRESH".equals(parseClaims(token).get("type", String.class));
+    }
+
+    public long getRefreshTokenExpiration() {
+        return refreshTokenExpiration;
     }
 }
