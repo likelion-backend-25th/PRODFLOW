@@ -7,4 +7,6 @@ public interface LineRepository extends JpaRepository<Line, Long> {
 
     // line_name 중복 검사
     boolean existsByLineName(String lineName);
+
+
 }

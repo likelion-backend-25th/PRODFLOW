@@ -14,8 +14,11 @@ public class LineDto {
     ) {
     }
 
-    public record UpdateCapacityRequest(
-            int productionCapacity
+    // 하루 생산량 수정. 수량이 바뀔 때 reason을 line_capacity_log에 남긴다.
+    public record UpdateRequest(
+            String lineName,
+            int productionCapacity,
+            String reason
     ) {
     }
 

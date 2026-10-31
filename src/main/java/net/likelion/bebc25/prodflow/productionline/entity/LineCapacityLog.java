@@ -52,9 +52,11 @@ public class LineCapacityLog {
     @Column(nullable = false, updatable = false)
     private LocalDateTime changedAt;
 
-    public LineCapacityLog(Line line, int beforeCapacity, int afterCapacity, String reason, User changedBy) {
+    public LineCapacityLog(Line line, int afterCapacity, String reason, User changedBy) {
         this.line = line;
-        this.beforeCapacity = beforeCapacity;
+        // 호출 시점의 라인 생산량이다. editProduction 전에 만들어야 변경 전 수량이 남는다.
+        this.beforeCapacity = line.getProductionCapacity();
+        // 변경 후 생산량은 라인이 아니라 이 인자다. 라인을 나중에 바꿔도 이 값은 그대로 저장된다.
         this.afterCapacity = afterCapacity;
         this.reason = reason;
         this.changedBy = changedBy;

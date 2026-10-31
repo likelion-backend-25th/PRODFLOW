@@ -40,22 +40,11 @@ public class Line extends BaseTimeEntity {
         this.lineName = lineName;
         this.productionCapacity = productionCapacity;
     }
+    
 
-    // 등록 메서드가 넘긴 로그인 직원 이름을 작성자 컬럼에 넣는다.
-    public void recordWriter(String writer) {
-        setParentWriter("createdBy", writer);
-        setParentWriter("updatedBy", writer);
-    }
-
-    // 부모 클래스 BaseTimeEntity에서 createdBy,updatedBy 컬럼을 가져옴
-    private void setParentWriter(String fieldName, String writer) {
-        try {
-            java.lang.reflect.Field field = BaseTimeEntity.class.getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(this, writer);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new IllegalStateException("라인 작성자를 기록하지 못했습니다.", e);
-        }
+    // 라인 이름 변경
+    public void changeName(String lineName) {
+        this.lineName = lineName;
     }
 
     // 라인 생산량 수정
