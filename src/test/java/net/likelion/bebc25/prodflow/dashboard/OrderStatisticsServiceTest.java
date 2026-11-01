@@ -1,7 +1,7 @@
 package net.likelion.bebc25.prodflow.dashboard;
 
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
-import net.likelion.bebc25.prodflow.dashboard.service.DashboardService;
+import net.likelion.bebc25.prodflow.dashboard.service.OrderStatisticsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,17 +15,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @Transactional
-public class DashboardServiceTest {
+public class OrderStatisticsServiceTest {
 
     @Autowired
-    private DashboardService dashboardService;
+    private OrderStatisticsService orderStatisticsService;
 
     @Test
     @DisplayName("전체 수주 건수와 10월 수주 건수를 조회한다")
     void getOrderStatistics() {
 
         DashboardDto.OrderStatisticsResponse response =
-                dashboardService.getOrderStatistics(
+                orderStatisticsService.getOrderStatistics(
                         LocalDate.of(2026, 10, 1),
                         LocalDate.of(2026, 10, 31)
                 );
@@ -42,7 +42,7 @@ public class DashboardServiceTest {
     void invalidDateRange() {
 
         assertThatThrownBy(() ->
-                dashboardService.getOrderStatistics(
+                orderStatisticsService.getOrderStatistics(
                         LocalDate.of(2026, 10, 31),
                         LocalDate.of(2026, 10, 1)
                 )
@@ -56,7 +56,7 @@ public class DashboardServiceTest {
     void nullStartDate() {
 
         assertThatThrownBy(() ->
-                dashboardService.getOrderStatistics(
+                orderStatisticsService.getOrderStatistics(
                         null,
                         LocalDate.of(2026, 10, 31)
                 )
@@ -70,7 +70,7 @@ public class DashboardServiceTest {
     void nullEndDate() {
 
         assertThatThrownBy(() ->
-                dashboardService.getOrderStatistics(
+                orderStatisticsService.getOrderStatistics(
                         LocalDate.of(2026, 10, 1),
                         null
                 )
@@ -84,7 +84,7 @@ public class DashboardServiceTest {
     void sameDateRange() {
 
         DashboardDto.OrderStatisticsResponse response =
-                dashboardService.getOrderStatistics(
+                orderStatisticsService.getOrderStatistics(
                         LocalDate.of(2026, 10, 20),
                         LocalDate.of(2026, 10, 20)
                 );
@@ -98,7 +98,7 @@ public class DashboardServiceTest {
     void noOrdersInPeriod() {
 
         DashboardDto.OrderStatisticsResponse response =
-                dashboardService.getOrderStatistics(
+                orderStatisticsService.getOrderStatistics(
                         LocalDate.of(2030, 1, 1),
                         LocalDate.of(2030, 1, 31)
                 );

@@ -1,8 +1,11 @@
 package net.likelion.bebc25.prodflow.dashboard.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
-import net.likelion.bebc25.prodflow.dashboard.service.DashboardService;
+import net.likelion.bebc25.prodflow.dashboard.service.OrderStatisticsService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,14 +19,23 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class OrderStatisticsController {
 
-    private final DashboardService dashboardService;
+    private final OrderStatisticsService orderStatisticsService;
 
     // 수주 건수 통계 조회
+    @Operation(
+            summary = "수주 건수 통계 조회",
+            description = "조회 시작일과 종료일을 입력받아 해당 기간의 수주 건수 통계를 조회한다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 날짜 형식 또는 조회 기간 입력")
+    })
+
     @GetMapping("/orders")
     public DashboardDto.OrderStatisticsResponse getOrderStatistics(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, // 조회 시작일
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to // 조회 종료일
     ) {
-        return dashboardService.getOrderStatistics(from, to);
+        return orderStatisticsService.getOrderStatistics(from, to);
     }
 }

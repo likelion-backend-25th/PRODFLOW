@@ -45,6 +45,25 @@ public class DashboardDto {
     ) {
     }
 
+    // 월간 생산량 통계
+    public record MonthlyProductionResponse(
+            int year,
+            int month,
+            long plannedQuantity,
+            long completedQuantity
+    ) {
+    }
+
+    // 주차별 생산량 통계
+    public record WeeklyProductionResponse(
+            int week,
+            LocalDate startDate,
+            LocalDate endDate,
+            long plannedQuantity,
+            long completedQuantity
+    ) {
+    }
+
     // 제품별 생산 통계
     public record ProductProductionResponse(
             Long productId,
