@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public class DashboardService {
+public class OrderStatisticsService {
 
     private final OrderStatisticsRepository orderStatisticsRepository;
 
