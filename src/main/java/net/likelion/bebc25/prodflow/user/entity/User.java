@@ -84,12 +84,14 @@ public class User {
             String name,
             String email,
             String phone,
-            UserRole role
+            UserRole role,
+            UserStatus status
     ) {
         this.name = name;
         this.email = email;
         this.phone = phone;
         this.role = role;
+        this.status = status;
     }
 
     // 임시 비밀번호 발급

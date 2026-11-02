@@ -27,8 +27,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -210,7 +210,7 @@ class QuotationCreateTest {
                 User user = em.find(User.class, userId);
                 user.activate();
                 user.changePassword("encoded");
-                user.update("관리자", "writer@example.com", "010-1234-5678", UserRole.ORDER_MANAGER);
+                user.update("관리자", "writer@example.com", "010-1234-5678", UserRole.ORDER_MANAGER, user.getStatus());
                 switch (reason) {
                     case "inactive" -> user.deactivate();
                     case "password" -> user.updatePassword("temporary");
@@ -251,7 +251,7 @@ class QuotationCreateTest {
     private void authenticateAs(UserRole role) {
         CustomUserDetails principal = tx().execute(status -> {
             User user = em.find(User.class, userId);
-            user.update(user.getName(), user.getEmail(), user.getPhone(), role);
+            user.update(user.getName(), user.getEmail(), user.getPhone(), role, user.getStatus());
             return new CustomUserDetails(user);
         });
         SecurityContextHolder.getContext().setAuthentication(

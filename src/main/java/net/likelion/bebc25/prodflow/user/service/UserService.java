@@ -68,12 +68,24 @@ public class UserService {
 
     // 직원 정보 수정
     @Transactional
-    public UserDto.Response updateUser(Long id, UserDto.UpdateRequest request) {
+    public UserDto.Response updateUser(
+            Long id,
+            UserDto.UpdateRequest request
+
+    ) {
         // 직원 조회
         User user = findUserByIdOrThrow(id);
 
         // 삭제된 직원인지 검증
         validateNotDeleted(user);
+
+        // 수정 API에서는 ACTIVE와 INACTIVE만 허용
+        if (request.status() != UserStatus.ACTIVE
+                && request.status() != UserStatus.INACTIVE) {
+            throw new IllegalArgumentException(
+                    "계정 상태는 ACTIVE 또는 INACTIVE만 지정할 수 있습니다."
+            );
+        }
 
         //이메일이 변경된 경우에만 중복 검사
         if (!user.getEmail().equals(request.email())
@@ -83,25 +95,25 @@ public class UserService {
             );
         }
 
-        boolean securityInfoChanged = !user.getEmail().equals(request.email())
-                || user.getRole() != request.role()
-                || user.getStatus() != request.status()
-                || request.temporaryPassword() != null;
+        // 인증 관련 정보 변경 여부 확인
+        boolean securityInfoChanged =
+                //이메일
+                !user.getEmail().equals(request.email())
+                        // 계정 권한
+                        || user.getRole() != request.role()
+                        // 계정 상태
+                        || user.getStatus() != request.status()
+                        // 비밀번호 변경
+                        || request.temporaryPassword() != null;
 
         // 직원 정보 수정
         user.update(
                 request.name(),
                 request.email(),
                 request.phone(),
-                request.role()
+                request.role(),
+                request.status()
         );
-
-        // 계정 상태 변경
-        if (request.status() == UserStatus.ACTIVE) {
-            user.activate();
-        } else if (request.status() == UserStatus.INACTIVE) {
-            user.deactivate();
-        }
 
         // 임시 비밀번호 가져오기
         String temporaryPassword = request.temporaryPassword();
@@ -115,7 +127,7 @@ public class UserService {
 
             user.updatePassword(encodedPassword);
         }
-
+        // 계정 상태, 권한, 이메일, 비밀번호 변경 시 Refresh Token 폐기
         if (securityInfoChanged) {
             refreshTokenRepository.deleteByUserId(id);
         }
@@ -126,21 +138,10 @@ public class UserService {
         return UserDto.Response.from(user);
     }
 
-    // 계정 활성화
-    @Transactional
-    public UserDto.Response activateUser(Long id) {
-        return UserDto.Response.from(findUserByIdOrThrow(id));
-    }
-
-    // 계정 비활성화
-    @Transactional
-    public UserDto.Response deactivateUser(Long id) {
-        return UserDto.Response.from(findUserByIdOrThrow(id));
-    }
-
     // 직원 소프트 삭제
     @Transactional
     public UserDto.Response softDeleteUser(Long id) {
+
         return UserDto.Response.from(findUserByIdOrThrow(id));
     }
 
