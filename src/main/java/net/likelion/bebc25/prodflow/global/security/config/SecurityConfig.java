@@ -103,6 +103,11 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/v1/clients"
                         ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+                        
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/holidays/import"
+                        ).hasRole("SUPER_ADMIN")
 
                         .anyRequest().authenticated()
                 );
