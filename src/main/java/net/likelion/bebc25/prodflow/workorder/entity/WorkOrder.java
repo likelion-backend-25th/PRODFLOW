@@ -75,7 +75,8 @@ public class WorkOrder extends BaseTimeEntity {
                      User user,
                      int quantity,
                      LocalDate plannedStartDate,
-                     LocalDate plannedEndDate) {
+                     LocalDate plannedEndDate,
+                     String note) {
         this.workNo = workNo;
         this.orderProduct = orderProduct;
         this.line = line;
@@ -85,6 +86,7 @@ public class WorkOrder extends BaseTimeEntity {
         this.plannedStartDate = plannedStartDate;
         this.plannedEndDate = plannedEndDate;
         this.completedAt = null;
+        this.note = note;
     }
 
     public void changeStatus(CommonCode commonCode) {
