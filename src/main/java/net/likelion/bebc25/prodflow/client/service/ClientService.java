@@ -8,6 +8,7 @@ import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ public class ClientService {
 
 
     @Transactional
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public ClientDto.DetailResponse createClient(ClientDto.CreateRequest request) {
         // Order 관련 임시값
         int totalOrder = 0;
@@ -32,8 +34,8 @@ public class ClientService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않은 사용자입니다. id = " + request.userId()));
 
         // 로그인 구현이 안되어있어 임시로 구현한 메소드
-        Client client = clientRepository.save(request.toEntityWithoutLogin(user));
-//        Client client = clientRepository.save(request.toEntity(user));
+//        Client client = clientRepository.save(request.toEntityWithoutLogin(user));
+        Client client = clientRepository.save(request.toEntity(user));
         return ClientDto.DetailResponse.from(client, totalOrder, totalAmount, ongoingOrders);
     }
 
