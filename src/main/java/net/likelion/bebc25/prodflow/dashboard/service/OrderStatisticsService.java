@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
@@ -49,5 +50,10 @@ public class OrderStatisticsService {
                 totalOrderCount,
                 periodOrderCount
         );
+    }
+
+    // 수주 상태별 조회
+    public List<DashboardDto.OrderStatusStatisticsResponse> getOrderStatusStatistics() {
+        return orderStatisticsRepository.findOrderStatusStatistics();
     }
 }

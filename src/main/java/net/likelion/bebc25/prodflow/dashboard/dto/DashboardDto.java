@@ -90,6 +90,13 @@ public class DashboardDto {
     ) {
     }
 
+    public record OrderStatusStatisticsResponse(
+            String statusCode,
+            String statusName,
+            long orderCount
+    ) {
+    }
+
     // 대시보드 전체 응답
     public record DashboardResponse(
             SummaryResponse summary,
