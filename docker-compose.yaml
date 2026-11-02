@@ -1,12 +1,14 @@
 services:
   #  prodflow-app:
-  #    image: dltmddjs98/prodflow:latest
+  #    image: minkyolim/prodflow:latest
   #    container_name: prodflow-app
   #    restart: always
   #    env_file:
   #      - .env
-  #    expose:
-  #      - "8080"
+  #    ports:
+  #      - "127.0.0.1:8080:8080"
+  #      expose:
+  #        - "8080"
 
   mysql:
     image: mysql:9.7
