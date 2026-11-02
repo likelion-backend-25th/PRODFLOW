@@ -1,0 +1,18 @@
+info:
+  name: PRODUCT-01 파일 조회
+  type: http
+  seq: 12
+
+http:
+  method: GET
+  url: http://localhost:8080/api/v1/products/6/drawings/current
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwcm9kZmxvdyIsImp0aSI6IjEwNWM2Yjc4LWNjZTktNGMyYS1iNzExLWY3NjFlMTU2ODY5MyIsInN1YiI6IjEiLCJlbWFpbCI6ImFkbWluQHByb2RmbG93LmxvY2FsIiwicm9sZSI6IlNVUEVSX0FETUlOIiwidHlwZSI6IkFDQ0VTUyIsImlhdCI6MTc5MzU5MjQ0MCwiZXhwIjoxNzkzNTk0MjQwfQ.knXay1q3QsANUx8rEJbfG5Bj3L0p7I2S3-VRfvQRWMU
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
