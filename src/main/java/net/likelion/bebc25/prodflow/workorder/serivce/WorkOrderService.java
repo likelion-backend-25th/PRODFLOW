@@ -18,6 +18,8 @@ import net.likelion.bebc25.prodflow.workorder.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.workorder.entity.WorkOrder;
 import net.likelion.bebc25.prodflow.workorder.repsitory.ProductionPlanRepository;
 import net.likelion.bebc25.prodflow.workorder.repsitory.WorkOrderRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,7 @@ import java.time.Year;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 @Service
@@ -203,11 +206,18 @@ public class WorkOrderService {
         return responses;
     }
 
-    public List<WorkOrderDto.ListResponse> getList() {
+    // 작업지시서 페잊징 조회
+    public Page<WorkOrderDto.PageResponse> getPage(Pageable pageable) {
         // 완료 예정일이 빠른 순이다. 같은 날이면 id가 큰 최근 등록이 앞이다.
-        return workOrderRepository.findAllByOrderByPlannedEndDateAscIdDesc().stream()
-                // 작업지시 엔티티를 목록 응답으로 바꾼다.
-                .map(WorkOrderDto.ListResponse::from)
-                .toList();
+        return workOrderRepository.findAllByOrderByPlannedEndDateAscIdDesc(pageable)
+                // 작업지시 엔티티를 페이징 응답으로 바꾼다.
+                .map(WorkOrderDto.PageResponse::from);
+    }
+
+    // 작업지시서 상세 조회
+    public WorkOrderDto.DetailResponse getDetail(Long workOrderId) {
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+                .orElseThrow(() -> new NoSuchElementException("해당 지시서를 찾을 수 없습니다."));
+        return WorkOrderDto.DetailResponse.from(workOrder);
     }
 }

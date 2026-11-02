@@ -4,7 +4,8 @@ import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
 import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto.CreateRequest;
-import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto.ListResponse;
+import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto.DetailResponse;
+import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto.PageResponse;
 import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto.Response;
 import net.likelion.bebc25.prodflow.workorder.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.workorder.entity.WorkOrder;
@@ -15,13 +16,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Year;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -179,13 +184,24 @@ class WorkOrderServiceTest {
         Response laterDay = workOrderService.create(
                 request(15L, 1L, 4L, 100, date(2026, 12, 3), date(2026, 12, 3)), 1L).getFirst();
 
-        List<ListResponse> list = workOrderService.getList();
+        // 화면과 같이 5건씩이다. 정렬은 비워 레포지토리 순서를 쓴다.
+        Page<PageResponse> firstPage = workOrderService.getPage(PageRequest.of(0, 5));
 
-        assertThat(list).hasSize((int) workOrderRepository.count());
-        assertThat(list).isSortedAccordingTo(Comparator.comparing(ListResponse::plannedEndDate)
-                .thenComparing(Comparator.comparing(ListResponse::id).reversed()));
+        assertThat(firstPage.getNumber()).isZero();
+        assertThat(firstPage.getSize()).isEqualTo(5);
+        assertThat(firstPage.getContent()).hasSize(5);
+        assertThat(firstPage.getTotalElements()).isEqualTo(workOrderRepository.count());
 
-        List<String> workNos = list.stream().map(ListResponse::workNo).toList();
+        List<PageResponse> list = new ArrayList<>();
+        for (int page = 0; page < firstPage.getTotalPages(); page++) {
+            list.addAll(workOrderService.getPage(PageRequest.of(page, 5)).getContent());
+        }
+
+        assertThat(list).hasSize((int) firstPage.getTotalElements());
+        assertThat(list).isSortedAccordingTo(Comparator.comparing(PageResponse::plannedEndDate)
+                .thenComparing(Comparator.comparing(PageResponse::id).reversed()));
+
+        List<String> workNos = list.stream().map(PageResponse::workNo).toList();
         // 포장 완료도 빠지지 않는다. 완료 예정일 9월 21일이 10월 28일보다 앞이다.
         assertThat(workNos).contains("WI-2026-012", "WI-2026-001");
         assertThat(workNos.indexOf("WI-2026-012")).isLessThan(workNos.indexOf("WI-2026-001"));
@@ -198,7 +214,7 @@ class WorkOrderServiceTest {
         assertThat(laterRegistration).isLessThan(earlierRegistration);
         assertThat(earlierRegistration).isLessThan(afterThatDay);
 
-        ListResponse row = list.get(laterRegistration);
+        PageResponse row = list.get(laterRegistration);
         assertThat(row.id()).isEqualTo(secondOnSameDay.id());
         assertThat(row.orderNo()).isEqualTo("PF-2026-013");
         assertThat(row.clientName()).isEqualTo("세원모바일(주)");
@@ -209,6 +225,45 @@ class WorkOrderServiceTest {
         assertThat(row.workOrderDate()).isEqualTo(LocalDate.now());
         assertThat(row.plannedEndDate()).isEqualTo(date(2026, 12, 1));
         assertThat(row.status()).isEqualTo("PREPARE");
+    }
+
+    @Test
+    @DisplayName("작업지시 한 장의 수주, 라인, 담당자, 기간, 납기를 조회한다")
+    void getDetailOfSeedWorkOrder() {
+        // 시드 1번은 준비 상태다. 완료일은 없다.
+        DetailResponse detail = workOrderService.getDetail(1L);
+
+        assertThat(detail.id()).isEqualTo(1L);
+        assertThat(detail.workNo()).isEqualTo("WI-2026-001");
+        assertThat(detail.orderNo()).isEqualTo("PF-2026-001");
+        assertThat(detail.clientName()).isEqualTo("한빛케이스(주)");
+        assertThat(detail.productName()).isEqualTo("디자인 A 투명 케이스");
+        assertThat(detail.quantity()).isEqualTo(2000);
+        assertThat(detail.lineId()).isEqualTo(1L);
+        assertThat(detail.lineName()).isEqualTo("A라인");
+        assertThat(detail.assignedId()).isEqualTo(4L);
+        assertThat(detail.assignedName()).isEqualTo("김태호");
+        assertThat(detail.workOrderDate()).isEqualTo(date(2026, 10, 26));
+        assertThat(detail.plannedStartDate()).isEqualTo(date(2026, 10, 27));
+        assertThat(detail.plannedEndDate()).isEqualTo(date(2026, 10, 28));
+        assertThat(detail.completedAt()).isNull();
+        assertThat(detail.status()).isEqualTo("PREPARE");
+        assertThat(detail.note()).isEqualTo("디자인 A 투명 케이스 2,000개. A라인 10-27 1,000개, 10-28 1,000개");
+        assertThat(detail.estimatedDueDate()).isEqualTo(date(2026, 10, 30));
+
+        // 시드 12번은 포장 완료라 완료일이 있다.
+        DetailResponse packed = workOrderService.getDetail(12L);
+        assertThat(packed.workNo()).isEqualTo("WI-2026-012");
+        assertThat(packed.status()).isEqualTo("PACK_DONE");
+        assertThat(packed.completedAt()).isEqualTo(date(2026, 9, 21));
+    }
+
+    @Test
+    @DisplayName("없는 작업지시면 예외가 난다")
+    void rejectMissingWorkOrder() {
+        assertThatThrownBy(() -> workOrderService.getDetail(999L))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("해당 지시서를 찾을 수 없습니다.");
     }
 
     @Test
