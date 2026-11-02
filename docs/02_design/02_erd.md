@@ -245,6 +245,10 @@ erDiagram
       bigint id PK "견적서 고유 ID"
       varchar quotation_no UK "견적번호"
       bigint client_id FK "거래처 ID"
+      varchar contact_name "거래처 측 담당자 이름"
+      varchar email "거래처 이메일"
+      varchar phone "거래처 연락처"
+      varchar address "거래처 주소"
       bigint user_id FK "이 견적서를 작성한 직원 id"
       date requested_due_date "고객 희망 납기일"
       date estimated_due_date "등록된 수주와 라인 일일 생산량으로 계산한 예상 납기일"
@@ -409,14 +413,14 @@ erDiagram
       bigint conversation_id FK "대화방 ID"
       int sequence_no "대화방 내 메세지 순서"
       varchar role "메시지 발신자 구분 ASSISTANT / USER"
-      text content "질문 또는 AI 응답 내용"   
+      text content "질문 또는 AI 응답 내용"
       text generated_sql "AI가 생성한 SQL 쿼리문"
       datetime created_at "메시지 생성 일시"
   }
 
   holiday {
       bigint id PK "휴일 ID"
-      date holiday_date UK "생산일에서 빼는 날짜. 토요일·일요일은 저장하지 않는다."
+      date holiday_date UK "외부 API의 공휴일 날짜. 주말과 겹친 공휴일도 저장한다."
       varchar name "휴일 이름. 예: 설날, 추석, 삼일절 대체"
       datetime created_at "등록 일시"
   }
@@ -656,7 +660,7 @@ erDiagram
 
 ---
 
-생산일은 평일만 쓴다. 토요일과 일요일은 날짜의 요일로 계산해 뺀다. 그 날짜는 `holiday`에 넣지 않는다. 휴일은 `holiday.holiday_date`와 같은 날이면 뺀다. 빼는 날에는 수량을 넣지 않고
+생산일은 평일만 쓴다. 토요일과 일요일은 날짜의 요일로 계산해 뺀다. 일반 주말은 `holiday`에 넣지 않지만, API가 반환한 공휴일은 주말과 겹쳐도 저장한다. 휴일은 `holiday.holiday_date`와 같은 날이면 뺀다. 빼는 날에는 수량을 넣지 않고
 다음 날로 넘어간다. 생산이 끝난 뒤 3일을 더해 납기를 정한다. 포장 1일과 배송 2일이다. 이 3일을 셀 때도 주말과 휴일은 건너뛴다.
 
 백엔드는 그해 공휴일을 외부 API에서 한 번 받아 `holiday`에 저장한다. 사람이 추가하거나 삭제하지 않고, API가 준 날짜만 휴일이다.
@@ -716,6 +720,10 @@ erDiagram
 | id                 | BIGINT       | PK, AUTO_INCREMENT                                              | 견적서 고유 ID                                                                                                                           |
 | quotation_no       | VARCHAR(255) | UNIQUE, NOT NULL                                                | 견적번호                                                                                                                                |
 | client_id          | BIGINT       | FK, NOT NULL                                                    | 거래처 ID                                                                                                                              |
+| contact_name       | VARCHAR(255) | NOT NULL                                                        | 거래처 측 담당자 이름                                                                                                                        |
+| email              | VARCHAR(255) | NOT NULL                                                        | 거래처 이메일                                                                                                                             |
+| phone              | VARCHAR(255) | NOT NULL                                                        | 거래처 연락처                                                                                                                             |
+| address            | VARCHAR(255) | NOT NULL                                                        | 거래처 주소                                                                                                                              |
 | user_id            | BIGINT       | FK, NOT NULL                                                    | 이 견적서를 작성한 직원 id                                                                                                                    |
 | requested_due_date | DATE         | NOT NULL                                                        | 고객 희망 납기일                                                                                                                           |
 | estimated_due_date | DATE         | NOT NULL                                                        | 등록된 수주와 라인 일일 생산량으로 계산한 예상 납기일                                                                                                      |
@@ -742,6 +750,8 @@ erDiagram
   납기 계산에서 견적 날짜를 보지 않는다.
 - 수주 확정 이후의 일정 변경은 작업지시의 예정일과 `production_plan`이 바뀌고, 수주 전체 기간이 움직이면 `customer_order`의 생산 예정일도 바뀐다. 이미 승인한 견적서는 다시 고치지
   않는다.
+
+- 수주가 수동 또는 자동 취소되면 연결된 원본 견적의 `quotation.status`도 `CANCELLED`로 변경한다. 취소된 견적은 재승인하거나 새 수주 등록에 재사용하지 않는다. 다시 진행하려면 새 견적을 작성해 승인받아야 한다. 수주와 견적의 취소 상태 변경은 같은 트랜잭션으로 처리한다.
 
 ### 2.14 quotation_item (견적 품목)
 
@@ -816,7 +826,7 @@ erDiagram
 | id                 | BIGINT       | PK, AUTO_INCREMENT                  | 입금 내역 ID                       |
 | payment_id         | BIGINT       | FK, NOT NULL, UNIQUE                | 결제건 ID(Payment.id)             |
 | virtual_account_id | BIGINT       | FK                                  | 가상계좌 ID(VirtualAccount.id)     |
-| transaction_id     | VARCHAR(255) | NULL, UNIQUE                        | portone 에서 생성된 실제 결제 시도/거래 식별값 |
+| transaction_id     | VARCHAR(255) | UNIQUE                              | portone 에서 생성된 실제 결제 시도/거래 식별값 |
 | received_at        | DATETIME     | NOT NULL                            | 실제 입금 완료 일시                    |
 | created_at         | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 입금내역 DB 저장 일시                  |
 
@@ -876,16 +886,15 @@ erDiagram
 
 ### 2.23 order_notification (대시보드 알림 : 납기)
 
-| 컬럼명                    | 데이터 타입       | 제약 조건              | 설명                       |
-|------------------------|--------------|--------------------|--------------------------|
-| id                     | BIGINT       | PK, AUTO_INCREMENT | 알림 고유 식별자                |
-| customer_order_id      | BIGINT       | FK, NULL           | 관련 수주 ID                 |
-| target_id              | BIGINT       | FK                 | 수신자 ID                   |
-| notification_type      | VARCHAR(255) | NOT NULL           | DELIVERY_IMMINENT 납기 임박, 
- DELIVERY_DELAYED 납기 지연 |
-| message                | VARCHAR(500) | NOT NULL           | 알림 내용                    |
-| read_at                | DATETIME     | NULL               | 읽은 시각                    |
-| created_at             | DATETIME     | NOT NULL           | 알림 발송 시각                 |
+| 컬럼명               | 데이터 타입       | 제약 조건              | 설명                                              |
+|-------------------|--------------|--------------------|-------------------------------------------------|
+| id                | BIGINT       | PK, AUTO_INCREMENT | 알림 고유 식별자                                       |
+| customer_order_id | BIGINT       | FK, NULL           | 관련 수주 ID                                        |
+| target_id         | BIGINT       | FK                 | 수신자 ID                                          |
+| notification_type | VARCHAR(255) | NOT NULL           | DELIVERY_IMMINENT 납기 임박, DELIVERY_DELAYED 납기 지연 |
+| message           | VARCHAR(500) | NOT NULL           | 알림 내용                                           |
+| read_at           | DATETIME     | NULL               | 읽은 시각                                           |
+| created_at        | DATETIME     | NOT NULL           | 알림 발송 시각                                        |
 
 - 이 수주를 담당한 직원
 
@@ -952,10 +961,10 @@ erDiagram
 | 컬럼명          | 데이터 타입       | 제약 조건                               | 설명                              |
 |--------------|--------------|-------------------------------------|---------------------------------|
 | id           | BIGINT       | PK, AUTO_INCREMENT                  | 휴일 ID                           |
-| holiday_date | DATE         | NOT NULL, UNIQUE                    | 생산일에서 빼는 날짜. 토요일·일요일은 저장하지 않는다. |
+| holiday_date | DATE         | NOT NULL, UNIQUE                    | 외부 API의 공휴일 날짜. 주말과 겹친 공휴일도 저장한다. |
 | name         | VARCHAR(255) | NOT NULL                            | 휴일 이름. 예: 설날, 추석, 삼일절 대체        |
 | created_at   | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 등록 일시                           |
 
-- 토요일과 일요일은 날짜의 요일로 계산한다. 이 테이블에 넣지 않는다.
+- 토요일과 일요일은 날짜의 요일로 계산한다. 일반 주말은 넣지 않지만, API가 반환한 공휴일은 주말과 겹쳐도 이 테이블에 저장한다.
 - 백엔드는 그해 공휴일을 외부 API에서 한 번 받아 이 테이블에 저장한다. 사람이 행을 추가하거나 삭제하지 않는다. API가 준 날짜만 휴일이다.
 - 납기 계산은 `holiday_date`와 같은 날에 수량을 넣지 않는다. 생산 완료 뒤 3일(포장 1일, 배송 2일)을 셀 때도 이 날짜를 건너뛴다.

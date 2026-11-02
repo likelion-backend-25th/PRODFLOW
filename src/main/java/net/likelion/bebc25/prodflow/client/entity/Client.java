@@ -42,4 +42,13 @@ public class Client extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    public Client(String company, String employee, String email, String phone, Address address, User user) {
+        this.company = company;
+        this.employee = employee;
+        this.email = email;
+        this.phone = phone;
+        this.address = address;
+        this.user = user;
+    }
 }

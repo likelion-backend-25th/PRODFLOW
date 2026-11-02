@@ -52,6 +52,14 @@ logging:
 
     # 더 세부적인 필터 체인 통과 흐름을 보려면 TRACE 지정 가능
     # org.springframework.security.web.FilterChainProxy: TRACE
+
+holiday:
+  api:
+    base-url: https://date.nager.at
+  initialization:
+    # 운영 서버에서 true로 설정하면 시작 시 올해·다음 해 데이터를 수집
+    enabled: ${HOLIDAY_INITIALIZATION_ENABLED:true}
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}

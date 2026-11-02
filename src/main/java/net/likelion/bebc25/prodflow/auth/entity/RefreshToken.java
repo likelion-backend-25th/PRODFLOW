@@ -55,8 +55,13 @@ public class RefreshToken {
         this.expiresAt = expiresAt;
     }
 
+    public void rotate(String newTokenHash, LocalDateTime newExpiresAt) {
+        this.tokenHash = newTokenHash;
+        this.expiresAt = newExpiresAt;
+    }
+
     // Refresh Token 만료 여부 확인
     public boolean isExpired() {
-        return expiresAt.isBefore(LocalDateTime.now());
+        return !expiresAt.isAfter(LocalDateTime.now());
     }
 }

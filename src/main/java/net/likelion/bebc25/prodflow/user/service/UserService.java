@@ -2,6 +2,7 @@ package net.likelion.bebc25.prodflow.user.service;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.auth.repository.RefreshTokenRepository;
 import net.likelion.bebc25.prodflow.user.dto.UserDto;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
@@ -19,10 +20,16 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     // 직원 등록
     @Transactional
     public UserDto.Response createUser(UserDto.CreateRequest request) {
+
+        String temporaryPassword = request.temporaryPassword();
+        // 임시 비밀번호 유효성 검사
+        validateTemporaryPassword(temporaryPassword);
+
         // 이메일 중복 검사
         if (userRepository.existsByEmail(request.email())) {
             throw new IllegalArgumentException(
@@ -30,17 +37,15 @@ public class UserService {
             );
         }
 
-        // 임시 비밀번호 유효성 검사
-        validateTemporaryPassword(request.temporaryPassword());
-
         // 임시 비밀번호 암호화
         String encodedPassword = passwordEncoder.encode(request.temporaryPassword());
 
         // 새로 생성한 비영속 상태라 save()로 영속화
-        User user = userRepository.save(request.toEntity(encodedPassword));
+        User newUser = request.toEntity(encodedPassword);
+        User saveUser = userRepository.save(newUser);
 
         // 응답 Dto를 반환해 추가조회 없이 화면에 갱신가능
-        return UserDto.Response.from(user);
+        return UserDto.Response.from(saveUser);
     }
 
 
@@ -78,6 +83,11 @@ public class UserService {
             );
         }
 
+        boolean securityInfoChanged = !user.getEmail().equals(request.email())
+                || user.getRole() != request.role()
+                || user.getStatus() != request.status()
+                || request.temporaryPassword() != null;
+
         // 직원 정보 수정
         user.update(
                 request.name(),
@@ -104,6 +114,10 @@ public class UserService {
                     passwordEncoder.encode(temporaryPassword);
 
             user.updatePassword(encodedPassword);
+        }
+
+        if (securityInfoChanged) {
+            refreshTokenRepository.deleteByUserId(id);
         }
 
         // save()가 필요없는 이유 : @Transactional 내부에서 조회한 User는 영속 상태이므로,

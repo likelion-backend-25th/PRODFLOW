@@ -40,6 +40,12 @@ public class Line extends BaseTimeEntity {
         this.lineName = lineName;
         this.productionCapacity = productionCapacity;
     }
+    
+
+    // 라인 이름 변경
+    public void changeName(String lineName) {
+        this.lineName = lineName;
+    }
 
     // 라인 생산량 수정
     public void editProduction(int productionCapacity) {

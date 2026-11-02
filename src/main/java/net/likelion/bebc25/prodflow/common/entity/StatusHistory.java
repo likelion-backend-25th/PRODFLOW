@@ -55,6 +55,15 @@ public class StatusHistory {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    public StatusHistory(HistoryEntityType entity, Long entityId, String fromStatus, String toStatus, User user) {
+        this.entity = entity;
+        this.entityId = entityId;
+        this.fromStatus = fromStatus;
+        this.toStatus = toStatus;
+        this.user = user;
+        this.userName = user.getName();
+    }
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
