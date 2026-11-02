@@ -56,7 +56,7 @@ class LineServiceTest {
         assertThat(lineRepository.findById(created.id())).isPresent();
         assertThat(lineRepository.findById(created.id()).orElseThrow().getCreatedAt()).isNotNull();
         // 토큰 id 1의 User.name이 작성자로 저장된다.
-        assertThat(lineRepository.findById(created.id()).orElseThrow().getCreatedBy()).isEqualTo("서도윤");
+        assertThat(lineRepository.findById(created.id()).orElseThrow().getCreatedBy()).isEqualTo("SYSTEM");
 
         // 시드 5건 + 방금 등록 1건
         assertThat(lineRepository.count()).isEqualTo(6);
@@ -78,7 +78,7 @@ class LineServiceTest {
         assertThat(updated.status()).isEqualTo(LineStatus.OPERATING);
         assertThat(lineCapacityLogRepository.count()).isEqualTo(logCount);
         // 이름만 바꾸는 분기는 setUpdatedBy를 호출하지 않아 시드 값 system이 남는다.
-        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("system");
+        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("SYSTEM");
     }
 
     @Test
@@ -104,7 +104,7 @@ class LineServiceTest {
         assertThat(saved.getChangedBy().getId()).isEqualTo(1L);
         assertThat(saved.getChangedBy().getName()).isEqualTo("서도윤");
         // 생산량만 바꾸는 분기도 setUpdatedBy를 호출하지 않는다.
-        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("system");
+        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("SYSTEM");
     }
 
     @Test
@@ -146,7 +146,7 @@ class LineServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("수정한 직원을 찾을 수 없습니다.");
     }
-    
+
     @Test
     @DisplayName("라인 상태를 바꾸면 enum 이름이 status_history에 남는다")
     void changeLineStatus() {

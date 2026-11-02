@@ -9,17 +9,20 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "quotation_item")
+@Table(name = "quotation_item", uniqueConstraints = @UniqueConstraint(columnNames = {"quotation_id", "product_id"}))
 public class QuotationItem {
     
     @Id
@@ -66,13 +69,32 @@ public class QuotationItem {
         this.deviceName = deviceName;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
-        this.lineAmount = unitPrice * quantity;
+        this.lineAmount = calculateAmount(quantity, unitPrice);
         this.createdAt = LocalDateTime.now();
     }
 
     public void changePrice(int quantity, Long unitPrice) {
         this.quantity = quantity;
         this.unitPrice = unitPrice;
-        this.lineAmount = unitPrice * quantity;
+        this.lineAmount = calculateAmount(quantity, unitPrice);
+    }
+
+    private long calculateAmount(int quantity, Long unitPrice) {
+        if (quantity < 100 || unitPrice == null || unitPrice < 0) {
+            throw new IllegalArgumentException("견적 수량은 100개 이상, 단가는 0원 이상이어야 합니다.");
+        }
+        try {
+            // 금액 계산에는 소수 오차가 없는 BigDecimal을 사용한다.
+            BigDecimal price = BigDecimal.valueOf(unitPrice);
+            BigDecimal count = BigDecimal.valueOf(quantity);
+            BigDecimal amount = price.multiply(count);
+            if (!quotation.isVatIncluded()) {
+                amount = amount.multiply(new BigDecimal("1.1"));
+            }
+            // 원 단위로 반올림한다. long 범위를 넘으면 예외를 발생시킨다.
+            return amount.setScale(0, RoundingMode.HALF_UP).longValueExact();
+        } catch (ArithmeticException ex) {
+            throw new IllegalArgumentException("견적 품목 금액이 허용 범위를 초과했습니다.", ex);
+        }
     }
 }
