@@ -37,4 +37,14 @@ public class ProductDrawing extends BaseTimeEntity {
     // null이면 현재 도면
     @Column
     private LocalDateTime replacedAt;
+
+
+    public static ProductDrawing create(Product product, String objectKey, String fileName) {
+        ProductDrawing drawing = new ProductDrawing();
+        drawing.product = product;
+        drawing.objectKey = objectKey;
+        drawing.fileName = fileName;
+        drawing.replacedAt = null; // 현재 유효한 파일
+        return drawing;
+    }
 }

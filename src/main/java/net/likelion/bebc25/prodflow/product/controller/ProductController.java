@@ -2,9 +2,12 @@ package net.likelion.bebc25.prodflow.product.controller;
 
 
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.product.dto.ProductDrawingDto;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
+import net.likelion.bebc25.prodflow.product.service.ProductDrawingService;
 import net.likelion.bebc25.prodflow.product.service.ProductService;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -13,7 +16,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
 import java.util.List;
@@ -24,6 +29,8 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductDrawingService productDrawingService;
+
 
     @PostMapping
     public ResponseEntity<ProductDto.Response> create(@RequestBody ProductDto.CreateRequest request) {
@@ -63,5 +70,22 @@ public class ProductController {
     ) {
         ProductDto.Response response = productService.updateStatus(id, request);
         return ResponseEntity.ok(response);
+    }
+
+
+    @PostMapping(value = "/{id}/drawings", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProductDrawingDto.Response> uploadDrawing(
+            @PathVariable Long id,
+            @RequestPart("file") MultipartFile file
+    ) {
+        ProductDrawingDto.Response response = productDrawingService.upload(id, file);
+        return ResponseEntity
+                .created(URI.create("/api/v1/products/" + id + "/drawings/" + response.id()))
+                .body(response);
+    }
+
+    @GetMapping("/{id}/drawings/current")
+    public ResponseEntity<List<ProductDrawingDto.Response>> getCurrentDrawings(@PathVariable Long id) {
+        return ResponseEntity.ok(productDrawingService.getCurrentFiles(id));
     }
 }
