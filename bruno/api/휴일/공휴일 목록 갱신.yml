@@ -1,0 +1,20 @@
+info:
+  name: 공휴일 목록 갱신
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/holidays/import?year=2026"
+  params:
+    - name: year
+      value: "2026"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

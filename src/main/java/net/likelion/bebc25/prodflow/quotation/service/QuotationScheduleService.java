@@ -29,12 +29,15 @@ public class QuotationScheduleService {
     private final LineRepository lineRepository;
     private final QuotationScheduleRepository scheduleRepository;
 
-    public record Schedule(LocalDate estimatedDueDate, LocalDate plannedStartDate, LocalDate plannedEndDate) {}
+    public record Schedule(LocalDate estimatedDueDate, LocalDate plannedStartDate, LocalDate plannedEndDate) {
+    }
 
     public Schedule calculate(long quantity, LocalDate requestedDueDate, LocalDate today) {
-        // 하루 생산량 및 휴일 확인
+        // 하루 총 생산량
         long dailyCapacity = calculateDailyCapacity();
+        // 휴일 확인 (set으로 중복 방지)
         Set<LocalDate> holidays = new HashSet<>(scheduleRepository.findHolidays());
+
         // 요청별 예약 수량 임시 보관
         ProductionCalendar calendar = new ProductionCalendar(dailyCapacity, holidays, today.plusYears(20));
 
@@ -225,7 +228,7 @@ public class QuotationScheduleService {
         }
 
         private Map<LocalDate, Long> planFromDeadline(long quantity, LocalDate firstDate,
-                                                     LocalDate deadline, Map<LocalDate, Long> earliestPlan) {
+                                                      LocalDate deadline, Map<LocalDate, Long> earliestPlan) {
             Map<LocalDate, Long> plan = new LinkedHashMap<>();
             long remainingQuantity = quantity;
             LocalDate date = deadline;

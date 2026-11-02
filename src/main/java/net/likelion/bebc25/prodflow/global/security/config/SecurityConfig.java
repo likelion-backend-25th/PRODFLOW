@@ -51,6 +51,8 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/v1/users", "/api/v1/users/**").hasRole("SUPER_ADMIN")
 
+                        .requestMatchers(HttpMethod.POST, "/api/v1/holidays/import").hasRole("SUPER_ADMIN")
+
                         .requestMatchers(HttpMethod.POST, "/api/v1/lines").hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
 
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/lines/*").hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")

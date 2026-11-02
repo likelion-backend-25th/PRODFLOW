@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.common.entity;
+package net.likelion.bebc25.prodflow.holiday.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "holiday")
-public class holiday {
+public class Holiday {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,7 +36,7 @@ public class holiday {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public holiday(LocalDate holidayDate, String name) {
+    public Holiday(LocalDate holidayDate, String name) {
         this.holidayDate = holidayDate;
         this.name = name;
     }

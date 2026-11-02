@@ -1,0 +1,7 @@
+info:
+  name: 휴일
+  type: folder
+  seq: 12
+
+request:
+  auth: inherit

@@ -19,6 +19,7 @@ public interface QuotationScheduleRepository extends Repository<CustomerOrder, L
             """)
     List<CustomerOrder> findActiveOrders();
 
+    // 수주 ID 목록이 비어 있으면 DB를 조회하지 않고 빈 리스트 반환
     default List<OrderProduct> findOrderProducts(List<Long> orderIds) {
         if (orderIds.isEmpty()) {
             return List.of();
@@ -32,6 +33,7 @@ public interface QuotationScheduleRepository extends Repository<CustomerOrder, L
             """)
     List<OrderProduct> findOrderProductsByOrderIds(@Param("ids") List<Long> orderIds);
 
+    // 수주 ID 목록이 비어 있으면 DB를 조회하지 않고 빈 리스트 반환
     default List<ProductionPlan> findFixedPlans(List<Long> orderIds) {
         if (orderIds.isEmpty()) {
             return List.of();
@@ -48,6 +50,6 @@ public interface QuotationScheduleRepository extends Repository<CustomerOrder, L
             """)
     List<ProductionPlan> findFixedPlansByOrderIds(@Param("ids") List<Long> orderIds);
 
-    @Query("select h.holidayDate from holiday h")
+    @Query("select h.holidayDate from Holiday h")
     List<LocalDate> findHolidays();
 }
