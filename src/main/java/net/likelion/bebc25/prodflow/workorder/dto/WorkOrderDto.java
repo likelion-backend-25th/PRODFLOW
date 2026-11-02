@@ -25,7 +25,7 @@ public class WorkOrderDto {
     }
 
     // 목록 응답
-    public record ListResponse(
+    public record PageResponse(
             Long id,
             String workNo, // 작업 지시 번호
             String orderNo, // 수주 번호
@@ -38,8 +38,8 @@ public class WorkOrderDto {
             LocalDate plannedEndDate,
             String status
     ) {
-        public static ListResponse from(WorkOrder workOrder) {
-            return new ListResponse(
+        public static PageResponse from(WorkOrder workOrder) {
+            return new PageResponse(
                     workOrder.getId(),
                     workOrder.getWorkNo(),
                     workOrder.getOrderProduct().getCustomerOrder().getOrderNo(),
@@ -51,6 +51,49 @@ public class WorkOrderDto {
                     workOrder.getWorkOrderDate(),
                     workOrder.getPlannedEndDate(),
                     workOrder.getCommonCode().getCode()
+            );
+        }
+    }
+
+    // 상세 응답
+    public record DetailResponse(
+            Long id,
+            String workNo, // 작업 지시 번호
+            String orderNo, // 수주 번호
+            String clientName, // 거래처명
+            String productName, // 품목명
+            int quantity,
+            Long lineId,
+            String lineName,
+            Long assignedId,
+            String assignedName,
+            LocalDate workOrderDate, // 지시일
+            LocalDate plannedStartDate,
+            LocalDate plannedEndDate,
+            LocalDate completedAt,
+            String status,
+            String note,
+            LocalDate estimatedDueDate // 수주 납기
+    ) {
+        public static DetailResponse from(WorkOrder workOrder) {
+            return new DetailResponse(
+                    workOrder.getId(),
+                    workOrder.getWorkNo(),
+                    workOrder.getOrderProduct().getCustomerOrder().getOrderNo(),
+                    workOrder.getOrderProduct().getCustomerOrder().getClient().getCompany(),
+                    workOrder.getOrderProduct().getProductName(),
+                    workOrder.getQuantity(),
+                    workOrder.getLine().getId(),
+                    workOrder.getLine().getLineName(),
+                    workOrder.getUser().getId(),
+                    workOrder.getUser().getName(),
+                    workOrder.getWorkOrderDate(),
+                    workOrder.getPlannedStartDate(),
+                    workOrder.getPlannedEndDate(),
+                    workOrder.getCompletedAt(),
+                    workOrder.getCommonCode().getCode(),
+                    workOrder.getNote(),
+                    workOrder.getOrderProduct().getCustomerOrder().getEstimatedDueDate()
             );
         }
     }
