@@ -25,6 +25,11 @@ public class UserService {
     // 직원 등록
     @Transactional
     public UserDto.Response createUser(UserDto.CreateRequest request) {
+
+        String temporaryPassword = request.temporaryPassword();
+        // 임시 비밀번호 유효성 검사
+        validateTemporaryPassword(temporaryPassword);
+
         // 이메일 중복 검사
         if (userRepository.existsByEmail(request.email())) {
             throw new IllegalArgumentException(
@@ -32,17 +37,15 @@ public class UserService {
             );
         }
 
-        // 임시 비밀번호 유효성 검사
-        validateTemporaryPassword(request.temporaryPassword());
-
         // 임시 비밀번호 암호화
         String encodedPassword = passwordEncoder.encode(request.temporaryPassword());
 
         // 새로 생성한 비영속 상태라 save()로 영속화
-        User user = userRepository.save(request.toEntity(encodedPassword));
+        User newUser = request.toEntity(encodedPassword);
+        User saveUser = userRepository.save(newUser);
 
         // 응답 Dto를 반환해 추가조회 없이 화면에 갱신가능
-        return UserDto.Response.from(user);
+        return UserDto.Response.from(saveUser);
     }
 
 

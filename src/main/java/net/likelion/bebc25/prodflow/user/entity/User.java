@@ -76,7 +76,6 @@ public class User {
         this.email = email;
         this.phone = phone;
         this.role = role;
-        this.status = UserStatus.ACTIVE;
     }
 
 
