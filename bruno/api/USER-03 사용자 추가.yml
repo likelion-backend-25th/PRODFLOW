@@ -1,7 +1,7 @@
 info:
   name: USER-03 사용자 추가
   type: http
-  seq: 5
+  seq: 1
 
 http:
   method: POST

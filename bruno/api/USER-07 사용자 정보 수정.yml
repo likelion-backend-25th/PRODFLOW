@@ -1,7 +1,7 @@
 info:
   name: USER-07 사용자 정보 수정
   type: http
-  seq: 8
+  seq: 4
 
 http:
   method: PUT

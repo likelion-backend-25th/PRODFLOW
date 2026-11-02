@@ -64,4 +64,22 @@ class ProductServiceTest {
         Response detail = productService.getDetail(1L);
         assertThat(detail.status()).isEqualTo(ProductStatus.DISCONTINUED);
     }
+
+    @Test
+    @DisplayName("품목 정보 수정")
+    void updateProduct() {
+        Response updated = productService.update(
+                1L,
+                new ProductDto.UpdateRequest("수정된 케이스", 1L, "수정 설명", 15000L)
+        );
+
+        assertThat(updated.productName()).isEqualTo("수정된 케이스");
+        assertThat(updated.productDescription()).isEqualTo("수정 설명");
+        assertThat(updated.currentPrice()).isEqualTo(15000L);
+        assertThat(updated.modelCode()).isEqualTo("PF-CS-A100"); // modelCode 는 안 바뀜
+
+        Response detail = productService.getDetail(1L);
+        assertThat(detail.productName()).isEqualTo("수정된 케이스");
+        assertThat(detail.currentPrice()).isEqualTo(15000L);
+    }
 }

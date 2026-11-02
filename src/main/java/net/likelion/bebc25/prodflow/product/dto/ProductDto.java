@@ -10,7 +10,7 @@ public class ProductDto {
 
     public record UpdateStatusRequest(
             ProductStatus status
-    ){
+    ) {
 
     }
 
@@ -23,6 +23,7 @@ public class ProductDto {
 
     ) {
     }
+
 
     public record Response(
             Long id,
@@ -48,6 +49,14 @@ public class ProductDto {
                     product.getUpdatedAt()
             );
         }
+    }
+
+    public record UpdateRequest(
+            String productName,
+            Long deviceCode,
+            String productDescription,
+            Long currentPrice
+    ) {
     }
 
 

@@ -110,4 +110,31 @@ public class ProductService {
 
 
     }
+
+    public Response update(Long id, ProductDto.UpdateRequest request) {
+        Optional<Product> optionalProduct = productRepository.findById(id);
+        if (optionalProduct.isEmpty()) {
+            throw new EntityNotFoundException("품목을 찾을 수 없습니다: id=" + id);
+        }
+        Product product = optionalProduct.get();
+
+        if (request.currentPrice() == null || request.currentPrice() <= 0) {
+            throw new IllegalArgumentException("기준 단가는 0보다 커야 합니다.");
+        }
+
+        Optional<CommonCode> deviceExist = commonCodeRepository.findById(request.deviceCode());
+        if (deviceExist.isEmpty()) {
+            throw new EntityNotFoundException("기종 코드를 찾을 수 없습니다.");
+        }
+        CommonCode device = deviceExist.get();
+
+        product.update(
+                request.productName(),
+                device,
+                request.productDescription(),
+                request.currentPrice()
+        );
+
+        return Response.from(product);
+    }
 }

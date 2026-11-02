@@ -1,7 +1,7 @@
 info:
   name: PRODUCT-01 파일 업로드
   type: http
-  seq: 11
+  seq: 7
 
 http:
   method: POST
