@@ -6,6 +6,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.client.dto.ClientDto;
 import net.likelion.bebc25.prodflow.client.service.ClientService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -49,5 +53,24 @@ public class ClientController {
             @PathVariable("id") Long clientId
     ) {
         return ResponseEntity.ok(clientService.getClientDetail(clientId));
+    }
+
+    @Operation(
+            summary = "거래처 정보 리스트 조회",
+            description = "거래처들의 리스트를 페이지네이션하여 조회한다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping
+    public ResponseEntity<Page<ClientDto.Response>> getClients(
+            @PageableDefault(
+                    page = 0,
+                    size = 8,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable
+    ) {
+        return ResponseEntity.ok(clientService.getClients(pageable));
     }
 }

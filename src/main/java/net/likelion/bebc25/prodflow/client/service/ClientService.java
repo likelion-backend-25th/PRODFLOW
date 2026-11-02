@@ -6,8 +6,12 @@ import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 @Service
 @Transactional(readOnly = true)
@@ -42,5 +46,25 @@ public class ClientService {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않은 거래처 입니다. id = " + clientId));
         return ClientDto.DetailResponse.from(client, totalOrder, totalAmount, ongoingOrders);
+    }
+
+    public Page<ClientDto.Response> getClients(Pageable pageable) {
+        Page<Client> clients;
+
+        clients = clientRepository.findAll(pageable);
+
+        return clients.map(client -> {
+            // Order 관련 임시값
+            int totalOrder = 3;
+            Long totalAmount = 12340000L;
+            LocalDateTime recentOrderedAt = LocalDateTime.now();
+
+            return ClientDto.Response.from(
+                    client,
+                    totalOrder,
+                    totalAmount,
+                    recentOrderedAt
+            );
+        });
     }
 }
