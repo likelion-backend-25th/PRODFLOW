@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.global.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import net.likelion.bebc25.prodflow.auth.exception.AuthException;
 import org.apache.tomcat.websocket.AuthenticationException;
@@ -18,6 +19,13 @@ import java.util.NoSuchElementException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // 서비스 메서드 입력 검증 실패 시 400 응답
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
+        return ResponseEntity.status(ErrorCode.INVALID_INPUT_VALUE.getHttpStatus())
+                .body(ApiErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE));
+    }
 
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<Map<String, String>> handleAuthException(AuthException ex) {

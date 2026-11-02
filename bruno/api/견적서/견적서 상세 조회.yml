@@ -1,0 +1,23 @@
+info:
+  name: 견적서 상세 조회
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/quotations"
+  auth: inherit
+
+runtime:
+  variables:
+    - name: quotationId
+      value:
+        type: number
+        data: "1"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

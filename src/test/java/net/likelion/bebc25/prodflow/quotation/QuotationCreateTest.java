@@ -1,6 +1,7 @@
 package net.likelion.bebc25.prodflow.quotation;
 
 import jakarta.persistence.EntityManager;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
@@ -27,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -37,6 +39,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -130,6 +133,7 @@ class QuotationCreateTest {
         assertThat(itemRepository.count()).isEqualTo(1);
 
         var quotation = quotationRepository.findById(response.id()).orElseThrow();
+        assertThat(quotation.getTotalAmount()).isEqualTo(response.totalAmount());
         String expectedNo = "QT-" + today().format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + response.id();
         assertThat(response.quotationNo()).isEqualTo(expectedNo);
         assertThat(quotation.getQuotationNo()).isEqualTo(expectedNo);
@@ -156,12 +160,12 @@ class QuotationCreateTest {
         assertThat(validator.validate(tooSmall))
                 .anyMatch(violation -> violation.getPropertyPath().toString().contains("quantity"));
         assertThatThrownBy(() -> service.create(tooSmall, userId))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("100개");
+                .isInstanceOf(ConstraintViolationException.class).hasMessageContaining("100개");
         assertThat(validator.validate(request(List.of(item(100, 1000L))))).isEmpty();
 
         // 합계가 100개여도 각각 최소 수량 미만이면 거부한다.
         assertThatThrownBy(() -> service.create(request(List.of(item(60, 1000L), item(40, 1000L))), userId))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("100개");
+                .isInstanceOf(ConstraintViolationException.class).hasMessageContaining("100개");
         assertThat(quotationRepository.count()).isZero();
     }
 
@@ -200,16 +204,14 @@ class QuotationCreateTest {
     }
 
     @Test
-    void rechecksRoleAccountStateAndPasswordChangeInDatabase() {
-        for (String reason : new String[]{"role", "inactive", "password"}) {
+    void rechecksAccountStateAndPasswordChangeInDatabase() {
+        for (String reason : new String[]{"inactive", "password"}) {
             tx().executeWithoutResult(status -> {
                 User user = em.find(User.class, userId);
                 user.activate();
                 user.changePassword("encoded");
                 user.update("관리자", "writer@example.com", "010-1234-5678", UserRole.ORDER_MANAGER);
                 switch (reason) {
-                    case "role" ->
-                            user.update("조회 담당", "writer@example.com", "010-1234-5678", UserRole.INQUIRY_MANAGER);
                     case "inactive" -> user.deactivate();
                     case "password" -> user.updatePassword("temporary");
                 }
@@ -222,16 +224,71 @@ class QuotationCreateTest {
     }
 
     @Test
+    void superAdminAndOrderManagerCanCreateQuotation() {
+        for (UserRole role : List.of(UserRole.SUPER_ADMIN, UserRole.ORDER_MANAGER)) {
+            authenticateAs(role);
+            var response = service.create(request(List.of(item(100, 1000L))), userId);
+            assertThat(response.userId()).isEqualTo(userId);
+            assertThat(response.status()).isEqualTo(QuotationStatus.SENT);
+        }
+        assertThat(quotationRepository.count()).isEqualTo(2);
+        assertThat(itemRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void otherRolesCannotCreateQuotationOrLeavePartialData() {
+        for (UserRole role : List.of(UserRole.PRODUCTION_MANAGER, UserRole.INQUIRY_MANAGER)) {
+            authenticateAs(role);
+            assertThatThrownBy(() -> service.create(
+                    newClientRequest("권한 검증 회사", List.of(item(100, 1000L))), userId))
+                    .isInstanceOf(AccessDeniedException.class);
+            assertThat(quotationRepository.count()).isZero();
+            assertThat(itemRepository.count()).isZero();
+            assertThat(clientRepository.count()).isEqualTo(1);
+        }
+    }
+
+    private void authenticateAs(UserRole role) {
+        CustomUserDetails principal = tx().execute(status -> {
+            User user = em.find(User.class, userId);
+            user.update(user.getName(), user.getEmail(), user.getPhone(), role);
+            return new CustomUserDetails(user);
+        });
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
+    }
+
+    @Test
+    void rejectsMissingAndInvalidNestedInputsBeforeSaving() {
+        var invalidRequests = List.of(
+                new QuotationDto.CreateRequest(clientId, dueDate(), null, false, null, null, "담당자"),
+                new QuotationDto.CreateRequest(clientId, null, null, false, List.of(item(100, 1000L)), null, "담당자"),
+                request(java.util.Arrays.asList((QuotationItemDto.CreateRequest) null)),
+                request(List.of(new QuotationItemDto.CreateRequest(null, 100, 1000L))),
+                request(List.of(new QuotationItemDto.CreateRequest(0L, 100, 1000L))),
+                request(List.of(new QuotationItemDto.CreateRequest(productId, 100, null))));
+        assertThatThrownBy(() -> service.create(null, userId))
+                .isInstanceOf(ConstraintViolationException.class);
+        for (var invalid : invalidRequests) {
+            assertThatThrownBy(() -> service.create(invalid, userId))
+                    .isInstanceOf(ConstraintViolationException.class);
+        }
+        assertThat(quotationRepository.count()).isZero();
+        assertThat(itemRepository.count()).isZero();
+        assertThat(clientRepository.count()).isEqualTo(1);
+    }
+
+    @Test
     void rejectsStoppedProductsAndInvalidInput() {
         for (var items : List.of(List.of(item(100, -1L)), List.<QuotationItemDto.CreateRequest>of())) {
             assertThatThrownBy(() -> service.create(request(items), userId))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(ConstraintViolationException.class);
         }
         var blankContact = new QuotationDto.CreateRequest(clientId, dueDate(), null, false,
                 List.of(item(100, 1000L)), null, "");
         assertThat(validator.validate(blankContact)).isNotEmpty();
         assertThatThrownBy(() -> service.create(blankContact, userId))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("담당자");
+                .isInstanceOf(ConstraintViolationException.class).hasMessageContaining("담당자");
 
         tx().executeWithoutResult(status -> em.find(Product.class, productId).changeStatus(ProductStatus.DISCONTINUED));
         assertThatThrownBy(() -> service.create(request(List.of(item(100, 1000L))), userId))
@@ -243,6 +300,7 @@ class QuotationCreateTest {
     void roundsVatAndOddDepositToWonAndSupportsVatIncludedPrices() {
         var response = service.create(request(List.of(item(101, 1L))), userId);
         assertThat(response.totalAmount()).isEqualTo(111L);
+        assertThat(quotationRepository.findById(response.id()).orElseThrow().getTotalAmount()).isEqualTo(111L);
         assertThat(response.depositAmount()).isEqualTo(56L);
         assertThat(response.balanceAmount()).isEqualTo(55L);
         assertThat(response.validUntil()).isEqualTo(today().plusDays(14));
@@ -251,8 +309,42 @@ class QuotationCreateTest {
                 List.of(item(101, 1L)), null, "견적 담당자");
         var includedResponse = service.create(vatIncluded, userId);
         assertThat(includedResponse.totalAmount()).isEqualTo(101L);
+        assertThat(quotationRepository.findById(includedResponse.id()).orElseThrow().getTotalAmount()).isEqualTo(101L);
         assertThat(includedResponse.supplyAmount()).isEqualTo(92L);
         assertThat(includedResponse.vatAmount()).isEqualTo(9L);
+    }
+
+    @Test
+    void storesTotalAsSumOfIndividuallyRoundedLines() {
+        Long secondProductId = tx().execute(status -> {
+            Product original = em.find(Product.class, productId);
+            Product second = Product.create("TEST-002", "두 번째 품목", original.getDevice(), "설명", 1L);
+            em.persist(second);
+            return second.getId();
+        });
+        var response = service.create(request(List.of(item(105, 1L),
+                new QuotationItemDto.CreateRequest(secondProductId, 105, 1L))), userId);
+        assertThat(response.totalAmount()).isEqualTo(232L);
+        assertThat(quotationRepository.findById(response.id()).orElseThrow().getTotalAmount()).isEqualTo(232L);
+        assertThat(itemRepository.findByQuotationIdOrderByIdAsc(response.id()))
+                .extracting(item -> item.getLineAmount()).containsExactly(116L, 116L);
+    }
+
+    @Test
+    void rejectsTotalOverflowEvenWhenEachLineFitsWithoutLeavingNewClient() {
+        Long secondProductId = tx().execute(status -> {
+            Product original = em.find(Product.class, productId);
+            Product second = Product.create("TEST-002", "두 번째 품목", original.getDevice(), "설명", 1L);
+            em.persist(second);
+            return second.getId();
+        });
+        var request = newClientRequest("총액 초과 회사", List.of(item(100, 50000000000000000L),
+                new QuotationItemDto.CreateRequest(secondProductId, 100, 50000000000000000L)));
+        assertThatThrownBy(() -> service.create(request, userId))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("총액");
+        assertThat(quotationRepository.count()).isZero();
+        assertThat(itemRepository.count()).isZero();
+        assertThat(clientRepository.count()).isEqualTo(1);
     }
 
     @Test
@@ -288,10 +380,47 @@ class QuotationCreateTest {
         });
         var quotation = quotationRepository.findById(response.id()).orElseThrow();
         assertThat(quotation.getEmail()).isEqualTo("client@example.com");
+        assertThat(quotation.getTotalAmount()).isEqualTo(response.totalAmount());
         assertThat(quotation.getPhone()).isEqualTo("02-1234-5678");
         var item = itemRepository.findByQuotationIdOrderByIdAsc(response.id()).getFirst();
         assertThat(item.getProductName()).isEqualTo("테스트 품목");
         assertThat(item.getUnitPrice()).isEqualTo(1000L);
+    }
+
+    @Test
+    void detailReturnsSavedAmountsSnapshotsAndScheduleWithoutUpdatingQuotation() {
+        for (boolean vatIncluded : new boolean[]{false, true}) {
+            var request = new QuotationDto.CreateRequest(clientId, dueDate(), null, vatIncluded,
+                    List.of(item(101, 1000L)), null, "견적 담당자");
+            var created = service.create(request, userId);
+
+            tx().executeWithoutResult(status -> {
+                ReflectionTestUtils.setField(em.find(Client.class, clientId), "email", "changed@example.com");
+                ReflectionTestUtils.setField(em.find(Product.class, productId), "productName", "변경된 품목");
+                ReflectionTestUtils.setField(em.find(Product.class, productId), "currentPrice", 9999L);
+                em.createQuery("delete from Line").executeUpdate();
+            });
+
+            // 생산라인이 없어도 저장된 일정 조회 가능
+            var stored = quotationRepository.findById(created.id()).orElseThrow();
+            var detail = service.getQuotationById(created.id());
+            // DB 시간 정밀도 차이를 제외한 생성·조회 응답 비교
+            assertThat(detail).usingRecursiveComparison()
+                    .ignoringFields("createdAt", "updatedAt").isEqualTo(created);
+            assertThat(detail.createdAt()).isEqualTo(stored.getCreatedAt());
+            assertThat(detail.updatedAt()).isEqualTo(stored.getUpdatedAt());
+            assertThat(service.getQuotationById(created.id())).isEqualTo(detail);
+
+            // 다음 생성 시 사용할 생산라인 복원
+            tx().executeWithoutResult(status -> em.persist(new Line("라인 A", 1000)));
+        }
+    }
+
+    @Test
+    void detailRejectsUnknownQuotation() {
+        assertThatThrownBy(() -> service.getQuotationById(Long.MAX_VALUE))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("존재하지 않는 견적서");
     }
 
     private QuotationDto.CreateRequest request(List<QuotationItemDto.CreateRequest> items) {

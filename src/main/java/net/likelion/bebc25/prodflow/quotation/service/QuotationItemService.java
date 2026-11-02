@@ -23,27 +23,11 @@ public class QuotationItemService {
     private final QuotationItemRepository quotationItemRepository;
     private final ProductRepository productRepository;
 
-    // 견적 품목 입력값 및 중복 여부 검증
+    // DTO 검증을 통과한 견적 품목의 중복 여부 검증
     public void validateItems(List<QuotationItemDto.CreateRequest> requests) {
-        if (requests == null || requests.isEmpty()) {
-            throw new IllegalArgumentException("견적 품목은 하나 이상이어야 합니다.");
-        }
-
         Set<Long> productIds = new HashSet<>();
 
         for (QuotationItemDto.CreateRequest item : requests) {
-            // 품목 정보 존재 여부, 양수인 품목 ID, 0원 이상의 단가 검증
-            if (item == null || item.productId() == null || item.productId() <= 0
-                    || item.unitPrice() == null || item.unitPrice() < 0) {
-                throw new IllegalArgumentException(
-                        "유효한 품목 ID와 0원 이상의 단가를 입력해주세요.");
-            }
-
-            // 품목별 최소 주문 수량 100개 검증
-            if (item.quantity() < 100) {
-                throw new IllegalArgumentException("품목별 수량은 100개 이상이어야 합니다.");
-            }
-
             // 이미 저장된 품목 ID는 add()가 false를 반환하므로 중복으로 판단
             if (!productIds.add(item.productId())) {
                 throw new IllegalArgumentException("같은 품목을 중복으로 추가할 수 없습니다.");
