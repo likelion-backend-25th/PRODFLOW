@@ -66,4 +66,16 @@ public class Product extends BaseTimeEntity {
         this.status = status;
     }
 
+    public void update(
+            String productName,
+            CommonCode device,
+            String productDescription,
+            Long currentPrice
+    ) {
+        this.productName = productName;
+        this.device = device;
+        this.productDescription = productDescription;
+        this.currentPrice = currentPrice;
+    }
+
 }

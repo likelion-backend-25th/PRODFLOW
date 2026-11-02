@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -87,5 +88,14 @@ public class ProductController {
     @GetMapping("/{id}/drawings/current")
     public ResponseEntity<List<ProductDrawingDto.Response>> getCurrentDrawings(@PathVariable Long id) {
         return ResponseEntity.ok(productDrawingService.getCurrentFiles(id));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ProductDto.Response> update(
+            @PathVariable Long id,
+            @RequestBody ProductDto.UpdateRequest request
+    ) {
+        ProductDto.Response response = productService.update(id, request);
+        return ResponseEntity.ok(response);
     }
 }

@@ -1,7 +1,7 @@
 info:
   name: USER-06 사용자 상세 조회
   type: http
-  seq: 7
+  seq: 3
 
 http:
   method: GET
