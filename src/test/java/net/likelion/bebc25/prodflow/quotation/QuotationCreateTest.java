@@ -8,6 +8,7 @@ import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.commoncode.entity.CodeGroup;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.productionline.entity.Line;
@@ -50,25 +51,32 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "jwt.access-token-expiration=60000", "jwt.refresh-token-expiration=120000"
 })
 class QuotationCreateTest {
-    @Autowired EntityManager em;
-    @Autowired PlatformTransactionManager transactionManager;
-    @Autowired QuotationService service;
-    @Autowired Validator validator;
-    @Autowired QuotationRepository quotationRepository;
-    @Autowired QuotationItemRepository itemRepository;
-    @Autowired ClientRepository clientRepository;
+    @Autowired
+    EntityManager em;
+    @Autowired
+    PlatformTransactionManager transactionManager;
+    @Autowired
+    QuotationService service;
+    @Autowired
+    Validator validator;
+    @Autowired
+    QuotationRepository quotationRepository;
+    @Autowired
+    QuotationItemRepository itemRepository;
+    @Autowired
+    ClientRepository clientRepository;
     Long userId;
     Long clientId;
     Long productId;
 
     @BeforeEach
     void setUp() {
-        tx().executeWithoutResult(status -> {
+        CustomUserDetails principal = tx().execute(status -> {
             for (String entity : new String[]{"ProductionPlan", "WorkOrder", "OrderProduct", "CustomerOrder",
                     "QuotationItem", "Quotation", "Client", "Product", "Line", "CommonCode", "CodeGroup", "User", "holiday"}) {
                 em.createQuery("delete from " + entity).executeUpdate();
             }
-            User user = User.builder().name("수주 관리자").email("writer@example.com")
+            User user = User.builder().name("서도윤").email("writer@example.com")
                     .phone("010-1234-5678").password("encoded").role(UserRole.ORDER_MANAGER).build();
             user.changePassword("encoded");
             em.persist(user);
@@ -92,10 +100,11 @@ class QuotationCreateTest {
             em.persist(product);
             productId = product.getId();
             em.persist(new Line("라인 A", 1000));
+            return new CustomUserDetails(user);
         });
-        // Security 연동 전이므로 인증된 사용자의 정보를 테스트에서 준비한다.
+        // JWT 인증 필터와 동일하게 CustomUserDetails와 사용자 권한을 등록한다.
         SecurityContextHolder.getContext().setAuthentication(
-                UsernamePasswordAuthenticationToken.authenticated(userId.toString(), "", List.of()));
+                UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
     }
 
 
@@ -124,7 +133,8 @@ class QuotationCreateTest {
         String expectedNo = "QT-" + today().format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + response.id();
         assertThat(response.quotationNo()).isEqualTo(expectedNo);
         assertThat(quotation.getQuotationNo()).isEqualTo(expectedNo);
-        assertThat(quotation.getCreatedBy()).isEqualTo(userId.toString());
+        assertThat(quotation.getCreatedBy()).isEqualTo("서도윤");
+        assertThat(quotation.getUpdatedBy()).isEqualTo("서도윤");
         tx().executeWithoutResult(status -> {
             assertThat(em.createQuery("select count(w) from WorkOrder w", Long.class).getSingleResult()).isZero();
             assertThat(em.createQuery("select count(p) from ProductionPlan p", Long.class).getSingleResult()).isZero();
@@ -198,7 +208,8 @@ class QuotationCreateTest {
                 user.changePassword("encoded");
                 user.update("관리자", "writer@example.com", "010-1234-5678", UserRole.ORDER_MANAGER);
                 switch (reason) {
-                    case "role" -> user.update("조회 담당", "writer@example.com", "010-1234-5678", UserRole.INQUIRY_MANAGER);
+                    case "role" ->
+                            user.update("조회 담당", "writer@example.com", "010-1234-5678", UserRole.INQUIRY_MANAGER);
                     case "inactive" -> user.deactivate();
                     case "password" -> user.updatePassword("temporary");
                 }

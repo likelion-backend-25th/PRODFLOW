@@ -41,14 +41,21 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout").permitAll()
+
                         .requestMatchers("/api/v1/auth/change-password", "/api/v1/auth/me").authenticated()
+
                         .requestMatchers("/api/v1/users", "/api/v1/users/**").hasRole("SUPER_ADMIN")
+
                         .requestMatchers(HttpMethod.POST, "/api/v1/lines").hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/lines/*").hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
                         .anyRequest().authenticated())
+                
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, res, e) -> writeError(res, 401,
                                 "UNAUTHORIZED_ACCESS", "로그인이 필요합니다."))
