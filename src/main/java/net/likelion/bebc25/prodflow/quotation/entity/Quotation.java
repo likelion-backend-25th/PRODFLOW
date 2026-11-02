@@ -15,6 +15,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.likelion.bebc25.prodflow.client.entity.Client;
+import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.user.entity.User;
@@ -37,6 +38,19 @@ public class Quotation extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
+
+    @Column(name = "contact_name", nullable = false)
+    private String contactName;
+
+    @Column(nullable = false)
+    private String email;
+
+    @Column(nullable = false)
+    private String phone;
+
+    @Column(nullable = false)
+    private String address;
+
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
@@ -79,6 +93,10 @@ public class Quotation extends BaseTimeEntity {
     ) {
         this.quotationNo = quotationNo;
         this.client = client;
+        this.contactName = client.getEmployee();
+        this.email = client.getEmail();
+        this.phone = client.getPhone();
+        this.address = formatAddress(client.getAddress());
         this.user = user;
         this.requestedDueDate = requestedDueDate;
         this.estimatedDueDate = estimatedDueDate;
@@ -87,6 +105,27 @@ public class Quotation extends BaseTimeEntity {
         this.validUntil = validUntil;
         this.vatIncluded = vatIncluded;
         this.status = status;
+    }
+
+    public void changeQuotationNo(String quotationNo) {
+        if (quotationNo == null || quotationNo.isBlank()) {
+            throw new IllegalArgumentException("견적번호는 비어 있을 수 없습니다.");
+        }
+        this.quotationNo = quotationNo;
+    }
+
+    public void snapshotContact(String contactName, String email, String phone, Address address) {
+        this.contactName = contactName;
+        this.email = email;
+        this.phone = phone;
+        this.address = formatAddress(address);
+    }
+
+    private static String formatAddress(Address address) {
+        if (address == null) {
+            throw new IllegalArgumentException("거래처 주소가 필요합니다.");
+        }
+        return String.join(" ", address.getZipcode(), address.getRoadAddress(), address.getDetailAddress());
     }
 
     public void sent() {

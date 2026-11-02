@@ -1,9 +1,13 @@
 package net.likelion.bebc25.prodflow.quotation.dto;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
@@ -14,21 +18,23 @@ import net.likelion.bebc25.prodflow.user.entity.User;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 public class QuotationDto {
 
     public record CreateRequest(
-            @NotNull(message = "거래처를 선택해주세요.")
             @Positive(message = "거래처 ID는 양수여야 합니다.")
             Long clientId,
             @NotNull(message = "희망 납기일을 입력해주세요.")
             LocalDate requestedDueDate,
-            @NotNull(message = "견적 유효기간을 입력해주세요.")
             LocalDate validUntil,
             boolean vatIncluded,
             @NotEmpty(message = "견적 품목을 하나 이상 입력해주세요.")
-            List<QuotationItemDto.@NotNull(message = "견적 품목은 비어 있을 수 없습니다.") @Valid CreateRequest> items
+            List<QuotationItemDto.@NotNull(message = "견적 품목은 비어 있을 수 없습니다.") @Valid CreateRequest> items,
+            @Valid ClientRequest newClient,
+            @NotBlank(message = "거래처 담당자명을 입력해주세요.")
+            @Size(max = 255) String contactName
     ) {
         // 예상 납기와 생산 일정은 서버에서 계산한 값을 전달받는다.
         public Quotation toEntity(
@@ -37,7 +43,8 @@ public class QuotationDto {
                 User user,
                 LocalDate estimatedDueDate,
                 LocalDate plannedStartDate,
-                LocalDate plannedEndDate
+                LocalDate plannedEndDate,
+                LocalDate effectiveValidUntil
         ) {
             return new Quotation(
                     quotationNo,
@@ -47,10 +54,24 @@ public class QuotationDto {
                     estimatedDueDate,
                     plannedStartDate,
                     plannedEndDate,
-                    validUntil,
+                    effectiveValidUntil,
                     vatIncluded,
                     QuotationStatus.SENT
             );
+        }
+    }
+
+    public record ClientRequest(
+            @NotBlank @Size(max = 255) String company,
+            @NotBlank @Size(max = 50) String representativeName,
+            @NotBlank @Email @Size(max = 100) String email,
+            @NotBlank @Pattern(regexp = "[0-9+() -]{8,50}") String phone,
+            @NotBlank @Size(max = 10) String zipcode,
+            @NotBlank @Size(max = 100) String roadAddress,
+            @NotBlank @Size(max = 100) String detailAddress
+    ) {
+        public Address toAddress() {
+            return new Address(zipcode, roadAddress, detailAddress);
         }
     }
 
@@ -100,9 +121,7 @@ public class QuotationDto {
             String clientEmployee,
             String clientPhone,
             String clientEmail,
-            String zipcode,
-            String roadAddress,
-            String detailAddress,
+            String address,
             int itemCount,
             long totalQuantity,
             List<QuotationItemDto.Response> items,
@@ -136,22 +155,32 @@ public class QuotationDto {
                 Long balanceAmount
         ) {
             Client client = quotation.getClient();
-            Address address = client.getAddress();
+            long totalQuantity = 0;
+            List<QuotationItemDto.Response> itemResponses = new ArrayList<>();
+            for (QuotationItem item : items) {
+                totalQuantity += item.getQuantity();
+                itemResponses.add(QuotationItemDto.Response.from(item));
+            }
+
+            Long customerOrderId = null;
+            String orderNo = null;
+            if (customerOrder != null) {
+                customerOrderId = customerOrder.getId();
+                orderNo = customerOrder.getOrderNo();
+            }
             return new DetailResponse(
                     quotation.getId(),
                     quotation.getQuotationNo(),
                     quotation.getStatus(),
                     client.getId(),
                     client.getCompany(),
-                    client.getEmployee(),
-                    client.getPhone(),
-                    client.getEmail(),
-                    address == null ? null : address.getZipcode(),
-                    address == null ? null : address.getRoadAddress(),
-                    address == null ? null : address.getDetailAddress(),
+                    quotation.getContactName(),
+                    quotation.getPhone(),
+                    quotation.getEmail(),
+                    quotation.getAddress(),
                     items.size(),
-                    items.stream().mapToLong(QuotationItem::getQuantity).sum(),
-                    items.stream().map(QuotationItemDto.Response::from).toList(),
+                    totalQuantity,
+                    itemResponses,
                     quotation.isVatIncluded(),
                     supplyAmount,
                     vatAmount,
@@ -165,8 +194,8 @@ public class QuotationDto {
                     quotation.getValidUntil(),
                     quotation.getUser().getId(),
                     quotation.getUser().getName(),
-                    customerOrder == null ? null : customerOrder.getId(),
-                    customerOrder == null ? null : customerOrder.getOrderNo(),
+                    customerOrderId,
+                    orderNo,
                     quotation.getCreatedAt(),
                     quotation.getUpdatedAt()
             );
