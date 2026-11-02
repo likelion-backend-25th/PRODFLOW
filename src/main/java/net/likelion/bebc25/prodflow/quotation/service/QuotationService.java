@@ -1,20 +1,33 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationItemDto;
 import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
 import net.likelion.bebc25.prodflow.quotation.entity.QuotationItem;
+import net.likelion.bebc25.prodflow.quotation.enums.QuotationSortType;
+import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
+import net.likelion.bebc25.prodflow.quotation.repository.QuotationItemRepository;
 import net.likelion.bebc25.prodflow.quotation.repository.QuotationRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
-import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -23,22 +36,30 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
+@Validated
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class QuotationService {
     private final QuotationRepository quotationRepository;
+    private final QuotationItemRepository quotationItemRepository;
     private final ClientRepository clientRepository;
     private final UserRepository userRepository;
+    private final CustomerOrderRepository customerOrderRepository;
     private final QuotationItemService quotationItemService;
     private final QuotationScheduleService scheduleService;
 
+    // 견적서 작성
     @Transactional
-    public QuotationDto.DetailResponse create(QuotationDto.CreateRequest request, Long userId) {
-        // 작성자 조회 및 견적 작성 권한을 확인
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    public QuotationDto.DetailResponse create(@NotNull @Valid QuotationDto.CreateRequest request, Long userId) {
+        // 작성자 조회 및 계정 상태 확인
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "작성자 계정을 찾을 수 없습니다."));
         if (user.getStatus() != UserStatus.ACTIVE) {
@@ -48,13 +69,10 @@ public class QuotationService {
         if (user.isMustChangePassword()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "비밀번호를 먼저 변경해주세요.");
         }
-        if (user.getRole() != UserRole.SUPER_ADMIN && user.getRole() != UserRole.ORDER_MANAGER) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "견적 작성 권한이 없습니다.");
-        }
 
         // 입력값 검증
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
-        if (request.requestedDueDate() == null || request.requestedDueDate().isBefore(today)) {
+        if (request.requestedDueDate().isBefore(today)) {
             throw new IllegalArgumentException("희망 납기는 오늘 이후여야 합니다.");
         }
         // 유효기간 검증
@@ -65,15 +83,11 @@ public class QuotationService {
         if (validUntil.isBefore(today.plusDays(7)) || validUntil.isAfter(today.plusDays(14))) {
             throw new IllegalArgumentException("견적 유효기간은 발행일로부터 7~14일이어야 합니다.");
         }
-        if (request.contactName() == null || request.contactName().isBlank()) {
-            throw new IllegalArgumentException("거래처 담당자명을 입력해주세요.");
-        }
-        if (request.items() == null) {
-            throw new IllegalArgumentException("견적 품목을 입력해주세요.");
-        }
-
-        // 견적 품목 입력값 및 중복 여부 검증
+        // DTO 입력 검증 이후 품목 중복 여부 검증
         quotationItemService.validateItems(request.items());
+
+        // 품목별 VAT·원 단위 반올림 적용 후 총액 합산
+        long totalAmount = calculateTotalAmount(request.items(), request.vatIncluded());
 
         // 납기 계산에 사용할 전체 품목 수량 합산
         long totalQuantity = 0;
@@ -95,7 +109,7 @@ public class QuotationService {
 
         // 견적 엔티티 생성
         Quotation quotation = request.toEntity(quotationNo, client, user, schedule.estimatedDueDate(),
-                schedule.plannedStartDate(), schedule.plannedEndDate(), validUntil);
+                schedule.plannedStartDate(), schedule.plannedEndDate(), validUntil, totalAmount);
 
         // 견적에 거래처 정보 저장
         quotation.snapshotContact(request.contactName(), client.getEmail(), client.getPhone(), client.getAddress());
@@ -110,19 +124,33 @@ public class QuotationService {
         // 품목을 저장. 품목 저장이 실패하면 견적과 신규 거래처 저장도 취소.
         List<QuotationItem> savedItems = quotationItemService.create(savedQuotation, request.items());
 
+        // 견적번호·품목 변경 DB 반영 및 감사 필드 갱신
+        quotationRepository.flush();
+
         // 금액을 계산하고 엔티티를 응답 DTO로 변환
-        return createResponse(savedQuotation, savedItems);
+        return toDetailResponse(savedQuotation, savedItems);
+    }
+
+    // 견적 최초 저장용 총액 계산
+    private long calculateTotalAmount(List<QuotationItemDto.CreateRequest> items, boolean vatIncluded) {
+        try {
+            long totalAmount = 0;
+            for (QuotationItemDto.CreateRequest item : items) {
+                long lineAmount = QuotationItem.calculateAmount(item.quantity(), item.unitPrice(), vatIncluded);
+                totalAmount = Math.addExact(totalAmount, lineAmount);
+            }
+            return totalAmount;
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException("견적 총액이 허용 범위를 초과했습니다.", e);
+        }
     }
 
     // 견적 금액과 계약금·잔금을 계산한 뒤 상세 응답 DTO 생성
-    private QuotationDto.DetailResponse createResponse(Quotation quotation, List<QuotationItem> items) {
+    private QuotationDto.DetailResponse toDetailResponse(Quotation quotation, List<QuotationItem> items) {
         try {
-            long totalAmount = 0; // 부가세 포함 금액
+            long totalAmount = quotation.getTotalAmount(); // 저장된 부가세 포함 총액
             long supplyAmount = 0; // 부가세 제외 공급가액
             for (QuotationItem item : items) {
-                // 품목별 최종 금액을 총액에 합산 (long 범위 초과 시 예외 발생)
-                totalAmount = Math.addExact(totalAmount, item.getLineAmount());
-
                 // 입력 단가에 부가세가 포함되지 않은 경우 공급가액 계산
                 if (!quotation.isVatIncluded()) {
                     long itemSupplyAmount = Math.multiplyExact(item.getUnitPrice(), (long) item.getQuantity());
@@ -147,9 +175,6 @@ public class QuotationService {
 
             // 잔금 = 총액 - 계약금
             long balanceAmount = totalAmount - depositAmount;
-
-            // 영속성 컨텍스트의 변경 사항을 DB에 반영 (트랜잭션 커밋은 아님)
-            quotationRepository.flush();
 
             // 견적 정보, 품목 목록, 계산한 금액을 상세 응답 DTO로 변환
             return QuotationDto.DetailResponse.from(quotation, items, null,
@@ -194,5 +219,64 @@ public class QuotationService {
     private String createQuotationNo(LocalDate today) {
         String date = today.format(DateTimeFormatter.BASIC_ISO_DATE);
         return "QT-" + date + "-" + UUID.randomUUID();
+    }
+
+    // 검색어·상태 필터·날짜 정렬로 견적서 목록 조회
+    public PageResponse<QuotationDto.Response> getQuotationList(
+            String keyword, QuotationStatus status, @NotNull QuotationSortType sortType, Pageable pageable) {
+        // 요청의 sort 대신 허용된 날짜 기준·방향 적용
+        Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sortType.toSort());
+
+        String normalizedKeyword = keyword == null || keyword.isBlank() ? null : keyword.trim();
+        //
+        Page<Quotation> quotations = quotationRepository.search(normalizedKeyword, status, sortedPageable);
+
+        // 현재 페이지에 견적서가 없으면 전체 건수와 페이징 정보를 유지한 빈 응답 반환
+        if (quotations.isEmpty()) {
+            Page<QuotationDto.Response> emptyPage = new PageImpl<>(List.of(), sortedPageable, quotations.getTotalElements());
+            return PageResponse.from(emptyPage);
+        }
+
+        // 현재 페이지에 포함된 견적서 ID 추출
+        List<Long> quotationIds = quotations.getContent().stream()
+                .map(Quotation::getId)
+                .toList();
+
+        // 해당 견적서들에 연결된 수주를 한 번에 조회하고, 견적 ID를 키로 저장
+        Map<Long, CustomerOrder> orders = findOrdersByQuotationIds(quotationIds);
+
+        // 각 견적서와 연결 수주를 응답 DTO로 변환하면서 페이징 정보 유지
+        // 연결된 수주가 없으면 orders.get()은 null을 반환
+        Page<QuotationDto.Response> responsePage = quotations.map(quotation -> QuotationDto.Response.from(
+                quotation,
+                orders.get(quotation.getId())
+        ));
+
+        // DTO 페이지를 공통 페이지 응답 형식으로 변환
+        return PageResponse.from(responsePage);
+    }
+
+    // 견적별 연결 수주 조회
+    // 여러 견적서에 연결된 수주를 조회하여 견적 ID 기준 Map으로 반환
+    private Map<Long, CustomerOrder> findOrdersByQuotationIds(List<Long> quotationIds) {
+        return customerOrderRepository
+                .findByQuotationIdIn(quotationIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        order -> order.getQuotation().getId(), // 키: 견적 ID
+                        order -> order // 값: 연결된 수주 엔티티
+                ));
+    }
+
+    // 견적서 상세 조회
+    public QuotationDto.DetailResponse getQuotationById(Long id) {
+        Quotation quotation = quotationRepository.findDetailById(id)
+                .orElseThrow(() -> new NoSuchElementException("존재하지 않는 견적서입니다. ID: " + id));
+
+        // 견적에 포함된 품목을 ID 오름차순으로 조회
+        List<QuotationItem> items = quotationItemRepository.findByQuotationIdOrderByIdAsc(id);
+
+        // 엔티티와 품목 목록을 상세 응답 DTO로 변환
+        return toDetailResponse(quotation, items);
     }
 }

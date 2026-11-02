@@ -69,17 +69,18 @@ public class QuotationItem {
         this.deviceName = deviceName;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
-        this.lineAmount = calculateAmount(quantity, unitPrice);
+        this.lineAmount = calculateAmount(quantity, unitPrice, quotation.isVatIncluded());
         this.createdAt = LocalDateTime.now();
     }
 
     public void changePrice(int quantity, Long unitPrice) {
         this.quantity = quantity;
         this.unitPrice = unitPrice;
-        this.lineAmount = calculateAmount(quantity, unitPrice);
+        this.lineAmount = calculateAmount(quantity, unitPrice, quotation.isVatIncluded());
     }
 
-    private long calculateAmount(int quantity, Long unitPrice) {
+    // 견적 총액 사전 계산·품목 금액 저장 공통 규칙
+    public static long calculateAmount(int quantity, Long unitPrice, boolean vatIncluded) {
         if (quantity < 100 || unitPrice == null || unitPrice < 0) {
             throw new IllegalArgumentException("견적 수량은 100개 이상, 단가는 0원 이상이어야 합니다.");
         }
@@ -88,7 +89,7 @@ public class QuotationItem {
             BigDecimal price = BigDecimal.valueOf(unitPrice);
             BigDecimal count = BigDecimal.valueOf(quantity);
             BigDecimal amount = price.multiply(count);
-            if (!quotation.isVatIncluded()) {
+            if (!vatIncluded) {
                 amount = amount.multiply(new BigDecimal("1.1"));
             }
             // 원 단위로 반올림한다. long 범위를 넘으면 예외를 발생시킨다.

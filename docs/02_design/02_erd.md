@@ -34,7 +34,7 @@ erDiagram
   user ||--o{ work_order_history : "changed_by"
   common_code ||--o{ product : "device_code"
   product ||--o{ product_drawing : "product_id"
-  quotation ||--o{ customer_order : "quotation_id"
+  quotation ||--o| customer_order : "quotation_id"
   client ||--o{ customer_order : "client_id"
   user ||--o{ customer_order : "user_id"
   common_code ||--o{ customer_order : "status_code"
@@ -199,7 +199,7 @@ erDiagram
   customer_order {
       bigint id PK "수주 고유 식별자"
       varchar order_no UK "수주번호. 예: PF-2026-001"
-      bigint quotation_id FK "수주 생성의 근거가 된 견적서 ID"
+      bigint quotation_id FK, UK "수주 생성의 근거가 된 견적서 ID. 견적당 수주 최대 한 건"
       bigint client_id FK "거래처 ID"
       varchar contact_name "거래처 측 담당자 이름"
       varchar email "거래처 이메일"
@@ -257,6 +257,7 @@ erDiagram
       varchar status "SENT(발송 완료), APPROVED(승인), REJECTED(거절), CANCELLED(취소), EXPIRED(만료)"
       date valid_until "이 단가로 승인할 수 있는 기한. 발행일+14일, 짧은 경우는 발행일+7일. 납기·생산 시작일과 무관"
       boolean vat_included "견적서 전체의 VAT 포함 여부. TRUE이면 VAT 포함 (quantity × unit_price), FALSE이면 별도 10%(round(quantity × unit_price × 1.1)). 품목마다 따로 두지 않는다."
+      bigint total_amount "견적 총액(원). 생성 시 품목별 line_amount 합계 저장, 이후 유지"
       datetime created_at "작성 시각"
       datetime updated_at "수정 시각"
       varchar created_by "생성한 사용자"
@@ -618,7 +619,7 @@ erDiagram
 |---------------------|--------------|-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | id                  | BIGINT       | PK, AUTO_INCREMENT                                    | 수주 고유 식별자                                                                                                                                                           |
 | order_no            | VARCHAR(255) | UK, NOT NULL, UNIQUE                                  | 수주번호. 예: PF-2026-001                                                                                                                                                |
-| quotation_id        | BIGINT       | FK, NOT NULL                                          | 수주 생성의 근거가 된 견적서 ID                                                                                                                                                 |
+| quotation_id        | BIGINT       | FK, UNIQUE, NOT NULL                                  | 수주 생성의 근거가 된 견적서 ID. 취소 수주를 포함해 견적당 최대 한 건                                                                                                                          |
 | client_id           | BIGINT       | FK, NOT NULL                                          | 거래처 ID                                                                                                                                                              |
 | contact_name        | VARCHAR(255) | NOT NULL                                              | 거래처 측 담당자 이름                                                                                                                                                        |
 | email               | VARCHAR(255) | NOT NULL                                              | 거래처 이메일                                                                                                                                                             |
@@ -646,6 +647,7 @@ erDiagram
 | created_by          | VARCHAR(255) | NOT NULL                                              | 생성한 사용자                                                                                                                                                             |
 | updated_by          | VARCHAR(255) | -                                                     | 수정한 사용자                                                                                                                                                             |
 
+- 견적 하나에는 수주가 없거나 한 건만 연결된다. `quotation_id`의 UNIQUE 제약으로 취소 수주를 포함한 중복 연결을 방지한다.
 - 수주 확정 상태는 `confirmation_status`에 저장한다. 진행 상태가 바뀌면 같이 고친다. 대기는 `PENDING`(예정), 취소는 `CANCELLED`(취소), 그 외는 `CONFIRMED`(확정)
   이다.
 - 입금 상태는 `payment` 테이블을 JOIN하여 조회한다.
@@ -660,7 +662,8 @@ erDiagram
 
 ---
 
-생산일은 평일만 쓴다. 토요일과 일요일은 날짜의 요일로 계산해 뺀다. 일반 주말은 `holiday`에 넣지 않지만, API가 반환한 공휴일은 주말과 겹쳐도 저장한다. 휴일은 `holiday.holiday_date`와 같은 날이면 뺀다. 빼는 날에는 수량을 넣지 않고
+생산일은 평일만 쓴다. 토요일과 일요일은 날짜의 요일로 계산해 뺀다. 일반 주말은 `holiday`에 넣지 않지만, API가 반환한 공휴일은 주말과 겹쳐도 저장한다. 휴일은 `holiday.holiday_date`와
+같은 날이면 뺀다. 빼는 날에는 수량을 넣지 않고
 다음 날로 넘어간다. 생산이 끝난 뒤 3일을 더해 납기를 정한다. 포장 1일과 배송 2일이다. 이 3일을 셀 때도 주말과 휴일은 건너뛴다.
 
 백엔드는 그해 공휴일을 외부 API에서 한 번 받아 `holiday`에 저장한다. 사람이 추가하거나 삭제하지 않고, API가 준 날짜만 휴일이다.
@@ -732,11 +735,13 @@ erDiagram
 | status             | VARCHAR(30)  | NOT NULL                                                        | SENT(발송 완료), APPROVED(승인), REJECTED(거절), CANCELLED(취소), EXPIRED(만료)                                                                 |
 | valid_until        | DATE         | NOT NULL                                                        | 이 단가로 승인할 수 있는 기한. 발행일+14일, 짧은 경우는 발행일+7일. 납기·생산 시작일과 무관                                                                            |
 | vat_included       | BOOLEAN      | NOT NULL                                                        | 견적서 전체의 VAT 포함 여부. `TRUE`이면 VAT 포함 (`quantity × unit_price`), `FALSE`이면 별도 10%(round(quantity × unit_price × 1.1)). 품목마다 따로 두지 않는다. |
+| total_amount       | BIGINT       | NOT NULL                                                        | 견적 총액(원). 생성 시 VAT가 반영된 품목별 line_amount의 합계를 서버에서 계산해 저장. 이후 유지 |
 | created_at         | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP                             | 작성 시각                                                                                                                               |
 | updated_at         | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 수정 시각                                                                                                                               |
 | created_by         | VARCHAR(255) | NOT NULL                                                        | 생성한 사용자                                                                                                                             |
 | updated_by         | VARCHAR(255) | -                                                               | 수정한 사용자                                                                                                                             |
 
+- `total_amount`는 견적 생성 시 서버가 품목별 `line_amount`를 합산하여 최초 저장 전에 설정한다. 견적과 품목은 같은 트랜잭션으로 저장한다. 총액은 클라이언트 입력으로 받지 않으며, 납기 재산정이나 수주 수량 변경에도 원본 견적 총액은 유지한다.
 - `valid_until`은 발행일부터 이 단가와 조건으로 견적을 승인할 수 있는 기한이다. 기본은 발행일+14일, 짧은 경우는 발행일+7일이다. 희망 납기일, 예상 납기일, 생산 시작 예정일, 계약금 입금 기한과
   무관하다.
 - 만료 배치는 `SENT`이면서 `valid_until`이 지난 견적만 `EXPIRED`로 바꾼다. `APPROVED`는 날짜가 지나도 만료로 바꾸지 않는다.
@@ -751,7 +756,8 @@ erDiagram
 - 수주 확정 이후의 일정 변경은 작업지시의 예정일과 `production_plan`이 바뀌고, 수주 전체 기간이 움직이면 `customer_order`의 생산 예정일도 바뀐다. 이미 승인한 견적서는 다시 고치지
   않는다.
 
-- 수주가 수동 또는 자동 취소되면 연결된 원본 견적의 `quotation.status`도 `CANCELLED`로 변경한다. 취소된 견적은 재승인하거나 새 수주 등록에 재사용하지 않는다. 다시 진행하려면 새 견적을 작성해 승인받아야 한다. 수주와 견적의 취소 상태 변경은 같은 트랜잭션으로 처리한다.
+- 수주가 수동 또는 자동 취소되면 연결된 원본 견적의 `quotation.status`도 `CANCELLED`로 변경한다. 취소된 견적은 재승인하거나 새 수주 등록에 재사용하지 않는다. 다시 진행하려면 새 견적을
+  작성해 승인받아야 한다. 수주와 견적의 취소 상태 변경은 같은 트랜잭션으로 처리한다.
 
 ### 2.14 quotation_item (견적 품목)
 
@@ -958,12 +964,12 @@ erDiagram
 
 ### 2.28 holiday (휴일)
 
-| 컬럼명          | 데이터 타입       | 제약 조건                               | 설명                              |
-|--------------|--------------|-------------------------------------|---------------------------------|
-| id           | BIGINT       | PK, AUTO_INCREMENT                  | 휴일 ID                           |
+| 컬럼명          | 데이터 타입       | 제약 조건                               | 설명                                |
+|--------------|--------------|-------------------------------------|-----------------------------------|
+| id           | BIGINT       | PK, AUTO_INCREMENT                  | 휴일 ID                             |
 | holiday_date | DATE         | NOT NULL, UNIQUE                    | 외부 API의 공휴일 날짜. 주말과 겹친 공휴일도 저장한다. |
-| name         | VARCHAR(255) | NOT NULL                            | 휴일 이름. 예: 설날, 추석, 삼일절 대체        |
-| created_at   | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 등록 일시                           |
+| name         | VARCHAR(255) | NOT NULL                            | 휴일 이름. 예: 설날, 추석, 삼일절 대체          |
+| created_at   | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 등록 일시                             |
 
 - 토요일과 일요일은 날짜의 요일로 계산한다. 일반 주말은 넣지 않지만, API가 반환한 공휴일은 주말과 겹쳐도 이 테이블에 저장한다.
 - 백엔드는 그해 공휴일을 외부 API에서 한 번 받아 이 테이블에 저장한다. 사람이 행을 추가하거나 삭제하지 않는다. API가 준 날짜만 휴일이다.

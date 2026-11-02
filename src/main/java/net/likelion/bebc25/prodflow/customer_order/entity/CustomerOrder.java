@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -37,8 +38,8 @@ public class CustomerOrder extends BaseTimeEntity {
     @Column(name = "order_no", nullable = false, unique = true)
     private String orderNo;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "quotation_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "quotation_id", nullable = false, unique = true)
     private Quotation quotation;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

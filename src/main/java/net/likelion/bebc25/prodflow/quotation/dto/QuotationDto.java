@@ -44,7 +44,8 @@ public class QuotationDto {
                 LocalDate estimatedDueDate,
                 LocalDate plannedStartDate,
                 LocalDate plannedEndDate,
-                LocalDate effectiveValidUntil
+                LocalDate effectiveValidUntil,
+                Long totalAmount
         ) {
             return new Quotation(
                     quotationNo,
@@ -56,7 +57,8 @@ public class QuotationDto {
                     plannedEndDate,
                     effectiveValidUntil,
                     vatIncluded,
-                    QuotationStatus.SENT
+                    QuotationStatus.SENT,
+                    totalAmount
             );
         }
     }
@@ -75,7 +77,7 @@ public class QuotationDto {
         }
     }
 
-    // 목록에서는 품목 전체를 불러오지 않고 집계된 총액을 전달받는다.
+    // 목록 총액은 견적에 저장된 값 사용
     public record Response(
             Long id,
             String quotationNo,
@@ -92,7 +94,7 @@ public class QuotationDto {
             String userName,
             LocalDateTime createdAt
     ) {
-        public static Response from(Quotation quotation, Long totalAmount, CustomerOrder customerOrder) {
+        public static Response from(Quotation quotation, CustomerOrder customerOrder) {
             return new Response(
                     quotation.getId(),
                     quotation.getQuotationNo(),
@@ -100,7 +102,7 @@ public class QuotationDto {
                     quotation.getClient().getCompany(),
                     quotation.getRequestedDueDate(),
                     quotation.getEstimatedDueDate(),
-                    totalAmount,
+                    quotation.getTotalAmount(),
                     quotation.getStatus(),
                     customerOrder == null ? null : customerOrder.getId(),
                     customerOrder == null ? "-" : customerOrder.getOrderNo(),

@@ -78,6 +78,9 @@ public class Quotation extends BaseTimeEntity {
     @Column(name = "vat_included", nullable = false)
     private boolean vatIncluded;
 
+    @Column(name = "total_amount", nullable = false, updatable = false)
+    private Long totalAmount;
+
     // 견적 품목은 QuotationItem으로 따로 조회한다.
     public Quotation(
             String quotationNo,
@@ -89,8 +92,12 @@ public class Quotation extends BaseTimeEntity {
             LocalDate plannedEndDate,
             LocalDate validUntil,
             boolean vatIncluded,
-            QuotationStatus status
+            QuotationStatus status,
+            Long totalAmount
     ) {
+        if (totalAmount == null || totalAmount < 0) {
+            throw new IllegalArgumentException("견적 총액은 0원 이상이어야 합니다.");
+        }
         this.quotationNo = quotationNo;
         this.client = client;
         this.contactName = client.getEmployee();
@@ -105,6 +112,7 @@ public class Quotation extends BaseTimeEntity {
         this.validUntil = validUntil;
         this.vatIncluded = vatIncluded;
         this.status = status;
+        this.totalAmount = totalAmount;
     }
 
     public void changeQuotationNo(String quotationNo) {
