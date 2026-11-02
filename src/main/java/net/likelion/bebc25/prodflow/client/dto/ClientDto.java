@@ -6,6 +6,8 @@ import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.user.entity.User;
 
+import java.time.LocalDateTime;
+
 @ToString
 public class ClientDto {
     public record CreateRequest(
@@ -26,6 +28,30 @@ public class ClientDto {
             client.setCreatedBy("TEST_NAME");
             client.setUpdatedBy("TEST_NAME");
             return client;
+        }
+    }
+
+    public record Response(
+            Long id,
+            String company,
+            String employee,
+            String phone,
+            String email,
+            int totalOrder,
+            Long totalAmount,
+            LocalDateTime recentOrderedAt
+    ) {
+        public static Response from(Client client, int totalOrder, Long totalAmount, LocalDateTime recentOrderedAt) {
+            return new Response(
+                    client.getId(),
+                    client.getCompany(),
+                    client.getEmployee(),
+                    client.getPhone(),
+                    client.getEmail(),
+                    totalOrder,
+                    totalAmount,
+                    recentOrderedAt
+            );
         }
     }
 
