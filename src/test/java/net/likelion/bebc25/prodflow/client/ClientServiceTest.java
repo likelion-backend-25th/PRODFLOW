@@ -7,18 +7,29 @@ import net.likelion.bebc25.prodflow.client.service.ClientService;
 import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -28,8 +39,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -44,6 +55,30 @@ public class ClientServiceTest {
 
     @InjectMocks
     private ClientService clientService;
+
+    private ClientService securedClientService;
+
+    @BeforeEach
+    void setUpMethodSecurity() {
+        SecurityContextHolder.clearContext();
+        // Mockito로 생성한 서비스에도 @PreAuthorize를 적용한다.
+        ProxyFactory proxyFactory = new ProxyFactory(clientService);
+        proxyFactory.addAdvisor(AuthorizationManagerBeforeMethodInterceptor.preAuthorize());
+        securedClientService = (ClientService) proxyFactory.getProxy();
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private void authenticate(String role) {
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(
+                        "test-user", null, List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                )
+        );
+    }
 
     @Test
     @DisplayName("거래처 목록 조회 시 상세 정보와 주문 통계를 반환하고 페이지 정보와 순서를 유지한다")
@@ -113,10 +148,12 @@ public class ClientServiceTest {
         verifyNoInteractions(userRepository);
     }
 
-    @Test
-    @DisplayName("거래처 등록 시 요청 정보와 담당자를 저장하고 상세 정보와 초기 주문 통계를 반환한다")
-    void createClient() {
+    @ParameterizedTest
+    @ValueSource(strings = {"SUPER_ADMIN", "ORDER_MANAGER"})
+    @DisplayName("최고관리자와 수주관리자는 거래처를 등록하고 상세 정보와 초기 주문 통계를 받는다")
+    void createClient(String role) {
         // given
+        authenticate(role);
         Long userId = 2L;
         Address address = new Address("06236", "서울특별시 강남구 테헤란로 152", "12층");
         ClientDto.CreateRequest request = new ClientDto.CreateRequest(
@@ -135,7 +172,7 @@ public class ClientServiceTest {
         });
 
         // when
-        ClientDto.DetailResponse response = clientService.createClient(request);
+        ClientDto.DetailResponse response = securedClientService.createClient(request);
 
         // then
         ArgumentCaptor<Client> clientCaptor = ArgumentCaptor.forClass(Client.class);
@@ -147,6 +184,9 @@ public class ClientServiceTest {
         assertThat(savedClient.getPhone()).isEqualTo(request.phone());
         assertThat(savedClient.getAddress()).isEqualTo(address);
         assertThat(savedClient.getUser()).isSameAs(user);
+        // 감사 정보는 JPA Auditing에서 처리하며 임시 이름을 직접 설정하지 않는다.
+        assertThat(savedClient.getCreatedBy()).isNull();
+        assertThat(savedClient.getUpdatedBy()).isNull();
 
         assertThat(response.id()).isEqualTo(10L);
         assertThat(response.company()).isEqualTo(request.company());
@@ -162,10 +202,12 @@ public class ClientServiceTest {
         verify(userRepository).findById(userId);
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {"SUPER_ADMIN", "ORDER_MANAGER"})
     @DisplayName("존재하지 않는 담당자 ID로 거래처를 등록하면 예외가 발생하고 저장하지 않는다")
-    void createClientWithNonexistentUserId() {
+    void createClientWithNonexistentUserId(String role) {
         // given
+        authenticate(role);
         Long userId = 999L;
         ClientDto.CreateRequest request = new ClientDto.CreateRequest(
                 "한빛케이스(주)", "최민재", "contact@hanbit-case.example",
@@ -175,11 +217,45 @@ public class ClientServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> clientService.createClient(request))
+        assertThatThrownBy(() -> securedClientService.createClient(request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("존재하지 않은 사용자입니다. id = " + userId);
         verify(userRepository).findById(userId);
         verifyNoInteractions(clientRepository);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PRODUCTION_MANAGER", "INQUIRY_MANAGER"})
+    @DisplayName("거래처 등록 권한이 없는 역할은 담당자 조회와 저장 전에 거부된다")
+    void createClientWithUnauthorizedRole(String role) {
+        // given
+        authenticate(role);
+        ClientDto.CreateRequest request = new ClientDto.CreateRequest(
+                "한빛케이스(주)", "최민재", "contact@hanbit-case.example",
+                "02-6000-1101", 2L,
+                new Address("06236", "서울특별시 강남구 테헤란로 152", "12층")
+        );
+
+        // when & then
+        assertThatThrownBy(() -> securedClientService.createClient(request))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(userRepository, clientRepository);
+    }
+
+    @Test
+    @DisplayName("미인증 사용자는 거래처를 등록할 수 없다")
+    void createClientWithoutAuthentication() {
+        // given
+        ClientDto.CreateRequest request = new ClientDto.CreateRequest(
+                "한빛케이스(주)", "최민재", "contact@hanbit-case.example",
+                "02-6000-1101", 2L,
+                new Address("06236", "서울특별시 강남구 테헤란로 152", "12층")
+        );
+
+        // when & then
+        assertThatThrownBy(() -> securedClientService.createClient(request))
+                .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
+        verifyNoInteractions(userRepository, clientRepository);
     }
 
     @Test

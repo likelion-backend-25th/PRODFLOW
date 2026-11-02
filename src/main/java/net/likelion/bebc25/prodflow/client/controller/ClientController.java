@@ -6,11 +6,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.client.dto.ClientDto;
 import net.likelion.bebc25.prodflow.client.service.ClientService;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +37,7 @@ public class ClientController {
     })
     @PostMapping
     public ResponseEntity<ClientDto.DetailResponse> createClient(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestBody ClientDto.CreateRequest request
     ) {
         ClientDto.DetailResponse response = clientService.createClient(request);
@@ -50,6 +53,7 @@ public class ClientController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<ClientDto.DetailResponse> getClientDetail(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable("id") Long clientId
     ) {
         return ResponseEntity.ok(clientService.getClientDetail(clientId));
@@ -64,6 +68,7 @@ public class ClientController {
     })
     @GetMapping
     public ResponseEntity<Page<ClientDto.Response>> getClients(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PageableDefault(
                     page = 0,
                     size = 8,

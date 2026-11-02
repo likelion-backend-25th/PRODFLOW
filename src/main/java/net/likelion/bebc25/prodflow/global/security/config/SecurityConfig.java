@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.global.security.config;
 
+import net.likelion.bebc25.prodflow.global.security.handler.CustomAccessDeniedHandler;
 import net.likelion.bebc25.prodflow.global.security.jwt.JwtAuthenticationFilter;
 import net.likelion.bebc25.prodflow.global.security.jwt.JwtProvider;
 import net.likelion.bebc25.prodflow.global.security.service.CustomUserDetailsService;
@@ -8,6 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -24,48 +26,92 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
     @Value("${auth.allowed-origins:http://localhost:3000,http://localhost:5173}")
     private String allowedOrigins;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtProvider jwtProvider,
-                                                   CustomUserDetailsService userDetailsService) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtProvider jwtProvider,
+            CustomUserDetailsService userDetailsService,
+            CustomAccessDeniedHandler customAccessDeniedHandler
+    ) throws Exception {
         http
                 // Access Token은 Authorization 헤더로 검증; Refresh Cookie 엔드포인트는 Origin 검증 + SameSite 사용.
                 .csrf(AbstractHttpConfigurer::disable)
+
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .httpBasic(AbstractHttpConfigurer::disable)
-                .formLogin(AbstractHttpConfigurer::disable)
-                .logout(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
 
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh",
-                                "/api/v1/auth/logout").permitAll()
-
-                        .requestMatchers("/api/v1/auth/change-password", "/api/v1/auth/me").authenticated()
-
-                        .requestMatchers("/api/v1/users", "/api/v1/users/**").hasRole("SUPER_ADMIN")
-
-                        .requestMatchers(HttpMethod.POST, "/api/v1/holidays/import").hasRole("SUPER_ADMIN")
-
-                        .requestMatchers(HttpMethod.POST, "/api/v1/lines").hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
-
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/lines/*").hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
-                        .anyRequest().authenticated())
-                
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, res, e) -> writeError(res, 401,
                                 "UNAUTHORIZED_ACCESS", "로그인이 필요합니다."))
-                        .accessDeniedHandler((req, res, e) -> writeError(res, 403,
-                                "FORBIDDEN_OPERATION", "접근 권한이 없습니다.")))
+                        .accessDeniedHandler(customAccessDeniedHandler)
+                )
+
                 // 필터를 Spring Bean으로 등록하지 않고 SecurityFilterChain 내부에서 한 번만 실행한다.
-                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, userDetailsService),
-                        UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(
+                        new JwtAuthenticationFilter(jwtProvider, userDetailsService),
+                        UsernamePasswordAuthenticationFilter.class
+                )
+
+                .httpBasic(AbstractHttpConfigurer::disable)
+
+                .formLogin(AbstractHttpConfigurer::disable)
+
+                .logout(AbstractHttpConfigurer::disable)
+
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                HttpMethod.OPTIONS,
+                                "/**"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                "/api/v1/auth/change-password", "/api/v1/auth/me"
+                        ).authenticated()
+
+                        .requestMatchers(
+                                "/api/v1/users", "/api/v1/users/**"
+                        ).hasRole("SUPER_ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/lines"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/lines/*"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/clients"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+                        
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/holidays/import"
+                        ).hasRole("SUPER_ADMIN")
+
+                        .anyRequest().authenticated()
+                );
+
         return http.build();
     }
 
