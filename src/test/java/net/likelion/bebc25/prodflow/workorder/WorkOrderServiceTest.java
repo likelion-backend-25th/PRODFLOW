@@ -4,6 +4,7 @@ import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
 import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto.CreateRequest;
+import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto.ListResponse;
 import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto.Response;
 import net.likelion.bebc25.prodflow.workorder.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.workorder.entity.WorkOrder;
@@ -164,6 +165,50 @@ class WorkOrderServiceTest {
         assertThatThrownBy(() -> workOrderService.create(request, 1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("점검·고장 라인에는 배정할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("목록은 상태와 상관없이 완료 예정일이 빠른 순이고 같은 날이면 최근 등록이 앞이다")
+    void listByPlannedEndDateThenLatestRegistration() {
+        // 12월 1일은 시드 계획이 없는 화요일이다. 같은 완료 예정일로 두 장을 만든다.
+        Response firstOnSameDay = workOrderService.create(
+                request(15L, 1L, 4L, 100, date(2026, 12, 1), date(2026, 12, 1)), 1L).getFirst();
+        Response secondOnSameDay = workOrderService.create(
+                request(15L, 1L, 4L, 100, date(2026, 12, 1), date(2026, 12, 1)), 1L).getFirst();
+        // 12월 3일은 더 늦은 완료 예정일이다.
+        Response laterDay = workOrderService.create(
+                request(15L, 1L, 4L, 100, date(2026, 12, 3), date(2026, 12, 3)), 1L).getFirst();
+
+        List<ListResponse> list = workOrderService.getList();
+
+        assertThat(list).hasSize((int) workOrderRepository.count());
+        assertThat(list).isSortedAccordingTo(Comparator.comparing(ListResponse::plannedEndDate)
+                .thenComparing(Comparator.comparing(ListResponse::id).reversed()));
+
+        List<String> workNos = list.stream().map(ListResponse::workNo).toList();
+        // 포장 완료도 빠지지 않는다. 완료 예정일 9월 21일이 10월 28일보다 앞이다.
+        assertThat(workNos).contains("WI-2026-012", "WI-2026-001");
+        assertThat(workNos.indexOf("WI-2026-012")).isLessThan(workNos.indexOf("WI-2026-001"));
+        // 시드의 10월 26일은 id가 큰 007이 006보다 앞이다.
+        assertThat(workNos.indexOf("WI-2026-007")).isLessThan(workNos.indexOf("WI-2026-006"));
+
+        int laterRegistration = workNos.indexOf(secondOnSameDay.workNo());
+        int earlierRegistration = workNos.indexOf(firstOnSameDay.workNo());
+        int afterThatDay = workNos.indexOf(laterDay.workNo());
+        assertThat(laterRegistration).isLessThan(earlierRegistration);
+        assertThat(earlierRegistration).isLessThan(afterThatDay);
+
+        ListResponse row = list.get(laterRegistration);
+        assertThat(row.id()).isEqualTo(secondOnSameDay.id());
+        assertThat(row.orderNo()).isEqualTo("PF-2026-013");
+        assertThat(row.clientName()).isEqualTo("세원모바일(주)");
+        assertThat(row.productName()).isEqualTo("디자인 A 투명 케이스");
+        assertThat(row.quantity()).isEqualTo(100);
+        assertThat(row.lineName()).isEqualTo("A라인");
+        assertThat(row.assignedName()).isEqualTo("김태호");
+        assertThat(row.workOrderDate()).isEqualTo(LocalDate.now());
+        assertThat(row.plannedEndDate()).isEqualTo(date(2026, 12, 1));
+        assertThat(row.status()).isEqualTo("PREPARE");
     }
 
     @Test

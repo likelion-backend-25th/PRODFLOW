@@ -202,4 +202,12 @@ public class WorkOrderService {
         // 만들어진 작업지시서 목록이다. 한 장이면 원소가 하나다.
         return responses;
     }
+
+    public List<WorkOrderDto.ListResponse> getList() {
+        // 완료 예정일이 빠른 순이다. 같은 날이면 id가 큰 최근 등록이 앞이다.
+        return workOrderRepository.findAllByOrderByPlannedEndDateAscIdDesc().stream()
+                // 작업지시 엔티티를 목록 응답으로 바꾼다.
+                .map(WorkOrderDto.ListResponse::from)
+                .toList();
+    }
 }

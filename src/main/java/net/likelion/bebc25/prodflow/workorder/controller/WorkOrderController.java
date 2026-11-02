@@ -12,6 +12,7 @@ import net.likelion.bebc25.prodflow.global.security.jwt.JwtProvider;
 import net.likelion.bebc25.prodflow.workorder.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.workorder.serivce.WorkOrderService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,5 +55,22 @@ public class WorkOrderController {
         return ResponseEntity
                 .created(URI.create("/api/v1/work-orders/" + responses.getFirst().id()))
                 .body(responses);
+    }
+
+
+    @Operation(
+            summary = "작업지시 목록 조회",
+            description = "로그인한 사용자가 작업지시를 조회한다. 완료 예정일이 빠른 순이고, 같은 날이면 최근 등록이 앞이다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "조회 성공",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = WorkOrderDto.ListResponse.class)))
+    )
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @GetMapping
+    public ResponseEntity<List<WorkOrderDto.ListResponse>> getList() {
+        // 서비스가 완료 예정일, 최근 등록 순으로 이미 정렬해 둔다.
+        return ResponseEntity.ok(workOrderService.getList());
     }
 }
