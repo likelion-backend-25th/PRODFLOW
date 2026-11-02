@@ -30,11 +30,11 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2026, 10, 31)
                 );
 
-        // 전체 수주 13건
-        assertThat(response.totalOrderCount()).isEqualTo(13);
+        // 취소 수주를 제외한 전체 수주 12건
+        assertThat(response.totalOrderCount()).isEqualTo(12);
 
         // 10월 등록 수주 10건
-        assertThat(response.periodOrderCount()).isEqualTo(10);
+        assertThat(response.periodOrderCount()).isEqualTo(9);
     }
 
     @Test
@@ -89,7 +89,9 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2026, 10, 20)
                 );
 
-        assertThat(response.totalOrderCount()).isEqualTo(13);
+        // 취소 수주를 제외한 전체 수주 12건
+        assertThat(response.totalOrderCount()).isEqualTo(12);
+
         assertThat(response.periodOrderCount()).isGreaterThanOrEqualTo(0);
     }
 
@@ -103,7 +105,9 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2030, 1, 31)
                 );
 
-        assertThat(response.totalOrderCount()).isEqualTo(13);
+        // 취소 수주를 제외한 전체 수주 12건
+        assertThat(response.totalOrderCount()).isEqualTo(12);
+
         assertThat(response.periodOrderCount()).isZero();
     }
 }

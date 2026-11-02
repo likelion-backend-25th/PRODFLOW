@@ -24,7 +24,7 @@ public class OrderStatisticsController {
     // 수주 건수 통계 조회
     @Operation(
             summary = "수주 건수 통계 조회",
-            description = "조회 시작일과 종료일을 입력받아 해당 기간의 수주 건수 통계를 조회한다."
+            description = "조회 시작일과 종료일을 입력받아 취소 수주를 제외한 해당 기간의 수주 건수 통계를 조회한다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
