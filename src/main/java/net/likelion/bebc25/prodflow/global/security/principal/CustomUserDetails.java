@@ -13,6 +13,7 @@ public class CustomUserDetails implements UserDetails {
     private final Long userId;
     private final String email;
     private final String password;
+    private final String name;
     private final UserStatus status;
     private final boolean mustChangePassword;
     private final List<GrantedAuthority> authorities;
@@ -21,6 +22,7 @@ public class CustomUserDetails implements UserDetails {
         this.userId = user.getId();
         this.email = user.getEmail();
         this.password = user.getPassword();
+        this.name = user.getName();
         this.status = user.getStatus();
         this.mustChangePassword = user.isMustChangePassword();
         this.authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
@@ -46,7 +48,7 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public String getUsername() {
-        return email;
+        return name;
     }
 
     @Override
