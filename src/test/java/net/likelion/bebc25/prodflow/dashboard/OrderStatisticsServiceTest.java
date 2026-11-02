@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @Transactional
-public class OrderStatisticsServiceTest {
+class OrderStatisticsServiceTest {
 
     @Autowired
     private OrderStatisticsService orderStatisticsService;
