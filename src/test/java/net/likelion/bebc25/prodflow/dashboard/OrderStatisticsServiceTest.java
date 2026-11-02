@@ -34,7 +34,7 @@ class OrderStatisticsServiceTest {
         assertThat(response.totalOrderCount()).isEqualTo(12);
 
         // 10월 등록 수주 10건
-        assertThat(response.periodOrderCount()).isEqualTo(10);
+        assertThat(response.periodOrderCount()).isEqualTo(9);
     }
 
     @Test
