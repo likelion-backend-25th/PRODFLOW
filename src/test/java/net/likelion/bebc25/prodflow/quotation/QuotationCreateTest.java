@@ -73,7 +73,7 @@ class QuotationCreateTest {
     void setUp() {
         CustomUserDetails principal = tx().execute(status -> {
             for (String entity : new String[]{"ProductionPlan", "WorkOrder", "OrderProduct", "CustomerOrder",
-                    "QuotationItem", "Quotation", "Client", "Product", "Line", "CommonCode", "CodeGroup", "User", "holiday"}) {
+                    "QuotationItem", "Quotation", "Client", "Product", "Line", "CommonCode", "CodeGroup", "User", "Holiday"}) {
                 em.createQuery("delete from " + entity).executeUpdate();
             }
             User user = User.builder().name("서도윤").email("writer@example.com")
