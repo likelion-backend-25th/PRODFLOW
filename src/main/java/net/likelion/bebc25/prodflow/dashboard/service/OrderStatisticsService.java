@@ -16,7 +16,7 @@ public class OrderStatisticsService {
 
     private final OrderStatisticsRepository orderStatisticsRepository;
 
-    // 수주 건주 통계 조회
+    // 수주 건수 통계 조회
     public DashboardDto.OrderStatisticsResponse getOrderStatistics(
             LocalDate startDate,
             LocalDate endDate
@@ -30,18 +30,19 @@ public class OrderStatisticsService {
             throw new IllegalArgumentException("조회 시작일은 종료일보다 늦을 수 없습니다.");
         }
 
-        // 전체 수주 건수 조회
+        // 전체 수주 건수 조회 (취소 수주 제외)
         long totalOrderCount = orderStatisticsRepository.countAllOrders();
 
-        // 조회 기간 시작일, 종료일 설정
+        // 조회 기간 시작일과 종료일 설정
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
 
-        // 조회 기간별 수주 건수 조회
-        long periodOrderCount = orderStatisticsRepository.countOrdersByPeriod(
-                startDate.atStartOfDay(),
-                endDate.plusDays(1).atStartOfDay()
-        );
+        // 조회 기간별 수주 건수 조회 (취소 수주 제외)
+        long periodOrderCount =
+                orderStatisticsRepository.countOrdersByPeriod(
+                        startDateTime,
+                        endDateTime
+                );
 
         // 조회 결과를 DTO로 변환하여 반환
         return new DashboardDto.OrderStatisticsResponse(
@@ -49,5 +50,4 @@ public class OrderStatisticsService {
                 periodOrderCount
         );
     }
-
 }
