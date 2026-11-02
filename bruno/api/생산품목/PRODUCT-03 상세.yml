@@ -1,7 +1,7 @@
 info:
   name: PRODUCT-03 상세
   type: http
-  seq: 3
+  seq: 1
 
 http:
   method: GET

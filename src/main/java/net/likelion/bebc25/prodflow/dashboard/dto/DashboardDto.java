@@ -64,6 +64,14 @@ public class DashboardDto {
     ) {
     }
 
+    // 납기 이행률 통계 응답
+    public record DeliveryPerformanceResponse(
+            long totalOrderCount,  // 집계 대상 수주 건수
+            long onTimeOrderCount, // 납기 내 완료된 수주 건수
+            double onTimeDeliveryRate // 납기 이행률 (%)
+    ) {
+    }
+
     // 제품별 생산 통계
     public record ProductProductionResponse(
             Long productId,
@@ -79,6 +87,13 @@ public class DashboardDto {
             LocalDate requestedDueDate,
             LocalDate plannedEndDate,
             Long statusCode
+    ) {
+    }
+
+    public record OrderStatusStatisticsResponse(
+            String statusCode,
+            String statusName,
+            long orderCount
     ) {
     }
 

@@ -1,7 +1,7 @@
 info:
   name: PRODUCT-05 검색
   type: http
-  seq: 4
+  seq: 1
 
 http:
   method: GET
