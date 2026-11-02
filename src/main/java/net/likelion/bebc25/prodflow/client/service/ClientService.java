@@ -50,10 +50,12 @@ public class ClientService {
         return ClientDto.DetailResponse.from(client, totalOrder, totalAmount, ongoingOrders);
     }
 
-    public Page<ClientDto.Response> getClients(Pageable pageable) {
+    public Page<ClientDto.Response> getClients(String keyword, Pageable pageable) {
         Page<Client> clients;
 
-        clients = clientRepository.findAll(pageable);
+        clients = keyword != null
+                ? clientRepository.findByKeyword(keyword, pageable)
+                : clientRepository.findAll(pageable);
 
         return clients.map(client -> {
             // Order 관련 임시값

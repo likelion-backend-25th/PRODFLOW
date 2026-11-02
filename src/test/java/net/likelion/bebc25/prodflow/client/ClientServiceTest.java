@@ -13,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -44,6 +45,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @ExtendWith(MockitoExtension.class)
 public class ClientServiceTest {
@@ -81,7 +83,7 @@ public class ClientServiceTest {
     }
 
     @Test
-    @DisplayName("거래처 목록 조회 시 상세 정보와 주문 통계를 반환하고 페이지 정보와 순서를 유지한다")
+    @DisplayName("검색어가 null이면 전체 거래처 목록과 주문 통계를 반환하고 페이지 정보와 순서를 유지한다")
     void getClients() {
         // given
         Pageable pageable = PageRequest.of(1, 2, Sort.by("id").descending());
@@ -100,7 +102,7 @@ public class ClientServiceTest {
 
         // when
         LocalDateTime before = LocalDateTime.now();
-        Page<ClientDto.Response> response = clientService.getClients(pageable);
+        Page<ClientDto.Response> response = clientService.getClients(null, pageable);
         LocalDateTime after = LocalDateTime.now();
 
         // then
@@ -125,18 +127,68 @@ public class ClientServiceTest {
         assertThat(response.getTotalPages()).isEqualTo(3);
         assertThat(response.hasNext()).isTrue();
         verify(clientRepository).findAll(pageable);
+        verifyNoMoreInteractions(clientRepository);
         verifyNoInteractions(userRepository);
     }
 
-    @Test
-    @DisplayName("등록된 거래처가 없으면 페이지 정보를 유지한 빈 목록을 반환한다")
-    void getClientsWhenEmpty() {
+    @ParameterizedTest
+    @ValueSource(strings = {"한빛", "", " "})
+    @DisplayName("검색어가 있으면 빈 문자열과 공백을 포함하여 그대로 검색하고 결과와 페이지 정보를 반환한다")
+    void getClientsWithKeyword(String keyword) {
         // given
-        Pageable pageable = PageRequest.of(0, 10, Sort.by("id").descending());
-        given(clientRepository.findAll(pageable)).willReturn(Page.empty(pageable));
+        Pageable pageable = PageRequest.of(1, 1, Sort.by("id").descending());
+        Client client = new Client(
+                "한빛케이스(주)", "최민재", "contact@hanbit-case.example", "02-6000-1101",
+                new Address("06236", "서울특별시 강남구 테헤란로 152", "12층"),
+                User.builder().name("이서준").phone("010-2000-0002").build()
+        );
+        ReflectionTestUtils.setField(client, "id", 2L);
+        given(clientRepository.findByKeyword(keyword, pageable))
+                .willReturn(new PageImpl<>(List.of(client), pageable, 3L));
 
         // when
-        Page<ClientDto.Response> response = clientService.getClients(pageable);
+        LocalDateTime before = LocalDateTime.now();
+        Page<ClientDto.Response> response = clientService.getClients(keyword, pageable);
+        LocalDateTime after = LocalDateTime.now();
+
+        // then
+        assertThat(response.getContent()).singleElement().satisfies(result -> {
+            assertThat(result.id()).isEqualTo(2L);
+            assertThat(result.company()).isEqualTo("한빛케이스(주)");
+            assertThat(result.employee()).isEqualTo("최민재");
+            assertThat(result.phone()).isEqualTo("02-6000-1101");
+            assertThat(result.email()).isEqualTo("contact@hanbit-case.example");
+            // 주문 통계와 최근 주문일은 현재 서비스에 정의된 임시값을 검증한다.
+            assertThat(result.totalOrder()).isEqualTo(3);
+            assertThat(result.totalAmount()).isEqualTo(12340000L);
+            assertThat(result.recentOrderedAt()).isBetween(before, after);
+        });
+        assertThat(response.getPageable()).isEqualTo(pageable);
+        assertThat(response.getNumber()).isEqualTo(1);
+        assertThat(response.getSize()).isEqualTo(1);
+        assertThat(response.getTotalElements()).isEqualTo(3L);
+        assertThat(response.getTotalPages()).isEqualTo(3);
+        assertThat(response.hasNext()).isTrue();
+        verify(clientRepository).findByKeyword(keyword, pageable);
+        verifyNoMoreInteractions(clientRepository);
+        verifyNoInteractions(userRepository);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"없는거래처"})
+    @DisplayName("전체 조회나 키워드 검색 결과가 없으면 페이지 정보를 유지한 빈 목록을 반환한다")
+    void getClientsWhenEmpty(String keyword) {
+        // given
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id").descending());
+        if (keyword == null) {
+            given(clientRepository.findAll(pageable)).willReturn(Page.empty(pageable));
+        } else {
+            given(clientRepository.findByKeyword(keyword, pageable)).willReturn(Page.empty(pageable));
+        }
+
+        // when
+        Page<ClientDto.Response> response = clientService.getClients(keyword, pageable);
 
         // then
         assertThat(response.getContent()).isEmpty();
@@ -144,7 +196,12 @@ public class ClientServiceTest {
         assertThat(response.getTotalElements()).isZero();
         assertThat(response.getTotalPages()).isZero();
         assertThat(response.hasNext()).isFalse();
-        verify(clientRepository).findAll(pageable);
+        if (keyword == null) {
+            verify(clientRepository).findAll(pageable);
+        } else {
+            verify(clientRepository).findByKeyword(keyword, pageable);
+        }
+        verifyNoMoreInteractions(clientRepository);
         verifyNoInteractions(userRepository);
     }
 
