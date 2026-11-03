@@ -84,4 +84,13 @@ public class ClientDto {
             );
         }
     }
+
+    public record ImportResponse(
+            Long id,
+            String company
+    ) {
+        public static ImportResponse from(Long id, String company) {
+            return new ImportResponse(id, company);
+        }
+    }
 }

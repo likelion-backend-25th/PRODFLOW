@@ -3,13 +3,14 @@ package net.likelion.bebc25.prodflow.common.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.data.annotation.CreatedBy;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedBy;
-import org.springframework.data.annotation.LastModifiedDate;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDateTime;
 
@@ -19,19 +20,58 @@ import java.time.LocalDateTime;
 @EntityListeners(AuditingEntityListener.class) // 아래의 이벤트 감지
 public abstract class BaseTimeEntity { // 추상 클래스 new 생성 안됨
 
-    @CreatedDate // Entity 최초 저장될 때 생성일시를 자동으로 주입
     @Column(updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
-    @LastModifiedDate // Entity 마지막으로 저장될 때 수정일시를 자동으로 주입
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    @CreatedBy // Entity 최초 저장될 때 사용자의 이름을 자동으로 주입
     @Column(nullable = false)
     private String createdBy;
 
-    @LastModifiedBy // Entity 마지막으로 저장될 때 사용자의 이름을 자동으로 주입
     @Column(nullable = false)
     private String updatedBy;
+
+    // Entity 최초 저장될 때 일시와 사용자의 이름이 존재하지 않으면 자동으로 주입
+    @PrePersist
+    public void prePersist() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (createdBy == null) {
+            createdBy = getPrincipalUserName();
+        }
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
+        if (updatedBy == null) {
+            updatedBy = getPrincipalUserName();
+        }
+    }
+
+    // Entity 수정할 때 수정일시와 사용자의 이름을 자동으로 주입
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = LocalDateTime.now();
+        updatedBy = getPrincipalUserName();
+    }
+
+    private String getPrincipalUserName() {
+        // 현재 실행 중인 스레드의 SecurityContext에서 인증 정보를 가져옴.
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        // 인증 정보가 없거나 인증되지 않은 경우 SYSTEM을 반환
+        if (auth == null || !auth.isAuthenticated()) {
+            return "SYSTEM";
+        }
+
+        // 인증된 사용자 정보(principal)가 프로젝트의 CustomUserDetails인지 확인
+        if (auth.getPrincipal() instanceof CustomUserDetails userDetails) {
+            // 현재 CustomUserDetails.getUsername()은 User.name으로 직원 이름을 작성자,수정자로 기록
+            return userDetails.getUsername();
+        }
+
+        // 익명 사용자 또는 CustomUserDetails가 아닌 인증 정보는 SYSTEM으로 기록
+        return "SYSTEM";
+    }
 }

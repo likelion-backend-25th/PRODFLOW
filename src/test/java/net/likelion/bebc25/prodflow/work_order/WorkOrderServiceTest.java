@@ -89,8 +89,8 @@ class WorkOrderServiceTest {
         assertThat(saved.getPlannedEndDate()).isEqualTo(end);
         assertThat(saved.getCommonCode().getCode()).isEqualTo("PREPARE");
         // 서비스는 수주 담당자 이서준을 넣는다. 로그인 사용자가 없으면 Auditing이 SYSTEM으로 덮어쓴다.
-        assertThat(saved.getCreatedBy()).isEqualTo("SYSTEM");
-        assertThat(saved.getUpdatedBy()).isEqualTo("SYSTEM");
+        assertThat(saved.getCreatedBy()).isEqualTo("이서준");
+        assertThat(saved.getUpdatedBy()).isEqualTo("이서준");
         assertThat(saved.getCompletedAt()).isNull();
 
         List<ProductionPlan> plans = plansOf(saved.getId());

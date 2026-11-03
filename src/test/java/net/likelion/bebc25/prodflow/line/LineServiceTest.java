@@ -56,7 +56,7 @@ class LineServiceTest {
         assertThat(lineRepository.findById(created.id())).isPresent();
         assertThat(lineRepository.findById(created.id()).orElseThrow().getCreatedAt()).isNotNull();
         // 토큰 id 1의 User.name이 작성자로 저장된다.
-        assertThat(lineRepository.findById(created.id()).orElseThrow().getCreatedBy()).isEqualTo("SYSTEM");
+        assertThat(lineRepository.findById(created.id()).orElseThrow().getCreatedBy()).isEqualTo("서도윤");
 
         // 시드 5건 + 방금 등록 1건
         assertThat(lineRepository.count()).isEqualTo(6);
