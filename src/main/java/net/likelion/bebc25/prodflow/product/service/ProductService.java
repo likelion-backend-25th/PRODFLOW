@@ -4,6 +4,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
+import net.likelion.bebc25.prodflow.commoncode.service.CommonCodeService;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto.Response;
 import net.likelion.bebc25.prodflow.product.entity.Product;
@@ -23,6 +24,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CommonCodeRepository commonCodeRepository;
+    private final CommonCodeService commonCodeService;
 
     @Transactional
     public Response create(ProductDto.CreateRequest request) {
@@ -32,13 +34,7 @@ public class ProductService {
             throw new IllegalArgumentException("이미 존재하는 모델코드입니다.");
         }
 
-        //devicecode로 기종 찾기
-
-        Optional<CommonCode> deviceExist = commonCodeRepository.findById(request.deviceCode());
-        if (deviceExist.isEmpty()) {
-            throw new EntityNotFoundException("기종 코드를 찾을 수 없습니다.");
-        }
-        CommonCode device = deviceExist.get();
+        CommonCode device = resolveDeviceForCreate(request.deviceCode(), request.deviceName());
 
         Product product = Product.create(
                 request.modelCode(),
@@ -51,6 +47,23 @@ public class ProductService {
         Product save = productRepository.save(product);
 
         return Response.from(save);
+    }
+
+    private CommonCode resolveDeviceForCreate(Long deviceCode, String deviceName) {
+        boolean hasCode = deviceCode != null;
+        boolean hasName = deviceName != null && !deviceName.isBlank();
+
+        if (hasCode && hasName) {
+            throw new IllegalArgumentException("기존 기종 ID 또는 새 기종명 중 하나만 입력해주세요.");
+        }
+        if (!hasCode && !hasName) {
+            throw new IllegalArgumentException("기존 기종 ID 또는 새 기종명을 입력해주세요.");
+        }
+        if (hasCode) {
+            return commonCodeRepository.findById(deviceCode)
+                    .orElseThrow(() -> new EntityNotFoundException("기종 코드를 찾을 수 없습니다."));
+        }
+        return commonCodeService.resolveOrCreateDevice(deviceName);
     }
 
     //목록 조회
