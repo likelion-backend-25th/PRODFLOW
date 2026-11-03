@@ -16,6 +16,12 @@ public class WorkOrderDto {
     ) {
     }
 
+    public record UpdatedRequest(
+            Long lineId,
+            Long assignedId
+    ) {
+    }
+
     // 등록 후 응답
     public record Response(
             Long id, // 저장된 작업지시서 고유 번호

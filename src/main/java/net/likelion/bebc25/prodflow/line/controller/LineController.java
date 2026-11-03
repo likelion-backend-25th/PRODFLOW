@@ -1,16 +1,15 @@
 package net.likelion.bebc25.prodflow.line.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import net.likelion.bebc25.prodflow.global.security.jwt.JwtProvider;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.line.dto.LineDto;
 import net.likelion.bebc25.prodflow.line.serivce.LineService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,7 +25,6 @@ import java.net.URI;
 public class LineController {
 
     private final LineService lineService; // 등록 로직은 서비스
-    private final JwtProvider jwtProvider; // 토큰 subject에서 직원 id를 꺼낸다
 
 
     @Operation(
@@ -44,16 +42,10 @@ public class LineController {
     @PostMapping
     public ResponseEntity<LineDto.Response> create(
             @RequestBody LineDto.CreateRequest request, // 이름, 생산 능력, 도입일
-            @Parameter(hidden = true) HttpServletRequest httpRequest // HttpServletRequest가 SWAGGER에서 보이지 않음
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        // Authorization: Bearer {토큰}. 토큰 subject는 User.id다.
         // 이름은 토큰에 없으므로 서비스가 id로 User를 조회한다.
-        String header = httpRequest.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            throw new IllegalArgumentException("로그인이 필요합니다.");
-        }
-        Long userId = jwtProvider.getUserId(header.substring(7));
-        LineDto.Response response = lineService.create(request, userId);
+        LineDto.Response response = lineService.create(request, userDetails.getUserId());
         return ResponseEntity.created(URI.create("api/v1/lines" + response.id())).body(response);
     }
 
@@ -74,16 +66,10 @@ public class LineController {
     public ResponseEntity<LineDto.Response> update(
             @PathVariable Long lineId, // 수정할 라인 id
             @RequestBody LineDto.UpdateRequest request, // 이름, 생산량, 변경 사유
-            @Parameter(hidden = true) HttpServletRequest httpRequest // HttpServletRequest가 SWAGGER에서 보이지 않음
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        // Authorization: Bearer {토큰}. 토큰 subject는 User.id다.
         // 이름은 토큰에 없으므로 서비스가 id로 User를 조회한다.
-        String header = httpRequest.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            throw new IllegalArgumentException("로그인이 필요합니다.");
-        }
-        Long userId = jwtProvider.getUserId(header.substring(7));
-        return ResponseEntity.ok(lineService.update(lineId, request, userId));
+        return ResponseEntity.ok(lineService.update(lineId, request, userDetails.getUserId()));
     }
 
     @Operation(
@@ -102,14 +88,8 @@ public class LineController {
     public ResponseEntity<LineDto.Response> changeStatus(
             @PathVariable Long lineId,
             @RequestBody LineDto.UpdateStatusRequest request,
-            @Parameter(hidden = true) HttpServletRequest httpRequest // HttpServletRequest가 SWAGGER에서 보이지 않음.
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        // Authorization: Bearer {토큰}. 토큰 subject는 User.id다.
-        String header = httpRequest.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            throw new IllegalArgumentException("로그인이 필요합니다.");
-        }
-        Long userId = jwtProvider.getUserId(header.substring(7));
-        return ResponseEntity.ok(lineService.changeStatus(lineId, request, userId));
+        return ResponseEntity.ok(lineService.changeStatus(lineId, request, userDetails.getUserId()));
     }
 }
