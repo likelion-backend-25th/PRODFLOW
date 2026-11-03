@@ -89,10 +89,21 @@ public class WorkOrder extends BaseTimeEntity {
         this.note = note;
     }
 
+    // 상태 변경
     public void changeStatus(CommonCode commonCode) {
         this.commonCode = commonCode;
         if ("PACK_DONE".equals(commonCode.getCode())) {
             this.completedAt = LocalDate.now();
         }
+    }
+
+    // 라인 변경
+    public void changeLine(Line line) {
+        this.line = line;
+    }
+
+    // 담당자 변경
+    public void changeUser(User user) {
+        this.user = user;
     }
 }

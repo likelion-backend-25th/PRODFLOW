@@ -13,6 +13,8 @@ import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.user.enums.UserRole;
+import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
@@ -56,9 +58,16 @@ public class WorkOrderService {
                 .orElseThrow(() -> new IllegalArgumentException("수주 품목을 찾을 수 없습니다."));
         // 이 수주를 등록한 수주 관리자다. created_by에 이 이름을 넣는다.
         User creator = orderProduct.getCustomerOrder().getUser();
+
         // 생산 담당자다. 작업지시서 user_id에 들어간다.
         User assignee = userRepository.findById(request.assignedId())
                 .orElseThrow(() -> new IllegalArgumentException("생산 담당자를 찾을 수 없습니다."));
+        boolean isProductionManager = assignee.getRole() == UserRole.PRODUCTION_MANAGER;
+        boolean isActive = assignee.getStatus() == UserStatus.ACTIVE;
+        if (!isProductionManager || !isActive) {
+            throw new IllegalArgumentException("사용 중인 생산 현장 관리자만 담당자로 배정할 수 있습니다.");
+        }
+
         // 화면에서 고른 첫 배정 라인이다.
         Line line = lineRepository.findById(request.lineId())
                 .orElseThrow(() -> new IllegalArgumentException("라인을 찾을 수 없습니다."));
@@ -233,6 +242,53 @@ public class WorkOrderService {
     public WorkOrderDto.DetailResponse getDetail(Long workOrderId) {
         WorkOrder workOrder = workOrderRepository.findById(workOrderId)
                 .orElseThrow(() -> new NoSuchElementException("해당 지시서를 찾을 수 없습니다."));
+        return WorkOrderDto.DetailResponse.from(workOrder);
+    }
+
+    // 작업지시서 수정
+    @Transactional
+    public WorkOrderDto.DetailResponse update(Long workOrderId,
+                                              WorkOrderDto.UpdatedRequest request,
+                                              Long userId) {
+        // 수정할 작업지시서 조회
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+                .orElseThrow(() -> new NoSuchElementException("해당 작업을 찾을 수 없습니다."));
+
+        // 변경할 내용이 있는지 확인
+        boolean isChangedLine = request.lineId() != null;
+        boolean isChangedAssigned = request.assignedId() != null;
+        // 변경 사항이 없는 경우
+        if (!isChangedLine && !isChangedAssigned) {
+            throw new IllegalArgumentException(
+                    "변경된 라인 또는 담당자가 없습니다."
+            );
+        }
+        // 라인변경
+        if (isChangedLine) {
+            Line line = lineRepository.findById(request.lineId())
+                    .orElseThrow(() -> new IllegalArgumentException("변경할 라인을 찾을 수 없습니다."));
+            if (line.getStatus() != LineStatus.AVAILABLE) {
+                throw new IllegalArgumentException(
+                        "가동 가능한 라인만 배정할 수 있습니다.");
+            }
+            workOrder.changeLine(line);
+        }
+        // 담당자 변경
+        if (isChangedAssigned) {
+            User assignedUser = userRepository.findById(request.assignedId())
+                    .orElseThrow(() -> new IllegalArgumentException(""));
+            boolean isProductionManager = assignedUser.getRole() == UserRole.PRODUCTION_MANAGER;
+            boolean isActive = assignedUser.getStatus() == UserStatus.ACTIVE;
+            if (!isProductionManager || !isActive) {
+                throw new IllegalArgumentException("사용 중인 생산 현장 관리자만 담당자로 배정할 수 있습니다.");
+            }
+            workOrder.changeUser(assignedUser);
+        }
+        // 갱신한 직원 업데이트
+        User modifier = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("수정자를 찾을 수 없습니다."));
+
+        workOrder.setUpdatedBy(modifier.getName());
         return WorkOrderDto.DetailResponse.from(workOrder);
     }
 }

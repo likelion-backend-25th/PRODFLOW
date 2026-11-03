@@ -10,6 +10,7 @@ import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.CreateRequest;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.DetailResponse;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.PageResponse;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.Response;
+import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.UpdatedRequest;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 import net.likelion.bebc25.prodflow.work_order.repsitory.ProductionPlanRepository;
@@ -287,6 +288,118 @@ class WorkOrderServiceTest {
     }
 
     @Test
+    @DisplayName("생산 현장 관리자가 아닌 직원은 작성 담당자가 될 수 없다")
+    void rejectCreateWhenAssigneeIsNotProductionManager() {
+        // 이서준은 사용 중인 수주 관리자다.
+        LocalDate day = firstOpenWeekday();
+        CreateRequest request = request(15L, 1L, 2L, 100, day, day);
+
+        assertThatThrownBy(() -> workOrderService.create(request, 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("사용 중인 생산 현장 관리자만 담당자로 배정할 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("비활성 생산 현장 관리자는 작성 담당자가 될 수 없다")
+    void rejectCreateWhenProductionManagerIsInactive() {
+        // 정민석은 생산 현장 관리자이지만 비활성이다.
+        LocalDate day = firstOpenWeekday();
+        CreateRequest request = request(15L, 1L, 8L, 100, day, day);
+
+        assertThatThrownBy(() -> workOrderService.create(request, 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("사용 중인 생산 현장 관리자만 담당자로 배정할 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("수정은 사용 중인 생산 현장 관리자로 담당자를 바꾼다")
+    void updateAssigneeToActiveProductionManager() {
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+
+        // 박시우는 사용 중인 생산 현장 관리자다. 수정한 직원은 서도윤이다.
+        DetailResponse updated = workOrderService.update(workOrderId, updateRequest(null, 6L), 1L);
+
+        assertThat(updated.assignedId()).isEqualTo(6L);
+        assertThat(updated.assignedName()).isEqualTo("박시우");
+        assertThat(updated.lineId()).isEqualTo(1L);
+        WorkOrder saved = workOrderRepository.findById(workOrderId).orElseThrow();
+        assertThat(saved.getUser().getId()).isEqualTo(6L);
+        assertThat(saved.getUpdatedBy()).isEqualTo("서도윤");
+    }
+
+    @Test
+    @DisplayName("생산 현장 관리자가 아닌 직원으로는 담당자를 바꾸지 않는다")
+    void rejectUpdateWhenAssigneeIsNotProductionManager() {
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+
+        assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(null, 2L), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("사용 중인 생산 현장 관리자만 담당자로 배정할 수 있습니다.");
+        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getUser().getId()).isEqualTo(4L);
+    }
+
+    @Test
+    @DisplayName("비활성 생산 현장 관리자로는 담당자를 바꾸지 않는다")
+    void rejectUpdateWhenProductionManagerIsInactive() {
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+
+        assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(null, 8L), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("사용 중인 생산 현장 관리자만 담당자로 배정할 수 있습니다.");
+        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getUser().getId()).isEqualTo(4L);
+    }
+
+    @Test
+    @DisplayName("가동 중인 라인으로는 작업지시 라인을 바꾸지 않는다")
+    void rejectUpdateWhenLineIsOperating() {
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        Long operatingLineId = lineRepository.findAll().stream()
+                .filter(line -> line.getStatus() == LineStatus.OPERATING)
+                .map(line -> line.getId())
+                .filter(lineId -> !lineId.equals(1L))
+                .findFirst()
+                .orElseThrow();
+
+        assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(operatingLineId, null), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("가동 가능한 라인만 배정할 수 있습니다.");
+        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getLine().getId()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("가동 가능 라인으로 작업지시 라인을 바꾼다")
+    void updateLineToAvailableLine() {
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        Long availableLineId = lineRepository.findAll().stream()
+                .filter(line -> line.getStatus() == LineStatus.AVAILABLE)
+                .map(line -> line.getId())
+                .findFirst()
+                .orElseThrow();
+
+        DetailResponse updated = workOrderService.update(workOrderId, updateRequest(availableLineId, null), 1L);
+
+        assertThat(updated.lineId()).isEqualTo(availableLineId);
+        assertThat(updated.assignedId()).isEqualTo(4L);
+        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getLine().getId()).isEqualTo(availableLineId);
+    }
+
+    @Test
+    @DisplayName("바꿀 라인과 담당자가 없으면 수정하지 않는다")
+    void rejectUpdateWhenNothingChanges() {
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+
+        assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(null, null), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("변경된 라인 또는 담당자가 없습니다.");
+    }
+
+    @Test
     @DisplayName("없는 수주 품목이면 예외가 난다")
     void rejectMissingOrderProduct() {
         LocalDate day = firstOpenWeekday();
@@ -300,6 +413,10 @@ class WorkOrderServiceTest {
     private CreateRequest request(Long orderProductId, Long lineId, Long assignedId, int quantity,
                                   LocalDate start, LocalDate end) {
         return new WorkOrderDto.CreateRequest(orderProductId, lineId, assignedId, quantity, start, end);
+    }
+
+    private UpdatedRequest updateRequest(Long lineId, Long assignedId) {
+        return new UpdatedRequest(lineId, assignedId);
     }
 
     private LocalDate firstOpenWeekday() {

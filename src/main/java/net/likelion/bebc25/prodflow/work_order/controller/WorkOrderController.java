@@ -6,16 +6,17 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import net.likelion.bebc25.prodflow.global.security.jwt.JwtProvider;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.work_order.serivce.WorkOrderService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,7 +34,6 @@ import java.util.List;
 public class WorkOrderController {
 
     private final WorkOrderService workOrderService;
-    private final JwtProvider jwtProvider;
 
     // 계약금 확인 전이므로 수주 흐름 대신 이 API로 등록을 시험한다.
     @Operation(
@@ -50,14 +50,9 @@ public class WorkOrderController {
     @PostMapping
     public ResponseEntity<List<WorkOrderDto.Response>> create(
             @RequestBody WorkOrderDto.CreateRequest request,
-            @Parameter(hidden = true) HttpServletRequest httpRequest
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        String header = httpRequest.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            throw new IllegalArgumentException("로그인이 필요합니다.");
-        }
-        Long userId = jwtProvider.getUserId(header.substring(7));
-        List<WorkOrderDto.Response> responses = workOrderService.create(request, userId);
+        List<WorkOrderDto.Response> responses = workOrderService.create(request, userDetails.getUserId());
         return ResponseEntity
                 .created(URI.create("/api/v1/work-orders/" + responses.getFirst().id()))
                 .body(responses);
@@ -109,5 +104,29 @@ public class WorkOrderController {
             @PathVariable Long workOrderId
     ) {
         return ResponseEntity.ok(workOrderService.getDetail(workOrderId));
+    }
+
+    
+    @Operation(
+            summary = "작업지시서 수정",
+            description = "작업지시서의 배정 생산 라인과 담당자를 변경한다. 라인 또는 담당자 중 변경할 항목만 전달할 수 있으며, 두 항목 모두 변경할 수도 있다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "수정 성공",
+            content = @Content(schema = @Schema(implementation = WorkOrderDto.DetailResponse.class))
+    )
+    @ApiResponse(responseCode = "400", description = "변경할 항목이 없거나 배정할 수 없는 라인 또는 담당자 정보가 유효하지 않음")
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "404", description = "작업지시서, 생산 라인 또는 담당자를 찾을 수 없음")
+    @PatchMapping("/{workOrderId}")
+    public ResponseEntity<WorkOrderDto.DetailResponse> update(
+            @PathVariable Long workOrderId,
+            @RequestBody WorkOrderDto.UpdatedRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(
+                workOrderService.update(workOrderId, request, userDetails.getUserId())
+        );
     }
 }
