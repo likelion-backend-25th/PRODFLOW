@@ -2,7 +2,7 @@ package net.likelion.bebc25.prodflow.quotation.repository;
 
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
-import net.likelion.bebc25.prodflow.workorder.entity.ProductionPlan;
+import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
