@@ -23,8 +23,9 @@ public class ProductionStatisticsService {
 
     // 선택한 월의 전체 생산량 통계
     public DashboardDto.MonthlyProductionResponse getMonthlyProduction(
-            int year, int month) {
-
+            int year,
+            int month
+    ) {
         validateMonth(year, month);
 
         LocalDate from = LocalDate.of(year, month, 1);
@@ -46,8 +47,9 @@ public class ProductionStatisticsService {
 
     // 선택한 월의 주차별 생산 계획량 및 완료량
     public List<DashboardDto.WeeklyProductionResponse> getWeeklyProduction(
-            int year, int month) {
-
+            int year,
+            int month
+    ) {
         validateMonth(year, month);
 
         LocalDate monthStart = LocalDate.of(year, month, 1);
@@ -68,15 +70,14 @@ public class ProductionStatisticsService {
         for (LocalDate date = monthStart; !date.isAfter(monthEnd); date = date.plusDays(1)) {
             int week = getWeekOfMonth(date, monthStart);
 
+            LocalDate weekStart = date.with(DayOfWeek.MONDAY);
+            LocalDate weekEnd = date.with(DayOfWeek.SUNDAY);
+
             weeklyMap.putIfAbsent(
                     week,
                     new WeeklyQuantity(
-                            date.with(DayOfWeek.MONDAY).isBefore(monthStart)
-                                    ? monthStart
-                                    : date.with(DayOfWeek.MONDAY),
-                            date.with(DayOfWeek.SUNDAY).isAfter(monthEnd)
-                                    ? monthEnd
-                                    : date.with(DayOfWeek.SUNDAY)
+                            weekStart.isBefore(monthStart) ? monthStart : weekStart,
+                            weekEnd.isAfter(monthEnd) ? monthEnd : weekEnd
                     )
             );
         }
@@ -123,7 +124,10 @@ public class ProductionStatisticsService {
             firstMonday = firstMonday.minusWeeks(1);
         }
 
-        return (int) (ChronoUnit.WEEKS.between(firstMonday, date.with(DayOfWeek.MONDAY))) + 1;
+        return (int) ChronoUnit.WEEKS.between(
+                firstMonday,
+                date.with(DayOfWeek.MONDAY)
+        ) + 1;
     }
 
     // 연도와 월 유효성 검사
@@ -139,12 +143,16 @@ public class ProductionStatisticsService {
 
     // 주차별 집계를 위한 내부 클래스
     private static class WeeklyQuantity {
+
         private final LocalDate startDate;
         private final LocalDate endDate;
         private long plannedQuantity;
         private long completedQuantity;
 
-        private WeeklyQuantity(LocalDate startDate, LocalDate endDate) {
+        private WeeklyQuantity(
+                LocalDate startDate,
+                LocalDate endDate
+        ) {
             this.startDate = startDate;
             this.endDate = endDate;
         }

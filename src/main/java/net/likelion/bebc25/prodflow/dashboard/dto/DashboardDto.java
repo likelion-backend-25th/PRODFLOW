@@ -90,6 +90,7 @@ public class DashboardDto {
     ) {
     }
 
+    // 수주 상태별 통계
     public record OrderStatusStatisticsResponse(
             String statusCode,
             String statusName,

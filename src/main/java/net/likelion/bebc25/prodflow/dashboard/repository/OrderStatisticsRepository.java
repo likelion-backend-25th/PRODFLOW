@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface OrderStatisticsRepository extends JpaRepository<CustomerOrder, Long> {
+
     // 전체 수주 건수 조회 (취소 수주 제외)
     @Query("""
             SELECT COUNT(o)
@@ -45,5 +46,4 @@ public interface OrderStatisticsRepository extends JpaRepository<CustomerOrder, 
             ORDER BY sc.code
             """)
     List<DashboardDto.OrderStatusStatisticsResponse> findOrderStatusStatistics();
-
 }

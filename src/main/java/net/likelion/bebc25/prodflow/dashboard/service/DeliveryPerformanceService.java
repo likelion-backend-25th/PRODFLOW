@@ -25,7 +25,9 @@ public class DeliveryPerformanceService {
         long totalOrderCount = deliveryPerformanceRepository.countTargetOrders(from, to);
         long onTimeOrderCount = deliveryPerformanceRepository.countOnTimeOrders(from, to);
 
-        double onTimeDeliveryRate = totalOrderCount == 0 ? 0.0 : (double) onTimeOrderCount / totalOrderCount * 100;
+        double onTimeDeliveryRate = totalOrderCount == 0
+                ? 0.0
+                : (double) onTimeOrderCount / totalOrderCount * 100;
 
         onTimeDeliveryRate = Math.round(onTimeDeliveryRate * 100.0) / 100.0;
 
@@ -34,7 +36,6 @@ public class DeliveryPerformanceService {
                 onTimeOrderCount,
                 onTimeDeliveryRate
         );
-
     }
 
     // 조회 기간 유효성 검사
@@ -47,6 +48,4 @@ public class DeliveryPerformanceService {
             throw new IllegalArgumentException("조회일은 종료일보다 늦을 수 없습니다.");
         }
     }
-
-
 }
