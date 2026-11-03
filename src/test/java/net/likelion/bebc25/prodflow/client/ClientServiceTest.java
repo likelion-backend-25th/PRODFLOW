@@ -84,7 +84,7 @@ public class ClientServiceTest {
 
     @Test
     @DisplayName("검색어가 null이면 전체 거래처 목록과 주문 통계를 반환하고 페이지 정보와 순서를 유지한다")
-    void getClients() {
+    void findClients() {
         // given
         Pageable pageable = PageRequest.of(1, 2, Sort.by("id").descending());
         Address address = new Address("06236", "서울특별시 강남구 테헤란로 152", "12층");
@@ -102,7 +102,7 @@ public class ClientServiceTest {
 
         // when
         LocalDateTime before = LocalDateTime.now();
-        Page<ClientDto.Response> response = clientService.getClients(null, pageable);
+        Page<ClientDto.Response> response = clientService.findClients(null, pageable);
         LocalDateTime after = LocalDateTime.now();
 
         // then
@@ -134,7 +134,7 @@ public class ClientServiceTest {
     @ParameterizedTest
     @ValueSource(strings = {"한빛", "", " "})
     @DisplayName("검색어가 있으면 빈 문자열과 공백을 포함하여 그대로 검색하고 결과와 페이지 정보를 반환한다")
-    void getClientsWithKeyword(String keyword) {
+    void findClientsWithKeyword(String keyword) {
         // given
         Pageable pageable = PageRequest.of(1, 1, Sort.by("id").descending());
         Client client = new Client(
@@ -148,7 +148,7 @@ public class ClientServiceTest {
 
         // when
         LocalDateTime before = LocalDateTime.now();
-        Page<ClientDto.Response> response = clientService.getClients(keyword, pageable);
+        Page<ClientDto.Response> response = clientService.findClients(keyword, pageable);
         LocalDateTime after = LocalDateTime.now();
 
         // then
@@ -178,7 +178,7 @@ public class ClientServiceTest {
     @NullSource
     @ValueSource(strings = {"없는거래처"})
     @DisplayName("전체 조회나 키워드 검색 결과가 없으면 페이지 정보를 유지한 빈 목록을 반환한다")
-    void getClientsWhenEmpty(String keyword) {
+    void findClientsWhenEmpty(String keyword) {
         // given
         Pageable pageable = PageRequest.of(0, 10, Sort.by("id").descending());
         if (keyword == null) {
@@ -188,7 +188,7 @@ public class ClientServiceTest {
         }
 
         // when
-        Page<ClientDto.Response> response = clientService.getClients(keyword, pageable);
+        Page<ClientDto.Response> response = clientService.findClients(keyword, pageable);
 
         // then
         assertThat(response.getContent()).isEmpty();

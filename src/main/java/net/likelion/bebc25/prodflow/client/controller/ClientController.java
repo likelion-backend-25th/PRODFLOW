@@ -20,9 +20,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
+import java.util.List;
 
 @RestController
 @RequestMapping("api/v1/clients")
@@ -44,6 +47,25 @@ public class ClientController {
     ) {
         ClientDto.DetailResponse response = clientService.createClient(request);
         return ResponseEntity.created(URI.create("/api/v1/clients/" + response.id())).body(response);
+    }
+
+    @Operation(
+            summary = "거래처 정보 일괄 등록",
+            description = "RequestPart로 엑셀파일을 받아 거래처 정보들을 일괄 등록한다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "등록 성공")
+    })
+    @PostMapping("/import")
+    public ResponseEntity<List<ClientDto.ImportResponse>> registerClients(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestPart(value = "file") MultipartFile multipartFile
+    ) {
+        if (multipartFile == null) {
+            throw new IllegalArgumentException("파일이 존재하지 않습니다.");
+        }
+        List<ClientDto.ImportResponse> list = clientService.registerClients(multipartFile);
+        return ResponseEntity.created(URI.create("/api/v1/clients/")).body(list);
     }
 
     @Operation(
@@ -81,6 +103,6 @@ public class ClientController {
                     direction = Sort.Direction.DESC
             ) Pageable pageable
     ) {
-        return ResponseEntity.ok(clientService.getClients(keyword, pageable));
+        return ResponseEntity.ok(clientService.findClients(keyword, pageable));
     }
 }
