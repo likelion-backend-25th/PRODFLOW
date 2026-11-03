@@ -73,13 +73,14 @@ if (isExpired) throw new CourseEnrollmentExpiredException("수강 기간이 만�
     - 패키지 루트: `net.likelion.bebc25.prodflow`
     - 공통 모듈: `net.likelion.bebc25.prodflow.common`
         - config, error, security, util 등
-    - 회원/인증 도메인: `net.likelion.bebc25.prodflow.domain.member`
+    - 회원/인증 도메인: `net.likelion.bebc25.prodflow.user.entity.User`
         - controller, service, repository, entity, dto 등
-    - 클라이언트 도메인: `net.likelion.bebc25.prodflow.domain.client`
-    - 주문 도메인: `net.likelion.bebc25.prodflow.domain.order`
-    - 제품 도메인: `net.likelion.bebc25.prodflow.domain.product`
-    - 결제 도메인: `net.likelion.bebc25.prodflow.domain.payment`
-    - 대시보드 도메인: `net.likelion.bebc25.prodflow.domain.dashboard`
+    - 클라이언트 도메인: `net.likelion.bebc25.prodflow.client.entity.Client`
+    - 수주 도메인: `net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder`
+    - 견적 도메인: `net.likelion.bebc25.prodflow.quotation.domain.Quotation`
+    - 제품 도메인: `net.likelion.bebc25.prodflow.product.entity.Product`
+    - 결제 도메인: `net.likelion.bebc25.prodflow.payment.entity.Payment`
+    - 대시보드 도메인: `net.likelion.bebc25.prodflow.dashboard`
 
 ### 3.2 클래스 및 인터페이스 명명 규칙
 
@@ -103,9 +104,9 @@ if (isExpired) throw new CourseEnrollmentExpiredException("수강 기간이 만�
     - 선택적 조회(Optional 또는 List 반환): `findByEmail`, `findAllByStatus`, `searchCourses`
     - 존재 여부 판별(boolean 반환): `existsByEmail`, `isEnrolled`
 - 상태 변경 메서드 관례:
-    - 생성 및 등록: `create`, `register`, `save`
-    - 수정 및 상태 전환: `updateStatus`, `completeLesson`, `cancelOrder`
-    - 삭제: `delete`, `remove`
+    - 생성 및 등록: `create`, `resister`
+    - 수정 및 상태 전환: `updateStatus`, `changeStatus`, `completeLesson`, `cancelOrder`
+    - 삭제: `delete`
 - 논리 판별 변수: `is~`, `has~`, `can~` 접두사를 사용하여 true/false 의도를 명확히 표현함 (예: `isCompleted`, `hasCertificate`).
 
 ### 3.4 상수 명명 규칙
