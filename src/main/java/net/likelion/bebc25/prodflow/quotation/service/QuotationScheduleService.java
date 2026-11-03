@@ -3,11 +3,11 @@ package net.likelion.bebc25.prodflow.quotation.service;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
-import net.likelion.bebc25.prodflow.productionline.entity.Line;
-import net.likelion.bebc25.prodflow.productionline.enums.LineStatus;
-import net.likelion.bebc25.prodflow.productionline.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line.entity.Line;
+import net.likelion.bebc25.prodflow.line.enums.LineStatus;
+import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
 import net.likelion.bebc25.prodflow.quotation.repository.QuotationScheduleRepository;
-import net.likelion.bebc25.prodflow.workorder.entity.ProductionPlan;
+import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

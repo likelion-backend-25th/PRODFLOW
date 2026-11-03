@@ -13,8 +13,8 @@ import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line_notification.enums.LineNotificationType;
-import net.likelion.bebc25.prodflow.productionline.entity.Line;
 import net.likelion.bebc25.prodflow.user.entity.User;
 
 import java.time.LocalDateTime;
