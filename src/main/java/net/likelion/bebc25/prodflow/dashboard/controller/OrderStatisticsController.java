@@ -31,11 +31,10 @@ public class OrderStatisticsController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 날짜 형식 또는 조회 기간 입력")
     })
-
     @GetMapping("/orders")
     public DashboardDto.OrderStatisticsResponse getOrderStatistics(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, // 조회 시작일
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to // 조회 종료일
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
         return orderStatisticsService.getOrderStatistics(from, to);
     }

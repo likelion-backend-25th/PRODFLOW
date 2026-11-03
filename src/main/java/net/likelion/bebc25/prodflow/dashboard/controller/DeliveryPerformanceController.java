@@ -32,13 +32,8 @@ public class DeliveryPerformanceController {
     })
     @GetMapping("/delivery-performance")
     public DashboardDto.DeliveryPerformanceResponse getDeliveryPerformance(
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate from,
-
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate to
+            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
         return deliveryPerformanceService.getDeliveryPerformance(from, to);
     }

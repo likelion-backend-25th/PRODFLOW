@@ -31,17 +31,16 @@ public class ProductionStatisticsController {
     })
     @GetMapping("/monthly")
     public DashboardDto.MonthlyProductionResponse getMonthlyProduction(
-            @RequestParam int year,
-            @RequestParam int month) {
-
+            @RequestParam("year") int year,
+            @RequestParam("month") int month
+    ) {
         return productionStatisticsService.getMonthlyProduction(year, month);
-
     }
 
     // 주간 생산량 통계
     @Operation(
             summary = "주간 생산량 통계 조회",
-            description = "연도와 월을 입력받아 해당 월의 주간 생산 계획량과 생산 완료량을 조회한다"
+            description = "연도와 월을 입력받아 해당 월의 주간 생산 계획량과 생산 완료량을 조회한다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -49,11 +48,9 @@ public class ProductionStatisticsController {
     })
     @GetMapping("/weekly")
     public List<DashboardDto.WeeklyProductionResponse> getWeeklyProduction(
-            @RequestParam int year,
-            @RequestParam int month) {
-
+            @RequestParam("year") int year,
+            @RequestParam("month") int month
+    ) {
         return productionStatisticsService.getWeeklyProduction(year, month);
-
     }
-
 }
