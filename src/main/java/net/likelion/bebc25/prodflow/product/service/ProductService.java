@@ -137,4 +137,14 @@ public class ProductService {
 
         return Response.from(product);
     }
+
+    @Transactional(readOnly = true)
+    public ProductDto.ModelCodeExistsResponse checkModelCodeExists(String modelCode) {
+        if (modelCode == null || modelCode.isBlank()) {
+            throw new IllegalArgumentException("모델코드는 필수입니다.");
+        }
+        String trimmed = modelCode.trim();
+        boolean exists = productRepository.existsByModelCode(trimmed);
+        return new ProductDto.ModelCodeExistsResponse(trimmed, !exists);
+    }
 }

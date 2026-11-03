@@ -59,5 +59,10 @@ public class ProductDto {
     ) {
     }
 
+    public record ModelCodeExistsResponse(
+            String modelCode,
+            boolean available
+    ) {
+    }
 
 }
