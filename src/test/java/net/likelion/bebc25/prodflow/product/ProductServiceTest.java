@@ -82,4 +82,24 @@ class ProductServiceTest {
         assertThat(detail.productName()).isEqualTo("수정된 케이스");
         assertThat(detail.currentPrice()).isEqualTo(15000L);
     }
+
+    @Test
+    @DisplayName("모델코드 중복확인 — 없으면 available=true")
+    void modelCodeAvailable_whenNotExists() {
+        ProductDto.ModelCodeExistsResponse result =
+                productService.checkModelCodeExists("NEW-CODE-9999");
+
+        assertThat(result.available()).isTrue();
+        assertThat(result.modelCode()).isEqualTo("NEW-CODE-9999");
+    }
+
+    @Test
+    @DisplayName("모델코드 중복확인 — 있으면 available=false")
+    void modelCodeNotAvailable_whenExists() {
+        ProductDto.ModelCodeExistsResponse result =
+                productService.checkModelCodeExists("PF-CS-A100");
+
+        assertThat(result.available()).isFalse();
+        assertThat(result.modelCode()).isEqualTo("PF-CS-A100");
+    }
 }

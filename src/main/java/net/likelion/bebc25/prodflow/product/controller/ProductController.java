@@ -98,4 +98,12 @@ public class ProductController {
         ProductDto.Response response = productService.update(id, request);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/model-code/exists")
+    public ResponseEntity<ProductDto.ModelCodeExistsResponse> checkModelCodeExists(
+            @RequestParam String modelCode
+    ) {
+        ProductDto.ModelCodeExistsResponse response = productService.checkModelCodeExists(modelCode);
+        return ResponseEntity.ok(response);
+    }
 }
