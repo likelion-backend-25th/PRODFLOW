@@ -78,12 +78,9 @@ class DeliveryPerformanceServiceTest {
 
         // then
         assertThat(response).isNotNull();
-        assertThat(response.totalOrderCount())
-                .isGreaterThanOrEqualTo(0);
-        assertThat(response.onTimeOrderCount())
-                .isGreaterThanOrEqualTo(0);
-        assertThat(response.onTimeDeliveryRate())
-                .isBetween(0.0, 100.0);
+        assertThat(response.totalOrderCount()).isGreaterThanOrEqualTo(0);
+        assertThat(response.onTimeOrderCount()).isGreaterThanOrEqualTo(0);
+        assertThat(response.onTimeDeliveryRate()).isBetween(0.0, 100.0);
     }
 
     @Test

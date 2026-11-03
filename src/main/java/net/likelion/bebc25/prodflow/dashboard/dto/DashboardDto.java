@@ -98,6 +98,22 @@ public class DashboardDto {
     ) {
     }
 
+    // 품목별 생산 비중 통계 조회 응답
+    public record ProductProductionShareResponse(
+            long totalCompletedQuantity,
+            List<ProductProductionShareItemResponse> items
+    ) {
+    }
+
+    // 품목별 생산 비중 항목
+    public record ProductProductionShareItemResponse(
+            Long productId,
+            String productName,
+            long completedQuantity,
+            double productionShare
+    ) {
+    }
+
     // 대시보드 전체 응답
     public record DashboardResponse(
             SummaryResponse summary,
