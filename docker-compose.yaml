@@ -5,10 +5,36 @@ services:
   #    restart: always
   #    env_file:
   #      - .env
+  #      #    ports:
+  #      #      - "127.0.0.1:8080:8080"
+  #    expose:
+  #      - "8080"
+  #
+  #  nginx:
+  #    image: nginx:stable-alpine
+  #    container_name: prodflow-nginx
+  #    restart: unless-stopped
+  #
   #    ports:
-  #      - "127.0.0.1:8080:8080"
-  #      expose:
-  #        - "8080"
+  #      - "80:80"
+  #      - "443:443"
+  #
+  #    volumes:
+  #      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+  #      - ./certbot/www:/var/www/certbot:ro
+  #      - ./certbot/conf:/etc/letsencrypt:ro
+  #
+  #    depends_on:
+  #      - prodflow-app
+  #
+  #  certbot:
+  #    image: certbot/certbot:latest
+  #    profiles:
+  #      - tools
+  #
+  #    volumes:
+  #      - ./certbot/www:/var/www/certbot
+  #      - ./certbot/conf:/etc/letsencrypt
 
   mysql:
     image: mysql:9.7
