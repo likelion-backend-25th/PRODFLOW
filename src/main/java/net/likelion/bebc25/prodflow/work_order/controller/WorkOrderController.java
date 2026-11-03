@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -75,6 +76,11 @@ public class WorkOrderController {
     @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
     @GetMapping
     public ResponseEntity<Page<WorkOrderDto.PageResponse>> getPage(
+            @RequestParam(required = false) String keyword, // 수주번호, 품목명, 거래처명, 담당자명
+            @RequestParam(required = false) LocalDate from, // 지시일 시작
+            @RequestParam(required = false) LocalDate to, // 지시일 종료
+            @RequestParam(required = false) String status, // 작업 상태 코드
+            @RequestParam(required = false) Long lineId, // 생산 라인
             @Parameter(description = "페이지 번호. 0부터 시작한다.", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기", example = "5")
@@ -82,7 +88,7 @@ public class WorkOrderController {
     ) {
         // 정렬이 없는 페이지다. 순서는 레포지토리 메서드가 정한다.
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(workOrderService.findAll(pageable));
+        return ResponseEntity.ok(workOrderService.findAll(lineId, status, from, to, keyword, pageable));
     }
 
 

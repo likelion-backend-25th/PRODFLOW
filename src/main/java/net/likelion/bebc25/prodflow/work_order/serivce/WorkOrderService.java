@@ -1,6 +1,7 @@
 package net.likelion.bebc25.prodflow.work_order.serivce;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
 import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -200,6 +202,9 @@ public class WorkOrderService {
 
         // 모든 라인을 봤는데도 수량이 남으면 기간 안 생산 가능량으로는 부족하다.
         if (remaining > 0) {
+            // 응답에는 기간과 남은 수량이 빠지므로 서버 로그에 남긴다.
+            log.warn("생산 가능량 초과. 기간 {} ~ {}, 요청 수량 중 남은 수량 {}",
+                    request.plannedStartDate(), request.plannedEndDate(), remaining);
             throw new IllegalArgumentException("선택한 기간의 생산 가능량을 초과했습니다.");
         }
         // 만들어진 작업지시서 목록이다. 한 장이면 원소가 하나다.
@@ -207,10 +212,20 @@ public class WorkOrderService {
     }
 
     // 작업지시서 페이징 조회
-    public Page<WorkOrderDto.PageResponse> findAll(Pageable pageable) {
-        // 완료 예정일이 빠른 순이다. 같은 날이면 id가 큰 최근 등록이 앞이다.
-        return workOrderRepository.findAllByOrderByPlannedEndDateAscIdDesc(pageable)
-                // 작업지시 엔티티를 페이징 응답으로 바꾼다.
+    public Page<WorkOrderDto.PageResponse> findAll(Long lineId, String status, LocalDate from, LocalDate to, String keyword, Pageable pageable) {
+        // 각 요소가 null, 빈칸이 아닌경우 공백 제거하여 저장
+        String code = status == null || status.isBlank() ? null : status.trim();
+        String word = keyword == null || keyword.isBlank() ? null : keyword.trim();
+        boolean hasCondition = lineId != null || code != null || from != null || to != null || word != null;
+        // 검색 조건이 전부 공백 상태인 경우
+        if (!hasCondition) {
+            // 완료 예정일이 빠른 순이다. 같은 날이면 id가 큰 최근 등록이 앞이다.
+            return workOrderRepository.findAllByOrderByPlannedEndDateAscIdDesc(pageable)
+                    // 작업지시 엔티티를 페이징 응답으로 바꾼다.
+                    .map(WorkOrderDto.PageResponse::from);
+        }
+        // 조건별 검색 기능
+        return workOrderRepository.search(lineId, status, from, to, keyword, pageable)
                 .map(WorkOrderDto.PageResponse::from);
     }
 
