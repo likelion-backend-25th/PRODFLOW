@@ -1,19 +1,16 @@
 info:
   name: 견적서 상세 조회
   type: http
-  seq: 2
+  seq: 1
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/v1/quotations"
-  auth: inherit
-
-runtime:
-  variables:
+  url: "{{baseUrl}}/api/v1/quotations/:quotationId"
+  params:
     - name: quotationId
-      value:
-        type: number
-        data: "1"
+      value: "18"
+      type: path
+  auth: inherit
 
 settings:
   encodeUrl: true

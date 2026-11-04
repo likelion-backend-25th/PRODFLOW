@@ -39,17 +39,17 @@ public class Quotation extends BaseTimeEntity {
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
 
-    @Column(name = "contact_name", nullable = false)
-    private String contactName;
+    @Column(name = "client_name", nullable = false)
+    private String clientName;
 
-    @Column(nullable = false)
-    private String email;
+    @Column(name = "client_email", nullable = false)
+    private String clientEmail;
 
-    @Column(nullable = false)
-    private String phone;
+    @Column(name = "client_phone", nullable = false)
+    private String clientPhone;
 
-    @Column(nullable = false)
-    private String address;
+    @Column(name = "client_address", nullable = false)
+    private String clientAddress;
 
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -78,13 +78,14 @@ public class Quotation extends BaseTimeEntity {
     @Column(name = "vat_included", nullable = false)
     private boolean vatIncluded;
 
-    @Column(name = "total_amount", nullable = false, updatable = false)
+    @Column(name = "total_amount", nullable = false)
     private Long totalAmount;
 
     // 견적 품목은 QuotationItem으로 따로 조회한다.
     public Quotation(
             String quotationNo,
             Client client,
+            String clientName,
             User user,
             LocalDate requestedDueDate,
             LocalDate estimatedDueDate,
@@ -100,10 +101,10 @@ public class Quotation extends BaseTimeEntity {
         }
         this.quotationNo = quotationNo;
         this.client = client;
-        this.contactName = client.getEmployee();
-        this.email = client.getEmail();
-        this.phone = client.getPhone();
-        this.address = formatAddress(client.getAddress());
+        this.clientName = clientName;
+        this.clientEmail = client.getEmail();
+        this.clientPhone = client.getPhone();
+        this.clientAddress = formatAddress(client.getAddress());
         this.user = user;
         this.requestedDueDate = requestedDueDate;
         this.estimatedDueDate = estimatedDueDate;
@@ -115,18 +116,35 @@ public class Quotation extends BaseTimeEntity {
         this.totalAmount = totalAmount;
     }
 
+    // 초안만 수정하며 견적 ID,번호,최초 작성자는 유지
+    public void changeDraft(Client client, String clientName, LocalDate requestedDueDate,
+                            LocalDate estimatedDueDate, LocalDate plannedStartDate, LocalDate plannedEndDate,
+                            LocalDate validUntil, boolean vatIncluded, Long totalAmount) {
+        if (status != QuotationStatus.DRAFT) {
+            throw new IllegalArgumentException("초안 상태의 견적만 수정할 수 있습니다.");
+        }
+        if (totalAmount == null || totalAmount < 0) {
+            throw new IllegalArgumentException("견적 총액은 0원 이상이어야 합니다.");
+        }
+        this.client = client;
+        this.clientName = clientName;
+        this.clientEmail = client.getEmail();
+        this.clientPhone = client.getPhone();
+        this.clientAddress = formatAddress(client.getAddress());
+        this.requestedDueDate = requestedDueDate;
+        this.estimatedDueDate = estimatedDueDate;
+        this.plannedStartDate = plannedStartDate;
+        this.plannedEndDate = plannedEndDate;
+        this.validUntil = validUntil;
+        this.vatIncluded = vatIncluded;
+        this.totalAmount = totalAmount;
+    }
+
     public void changeQuotationNo(String quotationNo) {
         if (quotationNo == null || quotationNo.isBlank()) {
             throw new IllegalArgumentException("견적번호는 비어 있을 수 없습니다.");
         }
         this.quotationNo = quotationNo;
-    }
-
-    public void snapshotContact(String contactName, String email, String phone, Address address) {
-        this.contactName = contactName;
-        this.email = email;
-        this.phone = phone;
-        this.address = formatAddress(address);
     }
 
     private static String formatAddress(Address address) {
@@ -160,13 +178,11 @@ public class Quotation extends BaseTimeEntity {
             LocalDate requestedDueDate,
             LocalDate estimatedDueDate,
             LocalDate plannedStartDate,
-            LocalDate plannedEndDate,
-            LocalDate validUntil
+            LocalDate plannedEndDate
     ) {
         this.requestedDueDate = requestedDueDate;
         this.estimatedDueDate = estimatedDueDate;
         this.plannedStartDate = plannedStartDate;
         this.plannedEndDate = plannedEndDate;
-        this.validUntil = validUntil;
     }
 }

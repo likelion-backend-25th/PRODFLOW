@@ -245,19 +245,19 @@ erDiagram
       bigint id PK "견적서 고유 ID"
       varchar quotation_no UK "견적번호"
       bigint client_id FK "거래처 ID"
-      varchar contact_name "거래처 측 담당자 이름"
-      varchar email "거래처 이메일"
-      varchar phone "거래처 연락처"
-      varchar address "거래처 주소"
+      varchar client_name "거래처 측 담당자 이름"
+      varchar client_email "거래처 이메일"
+      varchar client_phone "거래처 연락처"
+      varchar client_address "거래처 주소"
       bigint user_id FK "이 견적서를 작성한 직원 id"
       date requested_due_date "고객 희망 납기일"
       date estimated_due_date "등록된 수주와 라인 일일 생산량으로 계산한 예상 납기일"
       date planned_start_date "생산 시작 예정일. 예상 납기에 맞춰 계산한다."
       date planned_end_date "생산 완료 예정일. 예상 납기에 맞춰 계산한다."
-      varchar status "SENT(발송 완료), APPROVED(승인), REJECTED(거절), CANCELLED(취소), EXPIRED(만료)"
+      varchar status "DRAFT(초안), SENT(발송 확정), APPROVED(승인), REJECTED(거절), CANCELLED(취소), EXPIRED(만료)"
       date valid_until "이 단가로 승인할 수 있는 기한. 발행일+14일, 짧은 경우는 발행일+7일. 납기·생산 시작일과 무관"
       boolean vat_included "견적서 전체의 VAT 포함 여부. TRUE이면 VAT 포함 (quantity × unit_price), FALSE이면 별도 10%(round(quantity × unit_price × 1.1)). 품목마다 따로 두지 않는다."
-      bigint total_amount "견적 총액(원). 생성 시 품목별 line_amount 합계 저장, 이후 유지"
+      bigint total_amount "견적 총액(원). DRAFT에서 품목 변경 시 재계산, SENT 이후 유지"
       datetime created_at "작성 시각"
       datetime updated_at "수정 시각"
       varchar created_by "생성한 사용자"
@@ -723,31 +723,33 @@ erDiagram
 | id                 | BIGINT       | PK, AUTO_INCREMENT                                              | 견적서 고유 ID                                                                                                                           |
 | quotation_no       | VARCHAR(255) | UNIQUE, NOT NULL                                                | 견적번호                                                                                                                                |
 | client_id          | BIGINT       | FK, NOT NULL                                                    | 거래처 ID                                                                                                                              |
-| contact_name       | VARCHAR(255) | NOT NULL                                                        | 거래처 측 담당자 이름                                                                                                                        |
-| email              | VARCHAR(255) | NOT NULL                                                        | 거래처 이메일                                                                                                                             |
-| phone              | VARCHAR(255) | NOT NULL                                                        | 거래처 연락처                                                                                                                             |
-| address            | VARCHAR(255) | NOT NULL                                                        | 거래처 주소                                                                                                                              |
+| client_name        | VARCHAR(255) | NOT NULL                                                        | 거래처 측 담당자 이름                                                                                                                        |
+| client_email       | VARCHAR(255) | NOT NULL                                                        | 거래처 이메일                                                                                                                             |
+| client_phone       | VARCHAR(255) | NOT NULL                                                        | 거래처 연락처                                                                                                                             |
+| client_address     | VARCHAR(255) | NOT NULL                                                        | 거래처 주소                                                                                                                              |
 | user_id            | BIGINT       | FK, NOT NULL                                                    | 이 견적서를 작성한 직원 id                                                                                                                    |
 | requested_due_date | DATE         | NOT NULL                                                        | 고객 희망 납기일                                                                                                                           |
 | estimated_due_date | DATE         | NOT NULL                                                        | 등록된 수주와 라인 일일 생산량으로 계산한 예상 납기일                                                                                                      |
 | planned_start_date | DATE         | NOT NULL                                                        | 생산 시작 예정일. 예상 납기에 맞춰 계산한다.                                                                                                          |
 | planned_end_date   | DATE         | NOT NULL                                                        | 생산 완료 예정일. 예상 납기에 맞춰 계산한다.                                                                                                          |
-| status             | VARCHAR(30)  | NOT NULL                                                        | SENT(발송 완료), APPROVED(승인), REJECTED(거절), CANCELLED(취소), EXPIRED(만료)                                                                 |
+| status             | VARCHAR(30)  | NOT NULL                                                        | DRAFT(초안), SENT(발송 확정), APPROVED(승인), REJECTED(거절), CANCELLED(취소), EXPIRED(만료)                                                      |
 | valid_until        | DATE         | NOT NULL                                                        | 이 단가로 승인할 수 있는 기한. 발행일+14일, 짧은 경우는 발행일+7일. 납기·생산 시작일과 무관                                                                            |
 | vat_included       | BOOLEAN      | NOT NULL                                                        | 견적서 전체의 VAT 포함 여부. `TRUE`이면 VAT 포함 (`quantity × unit_price`), `FALSE`이면 별도 10%(round(quantity × unit_price × 1.1)). 품목마다 따로 두지 않는다. |
-| total_amount       | BIGINT       | NOT NULL                                                        | 견적 총액(원). 생성 시 VAT가 반영된 품목별 line_amount의 합계를 서버에서 계산해 저장. 이후 유지 |
+| total_amount       | BIGINT       | NOT NULL                                                        | 견적 총액(원). VAT가 반영된 품목별 line_amount 합계. DRAFT 수정 시 재계산, SENT 이후 유지                                                                   |
 | created_at         | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP                             | 작성 시각                                                                                                                               |
 | updated_at         | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 수정 시각                                                                                                                               |
 | created_by         | VARCHAR(255) | NOT NULL                                                        | 생성한 사용자                                                                                                                             |
 | updated_by         | VARCHAR(255) | -                                                               | 수정한 사용자                                                                                                                             |
 
-- `total_amount`는 견적 생성 시 서버가 품목별 `line_amount`를 합산하여 최초 저장 전에 설정한다. 견적과 품목은 같은 트랜잭션으로 저장한다. 총액은 클라이언트 입력으로 받지 않으며, 납기 재산정이나 수주 수량 변경에도 원본 견적 총액은 유지한다.
+- `total_amount`는 서버가 품목별 `line_amount`를 합산한다. DRAFT에서 품목·수량·단가·VAT를 수정하면 견적·품목·총액을 같은 트랜잭션으로 갱신한다. 클라이언트의 총액은 신뢰하지 않는다.
+  SENT 이후에는 납기 재산정이나 수주 수량 변경에도 원본 견적 총액을 유지한다.
 - `valid_until`은 발행일부터 이 단가와 조건으로 견적을 승인할 수 있는 기한이다. 기본은 발행일+14일, 짧은 경우는 발행일+7일이다. 희망 납기일, 예상 납기일, 생산 시작 예정일, 계약금 입금 기한과
   무관하다.
 - 만료 배치는 `SENT`이면서 `valid_until`이 지난 견적만 `EXPIRED`로 바꾼다. `APPROVED`는 날짜가 지나도 만료로 바꾸지 않는다.
 - 만료된 견적은 승인하거나 수주로 등록하지 않는다. 단가와 납기를 다시 잡아 견적서를 새로 보낸다.
 - 유효기간 안에 승인된 견적은 그 단가가 확정된다. 이후 납기를 조율해도 견적 행은 고치지 않는다.
-- 납기 재산정은 `SENT`인 견적에서 요청이 왔을 때만 한다. 자동으로 다시 계산하지 않으며, `APPROVED`, `REJECTED`, `CANCELLED`, `EXPIRED`는 재산정하지 않는다. 계산은 견적
+- 납기 재산정은 `SENT`인 견적에서 요청이 왔을 때만 한다. 자동으로 다시 계산하지 않으며, `DRAFT`, `APPROVED`, `REJECTED`, `CANCELLED`, `EXPIRED`는 발송완료 견적용
+  재산정 대상이 아니다. DRAFT는 초안 수정 과정에서 납기를 다시 계산한다. 계산은 견적
   작성과 같다. 재산정하는 날을 오늘로 보고, 생산은 오늘+3일(휴일이면 다음 생산일)부터 잡는다. 이미 등록된 수주만 자리를 차지하고, 다른 견적의 날짜는 넣지 않는다.
 - 재산정으로 바뀌는 칸은 `requested_due_date`, `estimated_due_date`, `planned_start_date`, `planned_end_date`뿐이다. 예상 납기가 바뀌면 생산
   시작·완료 예정일도 그 납기에 맞춰 다시 계산해 덮어쓴다. 이전 날짜는 남기지 않는다. 품목, 수량, 단가, `valid_until`, `status`는 그대로이며 `status`는 `SENT`로 남는다.

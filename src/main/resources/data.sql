@@ -6,7 +6,7 @@
 -- 기존 테스트용 비밀번호는 BCrypt 해시만 저장하며, 응답 DTO에 반환하지 않습니다.
 -- created_by / updated_by 컬럼은 BaseTimeEntity 상속 대상에만 포함했습니다.
 -- 견적/수주/생산/결제 상태는 ZIP의 현재 Entity 및 Enum 기준으로 맞추었습니다.
--- 기존 SQL에는 없던 신규 @Entity: holiday, status_history 의 예시 데이터도 추가했습니다.
+-- 기존 SQL에는 없던 신규 @Entity: status_history 의 예시 데이터도 추가했습니다.
 -- 데이터는 테스트 시나리오용이며 2026년 전체 공식 휴일 목록이 아닙니다.
 
 -- 직원 및 로그인
@@ -151,7 +151,8 @@ VALUES ('04', 'CJ대한통운', 'N'),
        ('01', '우체국택배', 'N');
 
 -- 견적
-INSERT INTO quotation (total_amount, id, quotation_no, client_id, contact_name, email, phone, address, user_id,
+INSERT INTO quotation (total_amount, id, quotation_no, client_id, client_name, client_email, client_phone,
+                       client_address, user_id,
                        requested_due_date, estimated_due_date, planned_start_date,
                        planned_end_date, status, valid_until, vat_included, created_at, updated_at, created_by,
                        updated_by)
@@ -497,13 +498,7 @@ VALUES (1, 1, 1, 'USER', '계약금이 아직 안 들어온 수주를 보여 줘
         'SELECT o.order_no, c.name AS progress_status, o.requested_due_date FROM customer_order o JOIN common_code c ON c.id = o.status_code WHERE o.confirmation_status = ''CONFIRMED'' AND c.code <> ''COMPLETED'' AND o.requested_due_date <= ''2026-10-31'' ORDER BY o.requested_due_date',
         '2026-10-26 11:01:00');
 
--- 신규 Entity: 공휴일 (테스트용 일부 날짜)
-INSERT INTO holiday (id, holiday_date, name, created_at)
-VALUES (1, '2026-01-01', '신정', '2026-01-01 00:00:00'),
-       (2, '2026-03-01', '삼일절', '2026-01-01 00:00:00'),
-       (3, '2026-05-05', '어린이날', '2026-01-01 00:00:00'),
-       (4, '2026-10-09', '한글날', '2026-01-01 00:00:00'),
-       (5, '2026-12-25', '성탄절', '2026-01-01 00:00:00');
+-- 공휴일은 서버 시작 시 공공데이터포털에서 수집하므로 초기 데이터를 입력하지 않는다.
 
 -- 신규 Entity: 상태 변경 이력 (entity_id는 다형성 대상 ID이므로 DB FK가 아닌 논리 참조)
 INSERT INTO status_history (id, entity, entity_id, from_status, to_status, user_id, user_name, note, created_at)

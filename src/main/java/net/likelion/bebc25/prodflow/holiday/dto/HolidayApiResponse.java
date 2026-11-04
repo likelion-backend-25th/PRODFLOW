@@ -1,15 +1,11 @@
 package net.likelion.bebc25.prodflow.holiday.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import java.time.LocalDate;
-import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
+// 공공데이터포털 공휴일 응답에서 추출한 날짜·명칭·공휴일 여부
 public record HolidayApiResponse(
         LocalDate date,
-        String localName,
-        String countryCode,
-        List<String> types
+        String name,
+        String isHoliday
 ) {
 }

@@ -6,7 +6,7 @@ import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
 import net.likelion.bebc25.prodflow.quotation.repository.QuotationScheduleRepository;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationScheduleService;
+import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleService;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +18,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class QuotationScheduleServiceTest {
@@ -195,7 +197,7 @@ class QuotationScheduleServiceTest {
         assertThatThrownBy(() -> service.calculate(-1, date(10), today))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("양수");
         assertThatThrownBy(() -> service.calculate(Long.MAX_VALUE, date(10), today))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("20년");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("2027-12-31");
     }
 
     @Test
@@ -214,6 +216,94 @@ class QuotationScheduleServiceTest {
         var result = service.calculate(100, date(12), today);
         assertThat(result.plannedEndDate()).isEqualTo(date(6));
         assertThat(result.estimatedDueDate()).isEqualTo(date(12));
+    }
+
+    @Test
+    void previewWithoutRequestedDateReturnsEarliestMultiDaySchedule() {
+        var result = service.previewSchedule(250, null, today);
+
+        assertThat(result.earliestSchedule().plannedStartDate()).isEqualTo(date(5));
+        assertThat(result.earliestSchedule().plannedEndDate()).isEqualTo(date(9));
+        assertThat(result.earliestSchedule().estimatedDueDate()).isEqualTo(date(12));
+        assertThat(result.selectedSchedule()).isEqualTo(result.earliestSchedule());
+        verify(lines, times(1)).findAll();
+        verify(repository, times(1)).findActiveOrders();
+        verify(repository, times(1)).findHolidays();
+    }
+
+    @Test
+    void previewOfImpossibleDateReturnsAlternativeWithoutReservingCapacity() {
+        var result = service.previewSchedule(100, date(9), today);
+
+        assertThat(result.earliestSchedule().estimatedDueDate()).isEqualTo(date(10));
+        assertThat(result.selectedSchedule()).isNull();
+        assertThat(service.previewSchedule(100, date(9), today)).isEqualTo(result);
+    }
+
+    @Test
+    void previewKeepsEarliestScheduleWhenSelectedScheduleIsLater() {
+        var result = service.previewSchedule(100, date(20), today);
+
+        assertThat(result.earliestSchedule().estimatedDueDate()).isEqualTo(date(10));
+        assertThat(result.earliestSchedule().plannedEndDate()).isEqualTo(date(5));
+        assertThat(result.selectedSchedule().plannedStartDate()).isEqualTo(date(17));
+        assertThat(result.selectedSchedule()).isEqualTo(service.calculate(100, date(20), today));
+    }
+
+    @Test
+    void previewAccountsForExistingOrdersAndHolidays() {
+        when(repository.findHolidays()).thenReturn(List.of(date(9)));
+        CustomerOrder existing = order(1L, date(11));
+        OrderProduct existingItem = item(existing, 100);
+        when(repository.findActiveOrders()).thenReturn(List.of(existing));
+        when(repository.findOrderProducts(List.of(1L))).thenReturn(List.of(existingItem));
+
+        var result = service.previewSchedule(100, null, today);
+
+        assertThat(result.earliestSchedule().plannedStartDate()).isEqualTo(date(6));
+        assertThat(result.earliestSchedule().estimatedDueDate()).isEqualTo(date(12));
+    }
+
+    @Test
+    void allowsRequestedDueDateOnLastDayOfNextYear() {
+        LocalDate limit = LocalDate.of(2027, 12, 31);
+
+        var result = service.calculate(100, limit, today);
+
+        assertThat(result.estimatedDueDate()).isEqualTo(limit);
+        assertThat(result.plannedEndDate()).isEqualTo(LocalDate.of(2027, 12, 28));
+    }
+
+    @Test
+    void rejectsRequestedDateBeyondNextYearEvenWhenProductionWouldFit() {
+        LocalDate beyondLimit = LocalDate.of(2028, 1, 1);
+
+        assertThatThrownBy(() -> service.calculate(100, beyondLimit, today))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("2027-12-31");
+        assertThatThrownBy(() -> service.previewSchedule(100, beyondLimit, today))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("2027-12-31");
+    }
+
+    @Test
+    void boundsEarliestDeliveryIncludingPackagingAndShipping() {
+        LocalDate lastProductionStart = LocalDate.of(2027, 12, 28);
+        when(repository.findHolidays()).thenReturn(today.plusDays(3).datesUntil(lastProductionStart).toList());
+
+        assertThat(service.previewSchedule(100, null, today).earliestSchedule().estimatedDueDate())
+                .isEqualTo(LocalDate.of(2027, 12, 31));
+        // 생산은 다음 해 안에 끝나지만 포장·배송이 그 이후로 넘어가면 거부한다.
+        assertThatThrownBy(() -> service.previewSchedule(200, null, today))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("2027-12-31");
+    }
+
+    @Test
+    void derivesLimitFromCalculationYearAndAllowsWeekendYearEnd() {
+        LocalDate nextYearToday = LocalDate.of(2027, 11, 2);
+        LocalDate nextYearLimit = LocalDate.of(2028, 12, 31);
+
+        assertThat(service.calculate(100, nextYearLimit, nextYearToday).estimatedDueDate()).isEqualTo(nextYearLimit);
+        assertThatThrownBy(() -> service.previewSchedule(100, nextYearLimit.plusDays(1), nextYearToday))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("2028-12-31");
     }
 
     private LocalDate date(int day) {

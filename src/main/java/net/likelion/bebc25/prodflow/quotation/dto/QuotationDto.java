@@ -32,9 +32,7 @@ public class QuotationDto {
             boolean vatIncluded,
             @NotEmpty(message = "견적 품목을 하나 이상 입력해주세요.")
             List<QuotationItemDto.@NotNull(message = "견적 품목은 비어 있을 수 없습니다.") @Valid CreateRequest> items,
-            @Valid ClientRequest newClient,
-            @NotBlank(message = "거래처 담당자명을 입력해주세요.")
-            @Size(max = 255) String contactName
+            @Valid ClientRequest newClient
     ) {
         // 예상 납기와 생산 일정은 서버에서 계산한 값을 전달받는다.
         public Quotation toEntity(
@@ -50,6 +48,7 @@ public class QuotationDto {
             return new Quotation(
                     quotationNo,
                     client,
+                    client.getEmployee(),
                     user,
                     requestedDueDate,
                     estimatedDueDate,
@@ -57,7 +56,7 @@ public class QuotationDto {
                     plannedEndDate,
                     effectiveValidUntil,
                     vatIncluded,
-                    QuotationStatus.SENT,
+                    QuotationStatus.DRAFT,
                     totalAmount
             );
         }
@@ -65,7 +64,7 @@ public class QuotationDto {
 
     public record ClientRequest(
             @NotBlank @Size(max = 255) String company,
-            @NotBlank @Size(max = 50) String representativeName,
+            @NotBlank(message = "거래처 담당자명을 입력해주세요.") @Size(max = 50) String employee,
             @NotBlank @Email @Size(max = 100) String email,
             @NotBlank @Pattern(regexp = "[0-9+() -]{8,50}") String phone,
             @NotBlank @Size(max = 10) String zipcode,
@@ -120,10 +119,10 @@ public class QuotationDto {
             QuotationStatus status,
             Long clientId,
             String clientCompany,
-            String clientEmployee,
+            String clientName,
             String clientPhone,
             String clientEmail,
-            String address,
+            String clientAddress,
             int itemCount,
             long totalQuantity,
             List<QuotationItemDto.Response> items,
@@ -143,7 +142,8 @@ public class QuotationDto {
             Long customerOrderId,
             String orderNo,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt
+            LocalDateTime updatedAt,
+            String createdBy
     ) {
         // 품목과 연결 수주는 별도로 조회하고, 금액은 서비스에서 계산해 전달한다.
         public static DetailResponse from(
@@ -176,10 +176,10 @@ public class QuotationDto {
                     quotation.getStatus(),
                     client.getId(),
                     client.getCompany(),
-                    quotation.getContactName(),
-                    quotation.getPhone(),
-                    quotation.getEmail(),
-                    quotation.getAddress(),
+                    quotation.getClientName(),
+                    quotation.getClientPhone(),
+                    quotation.getClientEmail(),
+                    quotation.getClientAddress(),
                     items.size(),
                     totalQuantity,
                     itemResponses,
@@ -199,7 +199,8 @@ public class QuotationDto {
                     customerOrderId,
                     orderNo,
                     quotation.getCreatedAt(),
-                    quotation.getUpdatedAt()
+                    quotation.getUpdatedAt(),
+                    quotation.getCreatedBy()
             );
         }
     }
