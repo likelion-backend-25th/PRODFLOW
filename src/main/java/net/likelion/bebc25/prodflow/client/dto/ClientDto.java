@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 @ToString
 public class ClientDto {
-    public record CreateRequest(
+    public record Request(
             String company,
             String employee,
             String email,
@@ -21,13 +21,6 @@ public class ClientDto {
     ) {
         public Client toEntity(User user) {
             return new Client(company, employee, email, phone, address, user);
-        }
-
-        public Client toEntityWithoutLogin(User user) {
-            Client client = new Client(company, employee, email, phone, address, user);
-            client.setCreatedBy("TEST_NAME");
-            client.setUpdatedBy("TEST_NAME");
-            return client;
         }
     }
 

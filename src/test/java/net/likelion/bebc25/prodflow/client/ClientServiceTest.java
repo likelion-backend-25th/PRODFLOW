@@ -213,7 +213,7 @@ public class ClientServiceTest {
         authenticate(role);
         Long userId = 2L;
         Address address = new Address("06236", "서울특별시 강남구 테헤란로 152", "12층");
-        ClientDto.CreateRequest request = new ClientDto.CreateRequest(
+        ClientDto.Request request = new ClientDto.Request(
                 "한빛케이스(주)", "최민재", "contact@hanbit-case.example",
                 "02-6000-1101", userId, address
         );
@@ -266,7 +266,7 @@ public class ClientServiceTest {
         // given
         authenticate(role);
         Long userId = 999L;
-        ClientDto.CreateRequest request = new ClientDto.CreateRequest(
+        ClientDto.Request request = new ClientDto.Request(
                 "한빛케이스(주)", "최민재", "contact@hanbit-case.example",
                 "02-6000-1101", userId,
                 new Address("06236", "서울특별시 강남구 테헤란로 152", "12층")
@@ -287,7 +287,7 @@ public class ClientServiceTest {
     void createClientWithUnauthorizedRole(String role) {
         // given
         authenticate(role);
-        ClientDto.CreateRequest request = new ClientDto.CreateRequest(
+        ClientDto.Request request = new ClientDto.Request(
                 "한빛케이스(주)", "최민재", "contact@hanbit-case.example",
                 "02-6000-1101", 2L,
                 new Address("06236", "서울특별시 강남구 테헤란로 152", "12층")
@@ -303,7 +303,7 @@ public class ClientServiceTest {
     @DisplayName("미인증 사용자는 거래처를 등록할 수 없다")
     void createClientWithoutAuthentication() {
         // given
-        ClientDto.CreateRequest request = new ClientDto.CreateRequest(
+        ClientDto.Request request = new ClientDto.Request(
                 "한빛케이스(주)", "최민재", "contact@hanbit-case.example",
                 "02-6000-1101", 2L,
                 new Address("06236", "서울특별시 강남구 테헤란로 152", "12층")
@@ -313,6 +313,138 @@ public class ClientServiceTest {
         assertThatThrownBy(() -> securedClientService.createClient(request))
                 .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
         verifyNoInteractions(userRepository, clientRepository);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SUPER_ADMIN", "ORDER_MANAGER"})
+    @DisplayName("최고관리자와 수주관리자는 거래처 정보와 담당자를 수정하고 상세 정보와 주문 통계를 받는다")
+    void updateClient(String role) {
+        // given
+        authenticate(role);
+        Long clientId = 1L;
+        Client client = existingClientForUpdate(clientId);
+        ClientDto.Request request = clientUpdateRequest();
+        User newUser = User.builder().name("박하은").phone("010-3000-0003").build();
+        given(clientRepository.findById(clientId)).willReturn(Optional.of(client));
+        given(userRepository.findById(request.userId())).willReturn(Optional.of(newUser));
+
+        // when
+        ClientDto.DetailResponse response = securedClientService.updateClient(clientId, request);
+
+        // then
+        assertThat(client.getId()).isEqualTo(clientId);
+        assertThat(client.getCompany()).isEqualTo(request.company());
+        assertThat(client.getEmployee()).isEqualTo(request.employee());
+        assertThat(client.getEmail()).isEqualTo(request.email());
+        assertThat(client.getPhone()).isEqualTo(request.phone());
+        assertThat(client.getAddress()).isEqualTo(request.address());
+        assertThat(client.getUser()).isSameAs(newUser);
+
+        assertThat(response.id()).isEqualTo(clientId);
+        assertThat(response.company()).isEqualTo(request.company());
+        assertThat(response.employee()).isEqualTo(request.employee());
+        assertThat(response.email()).isEqualTo(request.email());
+        assertThat(response.phone()).isEqualTo(request.phone());
+        assertThat(response.address()).isEqualTo("경기도 수원시 영통구 삼성로 129, 본관 3층");
+        assertThat(response.userName()).isEqualTo("박하은");
+        assertThat(response.userPhone()).isEqualTo("010-3000-0003");
+        // 주문 통계는 현재 서비스에 정의된 임시값을 검증한다.
+        assertThat(response.totalOrder()).isEqualTo(3);
+        assertThat(response.totalAmount()).isEqualTo(12340000L);
+        assertThat(response.ongoingOrders()).isEqualTo(1);
+        verify(clientRepository).findById(clientId);
+        verify(userRepository).findById(request.userId());
+        verifyNoMoreInteractions(clientRepository, userRepository);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 거래처를 수정하면 예외가 발생하고 담당자를 조회하지 않는다")
+    void updateClientWithNonexistentClientId() {
+        // given
+        authenticate("ORDER_MANAGER");
+        Long clientId = 999L;
+        ClientDto.Request request = clientUpdateRequest();
+        given(clientRepository.findById(clientId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> securedClientService.updateClient(clientId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("존재하지 않는 거래처 입니다. id = " + clientId);
+        verify(clientRepository).findById(clientId);
+        verifyNoMoreInteractions(clientRepository);
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 담당자로 수정하면 예외가 발생하고 기존 거래처 정보를 유지한다")
+    void updateClientWithNonexistentUserId() {
+        // given
+        authenticate("ORDER_MANAGER");
+        Long clientId = 1L;
+        Client client = existingClientForUpdate(clientId);
+        Address originalAddress = client.getAddress();
+        User originalUser = client.getUser();
+        ClientDto.Request request = clientUpdateRequest();
+        given(clientRepository.findById(clientId)).willReturn(Optional.of(client));
+        given(userRepository.findById(request.userId())).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> securedClientService.updateClient(clientId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("존재하지 않은 사용자입니다. id = " + request.userId());
+        assertThat(client.getId()).isEqualTo(clientId);
+        assertThat(client.getCompany()).isEqualTo("한빛케이스(주)");
+        assertThat(client.getEmployee()).isEqualTo("최민재");
+        assertThat(client.getEmail()).isEqualTo("contact@hanbit-case.example");
+        assertThat(client.getPhone()).isEqualTo("02-6000-1101");
+        assertThat(client.getAddress()).isSameAs(originalAddress);
+        assertThat(client.getUser()).isSameAs(originalUser);
+        verify(clientRepository).findById(clientId);
+        verify(userRepository).findById(request.userId());
+        verifyNoMoreInteractions(clientRepository, userRepository);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PRODUCTION_MANAGER", "INQUIRY_MANAGER"})
+    @DisplayName("거래처 수정 권한이 없는 역할은 거래처와 담당자 조회 전에 거부된다")
+    void updateClientWithUnauthorizedRole(String role) {
+        // given
+        authenticate(role);
+        ClientDto.Request request = clientUpdateRequest();
+
+        // when & then
+        assertThatThrownBy(() -> securedClientService.updateClient(1L, request))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(clientRepository, userRepository);
+    }
+
+    @Test
+    @DisplayName("미인증 사용자는 거래처를 수정할 수 없다")
+    void updateClientWithoutAuthentication() {
+        // given
+        ClientDto.Request request = clientUpdateRequest();
+
+        // when & then
+        assertThatThrownBy(() -> securedClientService.updateClient(1L, request))
+                .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
+        verifyNoInteractions(clientRepository, userRepository);
+    }
+
+    private Client existingClientForUpdate(Long clientId) {
+        Client client = new Client(
+                "한빛케이스(주)", "최민재", "contact@hanbit-case.example", "02-6000-1101",
+                new Address("06236", "서울특별시 강남구 테헤란로 152", "12층"),
+                User.builder().name("이서준").phone("010-2000-0002").build()
+        );
+        ReflectionTestUtils.setField(client, "id", clientId);
+        return client;
+    }
+
+    private ClientDto.Request clientUpdateRequest() {
+        return new ClientDto.Request(
+                "세원모바일(주)", "오지훈", "sales@sewon-mobile.example", "031-210-2202", 3L,
+                new Address("16677", "경기도 수원시 영통구 삼성로 129", "본관 3층")
+        );
     }
 
     @Test
