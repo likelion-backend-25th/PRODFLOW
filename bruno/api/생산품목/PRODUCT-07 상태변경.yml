@@ -1,11 +1,7 @@
 info:
   name: PRODUCT-07 상태변경
   type: http
-<<<<<<< Updated upstream:bruno/api/생산품목/PRODUCT-07 상태변경.yml
   seq: 2
-=======
-  seq: 5
->>>>>>> Stashed changes:bruno/api/PRODUCT-07 상태변경.yml
 
 http:
   method: PATCH

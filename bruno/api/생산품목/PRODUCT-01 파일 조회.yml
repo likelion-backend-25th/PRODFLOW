@@ -1,11 +1,7 @@
 info:
   name: PRODUCT-01 파일 조회
   type: http
-<<<<<<< Updated upstream:bruno/api/생산품목/PRODUCT-01 파일 조회.yml
   seq: 8
-=======
-  seq: 9
->>>>>>> Stashed changes:bruno/api/PRODUCT-01 파일 조회.yml
 
 http:
   method: GET

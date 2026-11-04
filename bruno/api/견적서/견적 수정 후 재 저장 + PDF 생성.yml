@@ -16,7 +16,7 @@ http:
       // 기존 거래처
       { 
         "clientId": 1, 
-        "requestedDueDate": "2027-06-30", 
+        "requestedDueDate": "2026-11-12", 
         "validUntil": "2026-11-18", 
         "vatIncluded": false, 
         "items": [ 
