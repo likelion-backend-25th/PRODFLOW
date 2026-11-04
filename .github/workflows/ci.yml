@@ -52,3 +52,13 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+
+          MAIL_USERNAME: ${{secrets.MAIL_USERNAME}}
+          MAIL_PASSWORD: ${{secrets.MAIL_PASSWORD}}
+
+          HOLIDAY_API_KEY: ${{secrets.HOLIDAY_API_KEY}}
+
+          SHIPMENT_TRACKING_API_KEY: ${{secrets.SHIPMENT_TRACKING_API_KEY}}
+
+          HOLIDAY_INITIALIZATION_ENABLED: "false"
+          SHIPMENT_TRACKING_REFRESH_ENABLED: "false"
