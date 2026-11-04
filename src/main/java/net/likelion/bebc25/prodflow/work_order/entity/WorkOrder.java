@@ -92,7 +92,7 @@ public class WorkOrder extends BaseTimeEntity {
     // 상태 변경
     public void changeStatus(CommonCode commonCode) {
         this.commonCode = commonCode;
-        if ("PACK_DONE".equals(commonCode.getCode())) {
+        if ("PACK".equals(commonCode.getCode())) {
             this.completedAt = LocalDate.now();
         }
     }

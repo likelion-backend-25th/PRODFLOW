@@ -2,6 +2,9 @@ package net.likelion.bebc25.prodflow.work_order.serivce;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
+import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
+import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
 import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
@@ -19,7 +22,9 @@ import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
+import net.likelion.bebc25.prodflow.work_order.entity.WorkOrderHistory;
 import net.likelion.bebc25.prodflow.work_order.repsitory.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderHistoryRepository;
 import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +37,7 @@ import java.time.Year;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
@@ -41,6 +47,15 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class WorkOrderService {
 
+    // 변경 가능한 상태 전이
+    private static final Map<String, Set<String>> ALLOWED_TRANSITIONS = Map.of(
+            "PREPARE", Set.of("PRODUCE", "HALT"),
+            "PRODUCE", Set.of("SUSPEND", "HALT", "PACK"),
+            "SUSPEND", Set.of("PRODUCE", "HALT"),
+            "HALT", Set.of("PREPARE"),
+            "PACK", Set.of("PACK_DONE")
+    );
+
     private final WorkOrderRepository workOrderRepository;
     private final OrderProductRepository orderProductRepository;
     private final LineRepository lineRepository;
@@ -48,6 +63,8 @@ public class WorkOrderService {
     private final CommonCodeRepository commonCodeRepository;
     private final HolidayRepository holidayRepository;
     private final ProductionPlanRepository productionPlanRepository;
+    private final StatusHistoryRepository statusHistoryRepository;
+    private final WorkOrderHistoryRepository workOrderHistoryRepository;
 
     // 한 라인이 부족하면 다른 라인에 장을 더 만든다. 장마다 지시번호가 1 증가한다.
     @Transactional
@@ -77,9 +94,9 @@ public class WorkOrderService {
             throw new IllegalArgumentException("점검·고장 라인에는 배정할 수 없습니다.");
         }
 
-        // ORDER_STATUS 그룹의 사용 중인 코드를 가져온다.
+        // WORK_ORDER_STATUS 그룹의 사용 중인 코드를 가져온다.
         CommonCode prepare = commonCodeRepository
-                .findByCodeGroup_GroupCodeAndStatus("ORDER_STATUS", CodeStatus.ACTIVE)
+                .findByCodeGroup_GroupCodeAndStatus("WORK_ORDER_STATUS", CodeStatus.ACTIVE)
                 .stream()
                 // code가 PREPARE인 행
                 .filter(code -> "PREPARE".equals(code.getCode()))
@@ -253,6 +270,8 @@ public class WorkOrderService {
         // 수정할 작업지시서 조회
         WorkOrder workOrder = workOrderRepository.findById(workOrderId)
                 .orElseThrow(() -> new NoSuchElementException("해당 작업을 찾을 수 없습니다."));
+        Line previousLine = workOrder.getLine();
+        User previousUser = workOrder.getUser();
 
         // 변경할 내용이 있는지 확인
         boolean isChangedLine = request.lineId() != null;
@@ -289,6 +308,158 @@ public class WorkOrderService {
                 .orElseThrow(() -> new IllegalArgumentException("수정자를 찾을 수 없습니다."));
 
         workOrder.setUpdatedBy(modifier.getName());
+        // 바꾸지 않은 라인·담당자는 변경 전과 같은 값을 남긴다.
+        workOrderHistoryRepository.save(new WorkOrderHistory(
+                workOrder,
+                previousLine,
+                workOrder.getLine(),
+                previousUser,
+                workOrder.getUser(),
+                modifier,
+                null
+        ));
         return WorkOrderDto.DetailResponse.from(workOrder);
+    }
+
+    @Transactional
+    public WorkOrderDto.DetailResponse changeStatus(Long workOrderId,
+                                                    WorkOrderDto.UpdateStatusRequest request,
+                                                    Long userId) {
+        // 수정할 직원
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("수정한 직원을 찾을 수 없습니다."));
+
+        // 수정할 작업지시서 조회
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+                .orElseThrow(() -> new NoSuchElementException("해당 작업을 찾을 수 없습니다."));
+
+        // 변경 전 작업 상태
+        CommonCode beforeCode = workOrder.getCommonCode();
+
+        // 변경 후 작업 상태. 그룹 WORK_ORDER_STATUS, 요청 코드, 활성화 상태 코드
+        CommonCode afterCode = commonCodeRepository
+                .findByCodeGroup_GroupCodeAndCodeAndStatus(
+                        "WORK_ORDER_STATUS", request.status(), CodeStatus.ACTIVE)
+                .orElseThrow(() -> new IllegalArgumentException("작업 상태 코드를 찾을 수 없습니다."));
+
+        // 변경 전·후 코드를 구한 다음 바로 아래에서 검증
+        validateStatusTransition(workOrder, beforeCode, afterCode);
+
+        // 요청 상태에 따라 라인과 수주를 바꾼 뒤 작업 상태를 저장한다.
+        processStatusChange(workOrder, afterCode, user);
+        workOrder.changeStatus(afterCode);
+        workOrder.setUpdatedBy(user.getName());
+        statusHistoryRepository.save(new StatusHistory(
+                HistoryEntityType.WORK_ORDER,
+                workOrder.getId(),
+                beforeCode.getCode(),
+                afterCode.getCode(),
+                user
+        ));
+        return WorkOrderDto.DetailResponse.from(workOrder);
+    }
+
+    // 상태 전이가 가능한지 검증하는 로직
+    private void validateStatusTransition(WorkOrder workOrder, CommonCode beforeCode, CommonCode afterCode) {
+        String before = beforeCode.getCode();
+        String after = afterCode.getCode();
+        // 동일한 상태를 체크하는 로직
+        if (before.equals(after)) {
+            throw new IllegalArgumentException("이미 같은 상태입니다.");
+        }
+        // 상태 전이를 검증하는 로직
+        boolean isAllowed = ALLOWED_TRANSITIONS.getOrDefault(before, Set.of()).contains(after);
+        if (!isAllowed) {
+            throw new IllegalArgumentException("현재 작업 상태에서는 요청한 상태로 변경할 수 없습니다.");
+        }
+        // 수주 취소로 멈춘 작업은 준비로 돌아가지 않는다. 생산 중지로 멈춘 작업은 가능하다.
+        boolean isResumeAfterHalt = "HALT".equals(before) && "PREPARE".equals(after);
+        if (isResumeAfterHalt && "CANCELLED".equals(orderStatus(workOrder))) {
+            throw new IllegalArgumentException("취소된 수주의 작업은 다시 준비할 수 없습니다.");
+        }
+    }
+
+    // 요청받은 작업 상태에 따라 라인과 수주를 바꾼다. 작업지시 상태는 이 호출 뒤에 저장한다.
+    private void processStatusChange(WorkOrder workOrder, CommonCode afterCode, User user) {
+        switch (afterCode.getCode()) {
+            case "PRODUCE" -> startProduction(workOrder, user);
+            case "SUSPEND" -> changeOrder(
+                    workOrder, otherProduceRemains(workOrder) ? "IN_PRODUCTION" : "ON_HOLD");
+            case "HALT" -> haltWork(workOrder);
+            case "PACK" -> finishProduction(workOrder, user);
+            case "PACK_DONE" -> {
+            }
+            case "PREPARE" -> changeLineStatus(workOrder.getLine(), LineStatus.AVAILABLE, user);
+            default -> throw new IllegalArgumentException("작업 상태 코드를 찾을 수 없습니다.");
+        }
+    }
+
+    // 생산 시작. 라인은 가동 중이 되고 수주는 생산중이 된다.
+    private void startProduction(WorkOrder workOrder, User user) {
+        if (workOrder.getPlannedStartDate().isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("생산 시작 예정일 전에는 시작할 수 없습니다.");
+        }
+        String orderStatus = workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode();
+        if ("WAITING".equals(orderStatus)) {
+            throw new IllegalArgumentException("대기 수주는 생산을 시작할 수 없습니다.");
+        }
+        changeLineStatus(workOrder.getLine(), LineStatus.OPERATING, user);
+        changeOrder(workOrder, "IN_PRODUCTION");
+    }
+
+    // 생산 중지. 수주가 취소면 생산대기로 되돌리지 않는다.
+    private void haltWork(WorkOrder workOrder) {
+        if ("CANCELLED".equals(orderStatus(workOrder))) {
+            return;
+        }
+        changeOrder(workOrder, "PRODUCTION_READY");
+    }
+
+    private String orderStatus(WorkOrder workOrder) {
+        return workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode();
+    }
+
+    // 생산을 마친다. 같은 라인에 다른 생산이 없으면 라인은 가동 가능이 된다.
+    private void finishProduction(WorkOrder workOrder, User user) {
+        boolean otherProduceOnLine = workOrderRepository.existsByLine_IdAndCommonCode_CodeAndIdNot(
+                workOrder.getLine().getId(), "PRODUCE", workOrder.getId());
+        if (!otherProduceOnLine) {
+            changeLineStatus(workOrder.getLine(), LineStatus.AVAILABLE, user);
+        }
+        Long customerOrderId = workOrder.getOrderProduct().getCustomerOrder().getId();
+        boolean packingRemains = workOrderRepository
+                .existsByOrderProduct_CustomerOrder_IdAndCommonCode_CodeNotInAndIdNot(
+                        customerOrderId, List.of("PACK", "PACK_DONE"), workOrder.getId());
+        changeOrder(workOrder, packingRemains ? "IN_PRODUCTION" : "PACKING");
+    }
+
+    // 이 작업을 빼도 같은 수주에 생산 중인 작업이 있는지
+    private boolean otherProduceRemains(WorkOrder workOrder) {
+        return workOrderRepository.existsByOrderProduct_CustomerOrder_IdAndCommonCode_CodeAndIdNot(
+                workOrder.getOrderProduct().getCustomerOrder().getId(), "PRODUCE", workOrder.getId());
+    }
+
+    // 라인 상태가 실제로 바뀔 때만 라인 상태 이력을 남긴다.
+    private void changeLineStatus(Line line, LineStatus nextStatus, User user) {
+        if (line.getStatus() == nextStatus) {
+            return;
+        }
+        String beforeStatus = line.getStatus().name();
+        line.changeStatus(nextStatus);
+        statusHistoryRepository.save(new StatusHistory(
+                HistoryEntityType.LINE,
+                line.getId(),
+                beforeStatus,
+                nextStatus.name(),
+                user
+        ));
+    }
+
+    // 수주 진행 상태는 ORDER_STATUS 그룹의 코드다.
+    private void changeOrder(WorkOrder workOrder, String orderStatus) {
+        CommonCode orderCode = commonCodeRepository
+                .findByCodeGroup_GroupCodeAndCodeAndStatus("ORDER_STATUS", orderStatus, CodeStatus.ACTIVE)
+                .orElseThrow(() -> new IllegalArgumentException("수주 상태 코드를 찾을 수 없습니다."));
+        workOrder.getOrderProduct().getCustomerOrder().changeProgress(orderCode);
     }
 }

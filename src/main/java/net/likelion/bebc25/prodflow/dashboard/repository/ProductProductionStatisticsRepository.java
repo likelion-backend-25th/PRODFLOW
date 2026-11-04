@@ -25,7 +25,7 @@ public interface ProductProductionStatisticsRepository
             JOIN cc.codeGroup cg
             WHERE wo.completedAt >= :startDate
             AND wo.completedAt < :endDate
-            AND cg.groupCode = 'ORDER_STATUS'
+            AND cg.groupCode = 'WORK_ORDER_STATUS'
             AND cc.code = 'PACK_DONE'
             GROUP BY op.product.id, op.productName
             ORDER BY op.product.id
@@ -43,7 +43,7 @@ public interface ProductProductionStatisticsRepository
             JOIN cc.codeGroup cg
             WHERE wo.completedAt >= :startDate
             AND wo.completedAt < :endDate
-            AND cg.groupCode = 'ORDER_STATUS'
+            AND cg.groupCode = 'WORK_ORDER_STATUS'
             AND cc.code = 'PACK_DONE'
             """)
     long sumCompletedProductionQuantity(

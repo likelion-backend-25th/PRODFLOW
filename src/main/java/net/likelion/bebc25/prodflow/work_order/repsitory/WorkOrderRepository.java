@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 
 
 public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
@@ -42,4 +43,21 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
             @Param("to") LocalDate to,
             @Param("keyword") String keyword,
             Pageable pageable);
+
+    // 이 작업을 뺀 같은 수주에 해당 상태의 작업이 있는지
+    boolean existsByOrderProduct_CustomerOrder_IdAndCommonCode_CodeAndIdNot(
+            Long customerOrderId,
+            String code,
+            Long workOrderId
+    );
+
+    // 이 작업을 뺀 같은 라인에 해당 상태의 작업이 있는지
+    boolean existsByLine_IdAndCommonCode_CodeAndIdNot(Long lineId, String code, Long workOrderId);
+
+    // 이 작업을 뺀 같은 수주에 포장 이전 작업이 있는지
+    boolean existsByOrderProduct_CustomerOrder_IdAndCommonCode_CodeNotInAndIdNot(
+            Long customerOrderId,
+            Collection<String> codes,
+            Long workOrderId
+    );
 }

@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.work_order;
 import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
 import net.likelion.bebc25.prodflow.holiday.repository.HolidayRepository;
+import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
@@ -10,10 +11,12 @@ import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.CreateRequest;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.DetailResponse;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.PageResponse;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.Response;
+import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.UpdateStatusRequest;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.UpdatedRequest;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 import net.likelion.bebc25.prodflow.work_order.repsitory.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderHistoryRepository;
 import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
 import net.likelion.bebc25.prodflow.work_order.serivce.WorkOrderService;
 import org.junit.jupiter.api.DisplayName;
@@ -56,6 +59,9 @@ class WorkOrderServiceTest {
 
     @Autowired
     StatusHistoryRepository statusHistoryRepository;
+
+    @Autowired
+    WorkOrderHistoryRepository workOrderHistoryRepository;
 
     @Autowired
     LineRepository lineRepository;
@@ -397,6 +403,64 @@ class WorkOrderServiceTest {
         assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(null, null), 1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("변경된 라인 또는 담당자가 없습니다.");
+    }
+
+    @Test
+    @DisplayName("작업 상태를 바꾸면 상태 변경 이력을 남긴다")
+    void recordStatusHistoryWhenStatusChanges() {
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        long assignmentHistoryCount = workOrderHistoryRepository.count();
+
+        // 준비에서 생산 중지로 바꾼다. 시작 예정일과 상관없이 허용되는 전이다.
+        DetailResponse changed = workOrderService.changeStatus(
+                workOrderId, new UpdateStatusRequest("HALT"), 1L);
+
+        assertThat(changed.status()).isEqualTo("HALT");
+        assertThat(statusHistoryRepository.findAll())
+                .filteredOn(history -> history.getEntity() == HistoryEntityType.WORK_ORDER
+                        && history.getEntityId().equals(workOrderId))
+                .singleElement()
+                .satisfies(history -> {
+                    assertThat(history.getFromStatus()).isEqualTo("PREPARE");
+                    assertThat(history.getToStatus()).isEqualTo("HALT");
+                    assertThat(history.getUser().getId()).isEqualTo(1L);
+                    assertThat(history.getUserName()).isEqualTo("서도윤");
+                });
+        // 상태 변경은 라인·담당자 변경 이력에 들어가지 않는다.
+        assertThat(workOrderHistoryRepository.count()).isEqualTo(assignmentHistoryCount);
+    }
+
+    @Test
+    @DisplayName("라인과 담당자를 바꾸면 작업지시 변경 이력을 남긴다")
+    void recordWorkOrderHistoryWhenLineAndAssigneeChange() {
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        long statusHistoryCount = statusHistoryRepository.count();
+        // 다른 라인을 이 테스트 안에서만 가동 가능으로 둔다.
+        Line targetLine = lineRepository.findAll().stream()
+                .filter(line -> !line.getId().equals(1L))
+                .findFirst()
+                .orElseThrow();
+        targetLine.changeStatus(LineStatus.AVAILABLE);
+
+        workOrderService.update(workOrderId, updateRequest(targetLine.getId(), 6L), 1L);
+
+        assertThat(workOrderHistoryRepository.findAll())
+                .filteredOn(history -> history.getWorkOrder().getId().equals(workOrderId))
+                .singleElement()
+                .satisfies(history -> {
+                    assertThat(history.getPreviousLine().getId()).isEqualTo(1L);
+                    assertThat(history.getNewLine().getId()).isEqualTo(targetLine.getId());
+                    assertThat(history.getPreviousUser().getId()).isEqualTo(4L);
+                    assertThat(history.getPreviousUser().getName()).isEqualTo("김태호");
+                    assertThat(history.getNewUser().getId()).isEqualTo(6L);
+                    assertThat(history.getNewUser().getName()).isEqualTo("박시우");
+                    assertThat(history.getChangedBy().getName()).isEqualTo("서도윤");
+                    assertThat(history.getChangeReason()).isNull();
+                });
+        // 라인·담당자 변경은 상태 변경 이력에 들어가지 않는다.
+        assertThat(statusHistoryRepository.count()).isEqualTo(statusHistoryCount);
     }
 
     @Test

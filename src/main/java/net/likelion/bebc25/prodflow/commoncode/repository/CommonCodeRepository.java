@@ -7,12 +7,20 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CommonCodeRepository extends JpaRepository<CommonCode, Long> {
 
     // 작업지시 등 기존 사용
     List<CommonCode> findByCodeGroup_GroupCodeAndStatus(
             String groupCode,
+            CodeStatus status
+    );
+
+    // 그룹과 코드가 같고 사용 중인 공통코드 한 건
+    Optional<CommonCode> findByCodeGroup_GroupCodeAndCodeAndStatus(
+            String groupCode,
+            String code,
             CodeStatus status
     );
 

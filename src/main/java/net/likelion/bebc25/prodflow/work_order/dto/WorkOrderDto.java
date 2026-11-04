@@ -16,6 +16,13 @@ public class WorkOrderDto {
     ) {
     }
 
+    // 작업 상태 변경. 값은 WORK_ORDER_STATUS의 code다.
+    public record UpdateStatusRequest(
+            String status
+    ) {
+    }
+
+    // 담당 라인, 작업자 변경 요청 dto
     public record UpdatedRequest(
             Long lineId,
             Long assignedId
