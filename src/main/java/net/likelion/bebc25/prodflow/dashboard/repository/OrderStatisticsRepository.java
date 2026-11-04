@@ -48,7 +48,7 @@ public interface OrderStatisticsRepository extends JpaRepository<CustomerOrder, 
             """)
     List<DashboardDto.OrderStatusStatisticsResponse> findOrderStatusStatistics();
 
-    // 취소되지 않은 수주의 미입금 금액 합계
+    // 미입금 금액 합계(취소 수주 제외)
     @Query("""
             SELECT COALESCE(SUM(o.totalAmount), 0)
                  - COALESCE((
