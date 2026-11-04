@@ -403,6 +403,11 @@ public class WorkOrderService {
         if ("WAITING".equals(orderStatus)) {
             throw new IllegalArgumentException("대기 수주는 생산을 시작할 수 없습니다.");
         }
+        boolean otherProduceOnLine = workOrderRepository.existsByLine_IdAndCommonCode_CodeAndIdNot(
+                workOrder.getLine().getId(), "PRODUCE", workOrder.getId());
+        if (otherProduceOnLine) {
+            throw new IllegalArgumentException("이 라인에서 이미 생산 중인 작업이 있습니다.");
+        }
         changeLineStatus(workOrder.getLine(), LineStatus.OPERATING, user);
         changeOrder(workOrder, "IN_PRODUCTION");
     }

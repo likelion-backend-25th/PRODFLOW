@@ -12,8 +12,15 @@ import net.likelion.bebc25.prodflow.line.repsitory.LineCapacityLogRepository;
 import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
+import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
+import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
@@ -21,10 +28,133 @@ import org.springframework.transaction.annotation.Transactional;
 public class LineService {
 
     private final LineRepository lineRepository;
+    private final WorkOrderRepository workOrderRepository;
     private final UserRepository userRepository;
     private final LineCapacityLogRepository lineCapacityLogRepository; // 라인 변경시 이력을 저장
     private final StatusHistoryRepository statusHistoryRepository; // 상태 변경시 이력을 저장
 
+    // 생산라인 목록. 카드 한 장과 상단 집계를 한 응답으로 만든다.
+    public LineDto.ListResponse findAll() {
+        // 쿼리는 라인 기준 아우터 조인이고, 라인 id 다음 작업 id 순이다.
+        // 생산 중 작업이 없으면 작업 번호, 품목, 수주, 담당자는 null이다.
+        // 같은 라인이 바로 다시 나오면 두 번째 생산 작업이라 건너뛴다. 먼저 나온 작업만 남는다.
+        List<LineDto.LineList> lines = new ArrayList<>();
+        // 가장 먼저 배정된 라인 정보
+        Long previousLineId = null;
+        for (LineDto.LineList row : lineRepository.findLineList()) {
+            // 이미 해당 라인에 정보가 있는경우 건너띔
+            if (row.lineId().equals(previousLineId)) {
+                continue;
+            }
+            lines.add(row);
+            previousLineId = row.lineId();
+        }
+        return new LineDto.ListResponse(
+                lines.size(), // 전체 라인 수. 작업이 없는 라인도 포함한다.
+                count(lines, LineStatus.OPERATING), // 가동 중
+                count(lines, LineStatus.AVAILABLE), // 가동 가능
+                count(lines, LineStatus.INSPECTION) + count(lines, LineStatus.BROKEN), // 점검과 고장
+                lines
+        );
+    }
+
+    // 상단 집계는 작업 수가 아니라 라인 상태만 센다.
+    private int count(List<LineDto.LineList> lines, LineStatus status) {
+        return (int) lines.stream().filter(line -> line.status() == status).count();
+    }
+
+    // 생산라인 상세. 현재 작업은 이 라인의 PRODUCE 중 먼저 등록된 한 건이다.
+    public LineDto.DetailResponse findByLineId(Long lineId) {
+        Line line = lineRepository.findById(lineId)
+                .orElseThrow(() -> new IllegalArgumentException("라인을 찾을 수 없습니다."));
+        // 이 라인 작업 중에서 현재·예정만 남긴다. 포장, 포장완료, 생산중지는 제외한다.
+        List<WorkOrder> workOrders = new ArrayList<>();
+        for (WorkOrder workOrder : workOrderRepository.search(
+                lineId, null, null, null, null, Pageable.unpaged()).getContent()) {
+            String status = workOrder.getCommonCode().getCode();
+            if ("PRODUCE".equals(status) || "PREPARE".equals(status) || "SUSPEND".equals(status)) {
+                workOrders.add(workOrder);
+            }
+        }
+        WorkOrder current = currentWork(workOrders);
+        // 생산 중인 작업이 없으면 이 여섯 값은 비운다.
+        String workNo = null;
+        String productName = null;
+        String orderNo = null;
+        LocalDate plannedStartDate = null;
+        LocalDate plannedEndDate = null;
+        String managerName = null;
+        if (current != null) {
+            workNo = current.getWorkNo();
+            productName = current.getOrderProduct().getProductName();
+            orderNo = current.getOrderProduct().getCustomerOrder().getOrderNo();
+            plannedStartDate = current.getPlannedStartDate();
+            plannedEndDate = current.getPlannedEndDate();
+            managerName = current.getUser().getName();
+        }
+        List<LineDto.CapacityLog> capacityLogs = lineCapacityLogRepository
+                .findByLine_IdOrderByChangedAtDesc(lineId).stream()
+                .map(this::toCapacityLog)
+                .toList();
+        return new LineDto.DetailResponse(
+                line.getId(),
+                line.getLineName(),
+                line.getStatus(),
+                line.getProductionCapacity(),
+                workOrders.size(), // 현재·예정 작업 수
+                countWork(workOrders, "PREPARE"), // 라인에 배정된 준비중인 작업 수
+                workNo,
+                productName,
+                orderNo,
+                plannedStartDate,
+                plannedEndDate,
+                managerName,
+                workOrders.stream().map(this::toDetailWorkOrder).toList(),
+                capacityLogs
+        );
+    }
+
+    // 생산 중 작업이 여러 건이면 id가 작은 작업을 현재 작업으로 둔다.
+    private WorkOrder currentWork(List<WorkOrder> workOrders) {
+        WorkOrder current = null;
+        for (WorkOrder workOrder : workOrders) {
+            if (!"PRODUCE".equals(workOrder.getCommonCode().getCode())) {
+                continue;
+            }
+            if (current == null || workOrder.getId() < current.getId()) {
+                current = workOrder;
+            }
+        }
+        return current;
+    }
+
+    private int countWork(List<WorkOrder> workOrders, String status) {
+        return (int) workOrders.stream()
+                .filter(workOrder -> status.equals(workOrder.getCommonCode().getCode()))
+                .count();
+    }
+
+    private LineDto.DetailWorkOrder toDetailWorkOrder(WorkOrder workOrder) {
+        return new LineDto.DetailWorkOrder(
+                workOrder.getWorkNo(),
+                workOrder.getOrderProduct().getCustomerOrder().getOrderNo(),
+                workOrder.getOrderProduct().getProductName(),
+                workOrder.getQuantity(),
+                workOrder.getPlannedStartDate(),
+                workOrder.getPlannedEndDate(),
+                workOrder.getCommonCode().getCode()
+        );
+    }
+
+    private LineDto.CapacityLog toCapacityLog(LineCapacityLog log) {
+        return new LineDto.CapacityLog(
+                log.getChangedAt(),
+                log.getBeforeCapacity(),
+                log.getAfterCapacity(),
+                log.getReason(),
+                log.getChangedBy().getName()
+        );
+    }
 
     /**
      * 라인 등록 (권한 : 최고 관리자, 수주 관리자)
