@@ -53,4 +53,13 @@ public class Client extends BaseTimeEntity {
         this.address = address;
         this.user = user;
     }
+
+    public void update(String company, String employee, String email, String phone, Address address, User user) {
+        this.company = company;
+        this.employee = employee;
+        this.email = email;
+        this.phone = phone;
+        this.address = address;
+        this.user = user;
+    }
 }

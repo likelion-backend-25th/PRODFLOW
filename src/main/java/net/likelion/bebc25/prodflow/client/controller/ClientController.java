@@ -43,10 +43,28 @@ public class ClientController {
     @PostMapping
     public ResponseEntity<ClientDto.DetailResponse> createClient(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestBody ClientDto.CreateRequest request
+            @RequestBody ClientDto.Request request
     ) {
         ClientDto.DetailResponse response = clientService.createClient(request);
         return ResponseEntity.created(URI.create("/api/v1/clients/" + response.id())).body(response);
+    }
+
+    @Operation(
+            summary = "거래처 정보 수정",
+            description = "RequestBody로 거래처 정보를 받아 등록한 뒤 상세 정보를 반환한다"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "등록 성공")
+    })
+    @PostMapping("/{id}")
+    public ResponseEntity<ClientDto.DetailResponse> updateClient(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Parameter(description = "거래처 ID", example = "1")
+            @PathVariable("id") Long clientId,
+            @RequestBody ClientDto.Request request
+    ) {
+        ClientDto.DetailResponse response = clientService.updateClient(clientId, request);
+        return ResponseEntity.created(URI.create("/api/v1/clients/" + clientId)).body(response);
     }
 
     @Operation(

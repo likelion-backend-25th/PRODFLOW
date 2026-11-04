@@ -35,7 +35,7 @@ public class ClientService {
 
     @Transactional
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
-    public ClientDto.DetailResponse createClient(ClientDto.CreateRequest request) {
+    public ClientDto.DetailResponse createClient(ClientDto.Request request) {
         // Order 관련 임시값
         int totalOrder = 0;
         Long totalAmount = 0L;
@@ -44,8 +44,6 @@ public class ClientService {
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않은 사용자입니다. id = " + request.userId()));
 
-        // 로그인 구현이 안되어있어 임시로 구현한 메소드
-//        Client client = clientRepository.save(request.toEntityWithoutLogin(user));
         Client client = clientRepository.save(request.toEntity(user));
         return ClientDto.DetailResponse.from(client, totalOrder, totalAmount, ongoingOrders);
     }
@@ -83,6 +81,32 @@ public class ClientService {
         }
 
         return list;
+    }
+
+    @Transactional
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
+    public ClientDto.DetailResponse updateClient(Long clientId, ClientDto.Request request) {
+        // Order 관련 임시값
+        int totalOrder = 3;
+        Long totalAmount = 12340000L;
+        int ongoingOrders = 1;
+
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 거래처 입니다. id = " + clientId));
+
+        User user = userRepository.findById(request.userId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않은 사용자입니다. id = " + request.userId()));
+
+        client.update(
+                request.company(),
+                request.employee(),
+                request.email(),
+                request.phone(),
+                request.address(),
+                user
+        );
+
+        return ClientDto.DetailResponse.from(client, totalOrder, totalAmount, ongoingOrders);
     }
 
     public ClientDto.DetailResponse getClientDetail(Long clientId) {

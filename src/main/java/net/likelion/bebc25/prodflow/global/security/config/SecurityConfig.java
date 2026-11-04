@@ -101,7 +101,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/api/v1/clients"
+                                "/api/v1/clients/", "/api/v1/clients/**"
                         ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
 
                         .requestMatchers(
