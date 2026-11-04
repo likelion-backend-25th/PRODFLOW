@@ -16,19 +16,20 @@ import net.likelion.bebc25.prodflow.quotation.enums.QuotationSortType;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.quotation.repository.QuotationItemRepository;
 import net.likelion.bebc25.prodflow.quotation.repository.QuotationRepository;
+import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleResult;
+import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleService;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -55,19 +56,18 @@ public class QuotationService {
     private final QuotationItemService quotationItemService;
     private final QuotationScheduleService scheduleService;
 
-    // 견적서 작성
+    // 견적 초안 저장. PDF 생성은 이 트랜잭션 커밋 이후 수행한다.
     @Transactional
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
     public QuotationDto.DetailResponse create(@NotNull @Valid QuotationDto.CreateRequest request, Long userId) {
         // 작성자 조회 및 계정 상태 확인
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "작성자 계정을 찾을 수 없습니다."));
+                .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("작성자 계정을 찾을 수 없습니다."));
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "사용 중인 계정만 견적을 작성할 수 있습니다.");
+            throw new AccessDeniedException("사용 중인 계정만 견적을 작성할 수 있습니다.");
         }
-        // 비밀번호 변경 안해도 이용가능한지 확인 필요
         if (user.isMustChangePassword()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "비밀번호를 먼저 변경해주세요.");
+            throw new AccessDeniedException("비밀번호를 먼저 변경해주세요.");
         }
 
         // 입력값 검증
@@ -80,12 +80,9 @@ public class QuotationService {
         if (validUntil == null) {
             validUntil = today.plusDays(14);
         }
-        if (validUntil.isBefore(today.plusDays(7)) || validUntil.isAfter(today.plusDays(14))) {
-            throw new IllegalArgumentException("견적 유효기간은 발행일로부터 7~14일이어야 합니다.");
+        if (!validUntil.equals(today.plusDays(7)) && !validUntil.equals(today.plusDays(14))) {
+            throw new IllegalArgumentException("견적 유효기간은 발행일로부터 7일 또는 14일이어야 합니다.");
         }
-        // DTO 입력 검증 이후 품목 중복 여부 검증
-        quotationItemService.validateItems(request.items());
-
         // 품목별 VAT·원 단위 반올림 적용 후 총액 합산
         long totalAmount = calculateTotalAmount(request.items(), request.vatIncluded());
 
@@ -95,14 +92,11 @@ public class QuotationService {
             totalQuantity += item.quantity();
         }
 
-        /**
-         *  납기일 계산
-         */
-        QuotationScheduleService.Schedule schedule = scheduleService.calculate(totalQuantity, request.requestedDueDate(), today);
+        // 최종 저장 시 납기 재계산
+        QuotationScheduleResult schedule = scheduleService.calculate(totalQuantity, request.requestedDueDate(), today);
 
         // 거래처 조회. 신규 거래처면 이 트랜잭션 안에서 함께 저장
         Client client = findOrCreateClient(request, user);
-//        Client client = clientService.findOrCreate(request.clientId(), request.newClient(), user);
 
         // NOT NULL 제약을 지키기 위해 임시 번호로 저장한 뒤, 생성된 ID로 번호를 확정
         String quotationNo = createQuotationNo(today);
@@ -111,8 +105,6 @@ public class QuotationService {
         Quotation quotation = request.toEntity(quotationNo, client, user, schedule.estimatedDueDate(),
                 schedule.plannedStartDate(), schedule.plannedEndDate(), validUntil, totalAmount);
 
-        // 견적에 거래처 정보 저장
-        quotation.snapshotContact(request.contactName(), client.getEmail(), client.getPhone(), client.getAddress());
         // 견적서 저장
         Quotation savedQuotation = quotationRepository.save(quotation);
 
@@ -129,6 +121,69 @@ public class QuotationService {
 
         // 금액을 계산하고 엔티티를 응답 DTO로 변환
         return toDetailResponse(savedQuotation, savedItems);
+    }
+
+    // 수정 커밋 후 컨트롤러에서 PDF를 생성. PDF 실패로 수정 내용을 되돌리지 않는다.
+    @Transactional
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    public QuotationDto.DetailResponse updateDraft(Long quotationId, @NotNull @Valid QuotationDto.CreateRequest request, Long userId) {
+        // 수정자 계정을 조회하고 사용 상태,최초 비밀번호 변경 완료 여부를 확인
+        User editor = userRepository.findById(userId)
+                .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("수정자 계정을 찾을 수 없습니다."));
+
+        if (editor.getStatus() != UserStatus.ACTIVE) {
+            throw new AccessDeniedException("사용 중인 계정만 견적을 수정할 수 있습니다.");
+        }
+        if (editor.isMustChangePassword()) {
+            throw new AccessDeniedException("비밀번호를 먼저 변경해주세요.");
+        }
+
+        // 같은 견적의 수정이 겹치지 않도록 트랜잭션이 끝날 때까지 견적 행에 쓰기 잠금을 건다.
+        Quotation quotation = quotationRepository.findByIdForUpdate(quotationId)
+                .orElseThrow(() -> new NoSuchElementException("존재하지 않는 견적서입니다. ID: " + quotationId));
+
+        // 발송을 확정한 견적은 일반 수정 대상이 아니므로 초안만 허용
+        if (quotation.getStatus() != QuotationStatus.DRAFT) {
+            throw new IllegalArgumentException("초안 상태의 견적만 수정할 수 있습니다.");
+        }
+
+        // 한국 날짜 기준으로 과거의 희망 납기는 거절
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        if (request.requestedDueDate().isBefore(today)) {
+            throw new IllegalArgumentException("희망 납기는 오늘 이후여야 합니다.");
+        }
+
+        // 현재 PDF의 발행일은 최초 작성일이므로 수정 시에도 같은 날짜를 기준으로 검증
+        LocalDate issuedDate = quotation.getCreatedAt().toLocalDate();
+
+        // 유효기간을 생략하면 기존 값을 유지하고, 입력하면 발행일 기준 7일,14일만 허용
+        LocalDate validUntil = request.validUntil() == null ? quotation.getValidUntil() : request.validUntil();
+
+        if (!validUntil.equals(issuedDate.plusDays(7)) && !validUntil.equals(issuedDate.plusDays(14))) {
+            throw new IllegalArgumentException("견적 유효기간은 발행일로부터 7일 또는 14일이어야 합니다.");
+        }
+
+        // 수정된 품목의 수량,단가,VAT로 총액과 납기 계산에 사용할 전체 수량을 다시 계산
+        long totalAmount = calculateTotalAmount(request.items(), request.vatIncluded());
+        long totalQuantity = request.items().stream().mapToLong(QuotationItemDto.CreateRequest::quantity).sum();
+
+        // 수정 시점의 생산 조건으로 납기를 계산. 불가능하면 수정 트랜잭션을 롤백한다.
+        QuotationScheduleResult schedule = scheduleService.calculate(totalQuantity, request.requestedDueDate(), today);
+        // 기존 거래처를 연결하거나 신규 거래처를 같은 수정 트랜잭션에서 등록한다.
+        Client client = findOrCreateClient(request, editor);
+
+        // 견적 ID,번호,최초 작성자는 유지하고 거래처 스냅샷·일정·금액 등 초안 내용만 갱신
+        quotation.changeDraft(client, client.getEmployee(), request.requestedDueDate(), schedule.estimatedDueDate(),
+                schedule.plannedStartDate(), schedule.plannedEndDate(), validUntil, request.vatIncluded(), totalAmount);
+
+        // 요청한 품목으로 교체. 실패하면 견적 변경과 신규 거래처 등록도 취소
+        List<QuotationItem> items = quotationItemService.replaceDraftItems(quotation, request.items());
+
+        // 변경 사항을 DB에 반영하고 감사 시각을 갱신한다. 실제 커밋은 서비스 메서드 반환 시 수행된다.
+        quotationRepository.flush();
+
+        // 커밋 후 컨트롤러가 PDF를 만들 수 있도록 수정된 견적과 품목의 상세 정보를 반환
+        return toDetailResponse(quotation, items);
     }
 
     // 견적 최초 저장용 총액 계산
@@ -209,13 +264,14 @@ public class QuotationService {
         }
 
         // 같은 회사명의 거래처가 없으면 입력 정보와 담당 사용자로 신규 거래처 생성
-        Client client = new Client(newClient.company(), newClient.representativeName(),
+        Client client = new Client(newClient.company(), newClient.employee(),
                 newClient.email(), newClient.phone(), newClient.toAddress(), user);
 
         // 신규 거래처를 DB에 저장하고 반환
         return clientRepository.save(client);
     }
 
+    // 견적서 번호 생성
     private String createQuotationNo(LocalDate today) {
         String date = today.format(DateTimeFormatter.BASIC_ISO_DATE);
         return "QT-" + date + "-" + UUID.randomUUID();
@@ -228,14 +284,7 @@ public class QuotationService {
         Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sortType.toSort());
 
         String normalizedKeyword = keyword == null || keyword.isBlank() ? null : keyword.trim();
-        //
         Page<Quotation> quotations = quotationRepository.search(normalizedKeyword, status, sortedPageable);
-
-        // 현재 페이지에 견적서가 없으면 전체 건수와 페이징 정보를 유지한 빈 응답 반환
-        if (quotations.isEmpty()) {
-            Page<QuotationDto.Response> emptyPage = new PageImpl<>(List.of(), sortedPageable, quotations.getTotalElements());
-            return PageResponse.from(emptyPage);
-        }
 
         // 현재 페이지에 포함된 견적서 ID 추출
         List<Long> quotationIds = quotations.getContent().stream()
@@ -259,6 +308,9 @@ public class QuotationService {
     // 견적별 연결 수주 조회
     // 여러 견적서에 연결된 수주를 조회하여 견적 ID 기준 Map으로 반환
     private Map<Long, CustomerOrder> findOrdersByQuotationIds(List<Long> quotationIds) {
+        if (quotationIds.isEmpty()) {
+            return Map.of();
+        }
         return customerOrderRepository
                 .findByQuotationIdIn(quotationIds)
                 .stream()

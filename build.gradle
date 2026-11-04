@@ -20,6 +20,11 @@ repositories {
 
 dependencies {
 
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // 견적 PDF 생성
+    implementation 'com.github.librepdf:openpdf:3.0.5'
+
     // 테스트 환경용 H2 인메모리 DB
     testRuntimeOnly 'com.h2database:h2'
 

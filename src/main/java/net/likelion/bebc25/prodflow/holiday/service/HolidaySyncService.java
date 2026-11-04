@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.holiday.service;
 
+import net.likelion.bebc25.prodflow.global.exception.ExternalApiException;
 import net.likelion.bebc25.prodflow.holiday.client.HolidayApiClient;
 import net.likelion.bebc25.prodflow.holiday.dto.HolidayApiResponse;
 import net.likelion.bebc25.prodflow.holiday.entity.Holiday;
@@ -22,14 +23,14 @@ import java.util.Set;
  */
 @Service
 public class HolidaySyncService {
-    private final HolidayApiClient apiClient;
-    private final HolidayRepository repository;
+    private final HolidayApiClient holidayApiClient;
+    private final HolidayRepository holidayRepository;
     private final TransactionTemplate transactionTemplate;
 
     public HolidaySyncService(HolidayApiClient apiClient, HolidayRepository repository,
                               PlatformTransactionManager transactionManager) {
-        this.apiClient = apiClient;
-        this.repository = repository;
+        this.holidayApiClient = apiClient;
+        this.holidayRepository = repository;
 
         // execute() 내부 DB 작업만 트랜잭션 적용
         // API 응답 수신 후 저장 트랜잭션 시작
@@ -47,7 +48,7 @@ public class HolidaySyncService {
      * @param year 수집할 연도(1~9999)
      * @return 신규 날짜 수, 추가 대상이 없으면 0
      * @throws IllegalArgumentException 허용 연도 범위 초과
-     * @throws IllegalStateException    외부 조회 실패·잘못된 응답
+     * @throws ExternalApiException     외부 조회 실패·잘못된 응답
      */
     public int importHolidays(int year) {
         // API 호출·DB 조회에 사용할 연도 검증
@@ -56,37 +57,36 @@ public class HolidaySyncService {
         }
 
         // 저장 트랜잭션 전 API 호출 및 응답 검증
-        List<HolidayApiResponse> response = apiClient.fetchHolidays(year);
+        List<HolidayApiResponse> response = holidayApiClient.fetchHolidays(year);
         if (response == null || response.isEmpty()) {
-            throw new IllegalStateException("공휴일 API 응답이 비어 있습니다.");
+            throw new ExternalApiException("공휴일 API 응답이 비어 있습니다.");
         }
 
         // 날짜 기준 중복 제거
         // API 응답의 날짜 등장 순서 유지
         Map<LocalDate, String> holidays = new LinkedHashMap<>();
         for (HolidayApiResponse item : response) {
-            // 연도·국가·필수값·이름 길이 검증
+            // 연도·필수값·이름 길이·공휴일 여부 검증
             // 잘못된 항목 발견 시 전체 수집 중단
             if (item == null || item.date() == null || item.date().getYear() != year
-                    || !"KR".equals(item.countryCode()) || item.localName() == null
-                    || item.localName().isBlank() || item.localName().length() > 255
-                    || item.types() == null || item.types().isEmpty()) {
-                throw new IllegalStateException("공휴일 API 응답의 날짜·이름·국가·유형이 올바르지 않습니다.");
+                    || item.name() == null || item.name().isBlank() || item.name().length() > 255
+                    || !("Y".equals(item.isHoliday()) || "N".equals(item.isHoliday()))) {
+                throw new ExternalApiException("공휴일 API 응답의 날짜·이름·공휴일 여부가 올바르지 않습니다.");
             }
-            // Public 유형만 저장
+            // 공공기관 휴일 여부가 Y인 날짜만 저장
             // 주말과 겹친 공휴일 포함
             // 일반 주말은 미저장, 납기 계산에서 요일 판단
-            if (!item.types().contains("Public")) {
+            if (!"Y".equals(item.isHoliday())) {
                 continue;
             }
-            // 같은 날짜의 첫 한국어 이름(localName) 유지
-            holidays.putIfAbsent(item.date(), item.localName());
+            // 같은 날짜의 첫 공휴일 이름 유지
+            holidays.putIfAbsent(item.date(), item.name());
         }
         return transactionTemplate.execute(status -> {
             // 요청 연도의 기존 날짜 일괄 조회
             // Set으로 기존 날짜 포함 여부 확인
             Set<LocalDate> existingDates = new HashSet<>();
-            repository.findByHolidayDateBetweenOrderByHolidayDateAsc(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))
+            holidayRepository.findByHolidayDateBetweenOrderByHolidayDateAsc(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))
                     .forEach(holiday -> existingDates.add(holiday.getHolidayDate()));
 
             // 기존 날짜 제외, 순차 재실행 시 중복 방지
@@ -100,7 +100,7 @@ public class HolidaySyncService {
             // flush로 INSERT·제약조건 검사, 커밋과 별개
             // 저장 실패 시 신규 등록 전체 롤백, 기존 행 유지
             // execute() 커밋 완료 후 추가 건수 반환
-            repository.saveAllAndFlush(newHolidays);
+            holidayRepository.saveAllAndFlush(newHolidays);
             return newHolidays.size();
         });
     }

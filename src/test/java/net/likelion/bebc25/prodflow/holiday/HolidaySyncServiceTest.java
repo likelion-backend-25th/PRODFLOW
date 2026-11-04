@@ -1,6 +1,7 @@
 package net.likelion.bebc25.prodflow.holiday;
 
 import net.likelion.bebc25.prodflow.holiday.client.HolidayApiClient;
+import net.likelion.bebc25.prodflow.global.exception.ExternalApiException;
 import net.likelion.bebc25.prodflow.holiday.dto.HolidayApiResponse;
 import net.likelion.bebc25.prodflow.holiday.entity.Holiday;
 import net.likelion.bebc25.prodflow.holiday.repository.HolidayRepository;
@@ -46,7 +47,7 @@ class HolidaySyncServiceTest {
                 holiday("2026-05-05", "중복 이름"),
                 holiday("2026-08-15", "토요일"),
                 holiday("2026-03-01", "일요일"),
-                new HolidayApiResponse(LocalDate.of(2026, 5, 1), "은행 휴일", "KR", List.of("Bank"))));
+                new HolidayApiResponse(LocalDate.of(2026, 5, 1), "공휴일 아님", "N")));
 
         assertThat(service.importHolidays(2026)).isEqualTo(3);
         assertThat(service.importHolidays(2026)).isZero();
@@ -63,8 +64,8 @@ class HolidaySyncServiceTest {
     @Test
     void apiFailurePreservesExistingData() {
         repository.saveAndFlush(new Holiday(LocalDate.of(2026, 1, 1), "새해"));
-        when(client.fetchHolidays(2026)).thenThrow(new IllegalStateException("API 실패"));
-        assertThatThrownBy(() -> service.importHolidays(2026)).isInstanceOf(IllegalStateException.class);
+        when(client.fetchHolidays(2026)).thenThrow(new ExternalApiException("API 실패"));
+        assertThatThrownBy(() -> service.importHolidays(2026)).isInstanceOf(ExternalApiException.class);
         assertThat(repository.count()).isEqualTo(1);
     }
 
@@ -73,14 +74,14 @@ class HolidaySyncServiceTest {
         for (HolidayApiResponse invalid : List.of(
                 holiday("2027-01-01", "다른 연도"),
                 holiday("2026-05-05", " "),
-                new HolidayApiResponse(LocalDate.of(2026, 1, 1), "다른 국가", "US", List.of("Public")))) {
+                new HolidayApiResponse(LocalDate.of(2026, 1, 1), "잘못된 휴일 여부", "UNKNOWN"))) {
             when(client.fetchHolidays(2026)).thenReturn(List.of(holiday("2026-05-05", "어린이날"), invalid));
-            assertThatThrownBy(() -> service.importHolidays(2026)).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> service.importHolidays(2026)).isInstanceOf(ExternalApiException.class);
             assertThat(repository.count()).isZero();
         }
     }
 
     private HolidayApiResponse holiday(String date, String name) {
-        return new HolidayApiResponse(LocalDate.parse(date), name, "KR", List.of("Public"));
+        return new HolidayApiResponse(LocalDate.parse(date), name, "Y");
     }
 }

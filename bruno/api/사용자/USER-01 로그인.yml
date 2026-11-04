@@ -9,18 +9,18 @@ http:
   body:
     type: json
     data: |-
-      // {
-      //   "email": "admin@prodflow.local",
-      //   "password": "Abcd123456!?"
-      // }
+      {
+        "email": "admin@prodflow.local",
+        "password": "Abcd123456!?"
+      }
       // {
       //   "email": "minjun@exaddmple.com",
       //   "password": "Abcd123456!?"
       // }
-      {
-        "email": "minjun@exaddmple.com",
-        "password": "prodflow1234!"
-      }
+      // {
+      //   "email": "minjun@exaddmple.com",
+      //   "password": "prodflow1234!"
+      // }
   auth: inherit
 
 runtime:

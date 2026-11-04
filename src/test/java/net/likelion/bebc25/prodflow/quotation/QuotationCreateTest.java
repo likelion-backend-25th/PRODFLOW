@@ -14,11 +14,16 @@ import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationRescheduleDto;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationItemDto;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.quotation.repository.QuotationItemRepository;
 import net.likelion.bebc25.prodflow.quotation.repository.QuotationRepository;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfService;
+import net.likelion.bebc25.prodflow.quotation.controller.QuotationController;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationRescheduleService;
+import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import org.junit.jupiter.api.AfterEach;
@@ -26,14 +31,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -61,6 +66,10 @@ class QuotationCreateTest {
     @Autowired
     QuotationService service;
     @Autowired
+    QuotationPdfService pdfService;
+    @Autowired
+    QuotationRescheduleService rescheduleService;
+    @Autowired
     Validator validator;
     @Autowired
     QuotationRepository quotationRepository;
@@ -84,7 +93,7 @@ class QuotationCreateTest {
             user.changePassword("encoded");
             em.persist(user);
             userId = user.getId();
-            Client client = new Client("기존 회사", "대표자", "client@example.com", "02-1234-5678",
+            Client client = new Client("기존 회사", "거래처 담당자", "client@example.com", "02-1234-5678",
                     new Address("12345", "서울시 테스트로 1", "2층"), user);
             em.persist(client);
             clientId = client.getId();
@@ -120,12 +129,12 @@ class QuotationCreateTest {
     void createsQuotationWithVatAndAuditWithoutReservingProduction() {
         var response = service.create(request(List.of(item(100, 1000L))), userId);
 
-        assertThat(response.status()).isEqualTo(QuotationStatus.SENT);
+        assertThat(response.status()).isEqualTo(QuotationStatus.DRAFT);
         assertThat(response.totalAmount()).isEqualTo(110000L);
         assertThat(response.supplyAmount()).isEqualTo(100000L);
         assertThat(response.vatAmount()).isEqualTo(10000L);
         assertThat(response.depositAmount()).isEqualTo(55000L);
-        assertThat(response.clientEmployee()).isEqualTo("견적 담당자");
+        assertThat(response.clientName()).isEqualTo("거래처 담당자");
         assertThat(response.userId()).isEqualTo(userId);
         assertThat(response.createdAt()).isNotNull();
         assertThat(response.updatedAt()).isNotNull();
@@ -184,6 +193,7 @@ class QuotationCreateTest {
         var response = service.create(newClientRequest("기존 회사", List.of(item(100, 1000L))), userId);
         assertThat(response.clientId()).isEqualTo(clientId);
         assertThat(response.clientEmail()).isEqualTo("client@example.com");
+        assertThat(response.clientName()).isEqualTo("거래처 담당자");
         assertThat(clientRepository.count()).isEqualTo(1);
     }
 
@@ -191,6 +201,9 @@ class QuotationCreateTest {
     void savesNewClientAndQuotationInOneTransaction() {
         var response = service.create(newClientRequest("새 회사", List.of(item(100, 1000L))), userId);
         assertThat(response.clientCompany()).isEqualTo("새 회사");
+        assertThat(response.clientName()).isEqualTo("신규 담당자");
+        assertThat(clientRepository.findById(response.clientId()).orElseThrow().getEmployee())
+                .isEqualTo(response.clientName());
         assertThat(clientRepository.count()).isEqualTo(2);
         assertThat(quotationRepository.count()).isEqualTo(1);
     }
@@ -198,8 +211,8 @@ class QuotationCreateTest {
     @Test
     void rejectsUnknownWriter() {
         assertThatThrownBy(() -> service.create(request(List.of(item(100, 1000L))), Long.MAX_VALUE))
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
+                .isInstanceOf(AuthenticationCredentialsNotFoundException.class)
+                .hasMessage("작성자 계정을 찾을 수 없습니다.");
         assertThat(quotationRepository.count()).isZero();
     }
 
@@ -217,8 +230,9 @@ class QuotationCreateTest {
                 }
             });
             assertThatThrownBy(() -> service.create(request(List.of(item(100, 1000L))), userId))
-                    .isInstanceOfSatisfying(ResponseStatusException.class,
-                            exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessage(reason.equals("inactive")
+                            ? "사용 중인 계정만 견적을 작성할 수 있습니다." : "비밀번호를 먼저 변경해주세요.");
         }
         assertThat(quotationRepository.count()).isZero();
     }
@@ -229,7 +243,7 @@ class QuotationCreateTest {
             authenticateAs(role);
             var response = service.create(request(List.of(item(100, 1000L))), userId);
             assertThat(response.userId()).isEqualTo(userId);
-            assertThat(response.status()).isEqualTo(QuotationStatus.SENT);
+            assertThat(response.status()).isEqualTo(QuotationStatus.DRAFT);
         }
         assertThat(quotationRepository.count()).isEqualTo(2);
         assertThat(itemRepository.count()).isEqualTo(2);
@@ -261,8 +275,8 @@ class QuotationCreateTest {
     @Test
     void rejectsMissingAndInvalidNestedInputsBeforeSaving() {
         var invalidRequests = List.of(
-                new QuotationDto.CreateRequest(clientId, dueDate(), null, false, null, null, "담당자"),
-                new QuotationDto.CreateRequest(clientId, null, null, false, List.of(item(100, 1000L)), null, "담당자"),
+                new QuotationDto.CreateRequest(clientId, dueDate(), null, false, null, null),
+                new QuotationDto.CreateRequest(clientId, null, null, false, List.of(item(100, 1000L)), null),
                 request(java.util.Arrays.asList((QuotationItemDto.CreateRequest) null)),
                 request(List.of(new QuotationItemDto.CreateRequest(null, 100, 1000L))),
                 request(List.of(new QuotationItemDto.CreateRequest(0L, 100, 1000L))),
@@ -284,8 +298,9 @@ class QuotationCreateTest {
             assertThatThrownBy(() -> service.create(request(items), userId))
                     .isInstanceOf(ConstraintViolationException.class);
         }
-        var blankContact = new QuotationDto.CreateRequest(clientId, dueDate(), null, false,
-                List.of(item(100, 1000L)), null, "");
+        var blankContact = new QuotationDto.CreateRequest(null, dueDate(), null, false,
+                List.of(item(100, 1000L)), new QuotationDto.ClientRequest("회사", "",
+                "client@example.com", "010-1111-2222", "12345", "서울 테스트로", "3층"));
         assertThat(validator.validate(blankContact)).isNotEmpty();
         assertThatThrownBy(() -> service.create(blankContact, userId))
                 .isInstanceOf(ConstraintViolationException.class).hasMessageContaining("담당자");
@@ -306,7 +321,7 @@ class QuotationCreateTest {
         assertThat(response.validUntil()).isEqualTo(today().plusDays(14));
 
         var vatIncluded = new QuotationDto.CreateRequest(clientId, dueDate(), null, true,
-                List.of(item(101, 1L)), null, "견적 담당자");
+                List.of(item(101, 1L)), null);
         var includedResponse = service.create(vatIncluded, userId);
         assertThat(includedResponse.totalAmount()).isEqualTo(101L);
         assertThat(quotationRepository.findById(includedResponse.id()).orElseThrow().getTotalAmount()).isEqualTo(101L);
@@ -357,31 +372,48 @@ class QuotationCreateTest {
 
     @Test
     void validatesQuotationExpiryAndRequestedDueDate() {
-        for (LocalDate expiry : List.of(today().plusDays(6), today().plusDays(15))) {
+        for (int days : new int[]{6, 8, 9, 10, 11, 12, 13, 15}) {
+            LocalDate expiry = today().plusDays(days);
             var request = new QuotationDto.CreateRequest(clientId, dueDate(), expiry, false,
-                    List.of(item(100, 1000L)), null, "견적 담당자");
+                    List.of(item(100, 1000L)), null);
             assertThatThrownBy(() -> service.create(request, userId))
                     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("유효기간");
         }
         var pastDue = new QuotationDto.CreateRequest(clientId, today().minusDays(1), null, false,
-                List.of(item(100, 1000L)), null, "견적 담당자");
+                List.of(item(100, 1000L)), null);
         assertThatThrownBy(() -> service.create(pastDue, userId))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("희망 납기");
+    }
+
+    @Test
+    void acceptsOnlySevenOrFourteenDayExpiry() {
+        for (int days : new int[]{7, 14}) {
+            LocalDate expiry = today().plusDays(days);
+            var request = new QuotationDto.CreateRequest(clientId, dueDate(), expiry, false,
+                    List.of(item(100, 1000L)), null);
+
+            var response = service.create(request, userId);
+
+            assertThat(response.validUntil()).isEqualTo(expiry);
+            assertThat(quotationRepository.findById(response.id()).orElseThrow().getValidUntil()).isEqualTo(expiry);
+        }
     }
 
     @Test
     void issuedContactAndProductSnapshotsSurviveMasterDataChanges() {
         var response = service.create(request(List.of(item(100, 1000L))), userId);
         tx().executeWithoutResult(status -> {
+            ReflectionTestUtils.setField(em.find(Client.class, clientId), "employee", "변경된 담당자");
             ReflectionTestUtils.setField(em.find(Client.class, clientId), "email", "changed@example.com");
             ReflectionTestUtils.setField(em.find(Client.class, clientId), "phone", "010-9999-9999");
             ReflectionTestUtils.setField(em.find(Product.class, productId), "productName", "변경된 품목");
             ReflectionTestUtils.setField(em.find(Product.class, productId), "currentPrice", 9999L);
         });
         var quotation = quotationRepository.findById(response.id()).orElseThrow();
-        assertThat(quotation.getEmail()).isEqualTo("client@example.com");
+        assertThat(quotation.getClientName()).isEqualTo("거래처 담당자");
+        assertThat(quotation.getClientEmail()).isEqualTo("client@example.com");
         assertThat(quotation.getTotalAmount()).isEqualTo(response.totalAmount());
-        assertThat(quotation.getPhone()).isEqualTo("02-1234-5678");
+        assertThat(quotation.getClientPhone()).isEqualTo("02-1234-5678");
         var item = itemRepository.findByQuotationIdOrderByIdAsc(response.id()).getFirst();
         assertThat(item.getProductName()).isEqualTo("테스트 품목");
         assertThat(item.getUnitPrice()).isEqualTo(1000L);
@@ -391,7 +423,7 @@ class QuotationCreateTest {
     void detailReturnsSavedAmountsSnapshotsAndScheduleWithoutUpdatingQuotation() {
         for (boolean vatIncluded : new boolean[]{false, true}) {
             var request = new QuotationDto.CreateRequest(clientId, dueDate(), null, vatIncluded,
-                    List.of(item(101, 1000L)), null, "견적 담당자");
+                    List.of(item(101, 1000L)), null);
             var created = service.create(request, userId);
 
             tx().executeWithoutResult(status -> {
@@ -423,14 +455,357 @@ class QuotationCreateTest {
                 .hasMessageContaining("존재하지 않는 견적서");
     }
 
+    @Test
+    void reschedulePreviewUsesStoredQuantityWithoutChangingQuotationOrReservingProduction() {
+        var created = createSentQuotation(List.of(item(2500, 1000L)));
+        var before = service.getQuotationById(created.id());
+
+        var preview = rescheduleService.previewSchedule(created.id(), new QuotationRescheduleDto.PreviewRequest(null));
+
+        assertThat(preview.feasible()).isTrue();
+        assertThat(preview.requestedDueDate()).isNull();
+        assertThat(preview.plannedEndDate()).isAfter(preview.plannedStartDate());
+        assertThat(service.getQuotationById(created.id())).isEqualTo(before);
+        assertThat(quotationRepository.count()).isEqualTo(1);
+        assertThat(itemRepository.count()).isEqualTo(1);
+        tx().executeWithoutResult(status -> {
+            assertThat(em.createQuery("select count(w) from WorkOrder w", Long.class).getSingleResult()).isZero();
+            assertThat(em.createQuery("select count(p) from ProductionPlan p", Long.class).getSingleResult()).isZero();
+        });
+    }
+
+    @Test
+    void rescheduleChangesOnlyFourDatesAndPreservesIssuedItemsEvenIfProductIsDiscontinued() {
+        var created = createSentQuotation(List.of(item(100, 1000L)));
+        var before = service.getQuotationById(created.id());
+        tx().executeWithoutResult(status ->
+                ReflectionTestUtils.setField(em.find(Product.class, productId), "status", ProductStatus.DISCONTINUED));
+        var earliest = rescheduleService.previewSchedule(created.id(), new QuotationRescheduleDto.PreviewRequest(null));
+
+        var updated = rescheduleService.updateSchedule(created.id(),
+                new QuotationRescheduleDto.UpdateRequest(earliest.earliestDueDate()));
+
+        assertThat(updated.requestedDueDate()).isEqualTo(earliest.earliestDueDate()).isNotEqualTo(before.requestedDueDate());
+        assertThat(updated.estimatedDueDate()).isEqualTo(earliest.earliestDueDate());
+        assertThat(updated.plannedStartDate()).isEqualTo(earliest.plannedStartDate());
+        assertThat(updated.plannedEndDate()).isEqualTo(earliest.plannedEndDate());
+        assertThat(updated).usingRecursiveComparison()
+                .ignoringFields("requestedDueDate", "estimatedDueDate", "plannedStartDate", "plannedEndDate", "updatedAt")
+                .isEqualTo(before);
+        assertThat(service.getQuotationById(created.id())).usingRecursiveComparison()
+                .ignoringFields("updatedAt").isEqualTo(updated);
+        assertThat(quotationRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void impossibleRescheduleKeepsOriginalSchedule() {
+        var created = createSentQuotation(List.of(item(100, 1000L)));
+        var before = service.getQuotationById(created.id());
+
+        var preview = rescheduleService.previewSchedule(created.id(), new QuotationRescheduleDto.PreviewRequest(today()));
+        assertThat(preview.feasible()).isFalse();
+        assertThat(preview.plannedStartDate()).isNull();
+        assertThatThrownBy(() -> rescheduleService.updateSchedule(created.id(), new QuotationRescheduleDto.UpdateRequest(today())))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("희망 납기");
+        assertThat(service.getQuotationById(created.id())).isEqualTo(before);
+    }
+
+    @Test
+    void rescheduleRejectsEveryNonSentStatus() {
+        for (QuotationStatus quotationStatus : QuotationStatus.values()) {
+            if (quotationStatus == QuotationStatus.SENT) {
+                continue;
+            }
+            var created = createSentQuotation(List.of(item(100, 1000L)));
+            tx().executeWithoutResult(status ->
+                    ReflectionTestUtils.setField(em.find(Quotation.class, created.id()), "status", quotationStatus));
+            assertThatThrownBy(() -> rescheduleService.previewSchedule(created.id(), new QuotationRescheduleDto.PreviewRequest(null)))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("발송완료");
+            assertThatThrownBy(() -> rescheduleService.updateSchedule(created.id(), new QuotationRescheduleDto.UpdateRequest(dueDate())))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("발송완료");
+        }
+    }
+
+    @Test
+    void rescheduleChecksExpiryDateEvenBeforeStatusIsExpiredAndAllowsLastValidDay() {
+        var created = createSentQuotation(List.of(item(100, 1000L)));
+        tx().executeWithoutResult(status ->
+                ReflectionTestUtils.setField(em.find(Quotation.class, created.id()), "validUntil", today().minusDays(1)));
+        assertThatThrownBy(() -> rescheduleService.previewSchedule(created.id(), new QuotationRescheduleDto.PreviewRequest(null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("유효기간");
+        assertThatThrownBy(() -> rescheduleService.updateSchedule(created.id(), new QuotationRescheduleDto.UpdateRequest(dueDate())))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("유효기간");
+
+        tx().executeWithoutResult(status ->
+                ReflectionTestUtils.setField(em.find(Quotation.class, created.id()), "validUntil", today()));
+        assertThat(rescheduleService.updateSchedule(created.id(), new QuotationRescheduleDto.UpdateRequest(dueDate())).validUntil())
+                .isEqualTo(today());
+    }
+
+    @Test
+    void rescheduleRechecksStatusAndCapacityAfterPreview() {
+        var created = createSentQuotation(List.of(item(100, 1000L)));
+        var preview = rescheduleService.previewSchedule(created.id(), new QuotationRescheduleDto.PreviewRequest(null));
+        tx().executeWithoutResult(status -> em.find(Quotation.class, created.id()).approve());
+        assertThatThrownBy(() -> rescheduleService.updateSchedule(created.id(), new QuotationRescheduleDto.UpdateRequest(preview.earliestDueDate())))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("발송완료");
+
+        tx().executeWithoutResult(status -> {
+            em.find(Quotation.class, created.id()).sent();
+            em.createQuery("delete from Line").executeUpdate();
+        });
+        var before = service.getQuotationById(created.id());
+        assertThatThrownBy(() -> rescheduleService.updateSchedule(created.id(), new QuotationRescheduleDto.UpdateRequest(preview.earliestDueDate())))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("가동 가능한 생산라인");
+        assertThat(service.getQuotationById(created.id())).isEqualTo(before);
+    }
+
+    @Test
+    void rescheduleRejectsMissingQuotationAndDatesBeyondNextYear() {
+        assertThatThrownBy(() -> rescheduleService.previewSchedule(Long.MAX_VALUE, new QuotationRescheduleDto.PreviewRequest(null)))
+                .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> rescheduleService.updateSchedule(Long.MAX_VALUE, new QuotationRescheduleDto.UpdateRequest(dueDate())))
+                .isInstanceOf(NoSuchElementException.class);
+        var created = createSentQuotation(List.of(item(100, 1000L)));
+        LocalDate beyond = LocalDate.of(today().getYear() + 2, 1, 1);
+        assertThatThrownBy(() -> rescheduleService.previewSchedule(created.id(), new QuotationRescheduleDto.PreviewRequest(beyond)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("다음 해");
+        assertThatThrownBy(() -> rescheduleService.updateSchedule(created.id(), new QuotationRescheduleDto.UpdateRequest(beyond)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("다음 해");
+    }
+
+    @Test
+    void rescheduleRequiresOrderManagerOrSuperAdminRole() {
+        var created = createSentQuotation(List.of(item(100, 1000L)));
+        for (UserRole role : List.of(UserRole.PRODUCTION_MANAGER, UserRole.INQUIRY_MANAGER)) {
+            authenticateAs(role);
+            assertThatThrownBy(() -> rescheduleService.previewSchedule(created.id(), new QuotationRescheduleDto.PreviewRequest(null)))
+                    .isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(() -> rescheduleService.updateSchedule(created.id(), new QuotationRescheduleDto.UpdateRequest(dueDate())))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+        authenticateAs(UserRole.SUPER_ADMIN);
+        assertThat(rescheduleService.previewSchedule(created.id(), new QuotationRescheduleDto.PreviewRequest(null)).feasible()).isTrue();
+    }
+
+    @Test
+    void createsDraftAndGeneratesPdfWithoutChangingStatusOrReservingProduction() throws Exception {
+        var created = service.create(request(List.of(item(100, 1000L))), userId);
+        byte[] pdf = pdfService.generate(created);
+        try (var reader = new org.openpdf.text.pdf.PdfReader(pdf)) {
+            assertThat(reader.getNumberOfPages()).isEqualTo(1);
+        }
+        assertThat(quotationRepository.findById(created.id()).orElseThrow().getStatus())
+                .isEqualTo(QuotationStatus.DRAFT);
+        assertThat(quotationRepository.count()).isEqualTo(1);
+        Long workOrderCount = tx().execute(status -> em.createQuery("select count(w) from WorkOrder w", Long.class)
+                .getSingleResult());
+        Long planCount = tx().execute(status -> em.createQuery("select count(p) from ProductionPlan p", Long.class)
+                .getSingleResult());
+        assertThat(workOrderCount).isZero();
+        assertThat(planCount).isZero();
+        assertThatThrownBy(() -> rescheduleService.previewSchedule(created.id(),
+                new QuotationRescheduleDto.PreviewRequest(null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("발송완료");
+    }
+
+    @Test
+    void pdfFailureAfterControllerSaveDoesNotRollBackDraftOrNewClient() {
+        var failingPdf = org.mockito.Mockito.mock(QuotationPdfService.class);
+        org.mockito.Mockito.when(failingPdf.generate(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new RuntimeException("PDF 생성 실패"));
+        var controller = new QuotationController(service, null, null, failingPdf);
+        var response = new MockHttpServletResponse();
+        var principal = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        assertThatThrownBy(() -> controller.createPdf(principal,
+                newClientRequest("PDF 실패 거래처", List.of(item(100, 1000L))), response))
+                .isInstanceOf(RuntimeException.class).hasMessage("PDF 생성 실패");
+
+        Long draftId = Long.valueOf(response.getHeader("X-Quotation-Id"));
+        assertThat(quotationRepository.findById(draftId).orElseThrow().getStatus()).isEqualTo(QuotationStatus.DRAFT);
+        assertThat(itemRepository.findByQuotationIdOrderByIdAsc(draftId)).hasSize(1);
+        assertThat(clientRepository.count()).isEqualTo(2);
+        assertThat(pdfService.generate(service.getQuotationById(draftId))).isNotEmpty();
+        assertThat(quotationRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void otherRolesCannotGenerateDraftPdf() {
+        var draft = service.create(request(List.of(item(100, 1000L))), userId);
+        for (UserRole role : List.of(UserRole.PRODUCTION_MANAGER, UserRole.INQUIRY_MANAGER)) {
+            authenticateAs(role);
+            assertThatThrownBy(() -> pdfService.generate(draft)).isInstanceOf(AccessDeniedException.class);
+        }
+    }
+
+    @Test
+    void updatesSameDraftAndPersistsChangedVatAmountsAndItemsAcrossRepeatedEdits() throws Exception {
+        var original = service.create(request(List.of(item(100, 1000L))), userId);
+        for (boolean included : new boolean[]{true, false}) {
+            var request = new QuotationDto.CreateRequest(clientId, dueDate().plusDays(1), null, included,
+                    List.of(item(250, 2000L)), null);
+            var updated = service.updateDraft(original.id(), request, userId);
+            assertThat(updated.id()).isEqualTo(original.id());
+            assertThat(updated.quotationNo()).isEqualTo(original.quotationNo());
+            assertThat(updated.userId()).isEqualTo(original.userId());
+            assertThat(updated.status()).isEqualTo(QuotationStatus.DRAFT);
+            assertThat(updated.totalQuantity()).isEqualTo(250);
+            assertThat(updated.totalAmount()).isEqualTo(included ? 500000L : 550000L);
+            assertThat(updated.clientName()).isEqualTo("거래처 담당자");
+            assertThat(updated.requestedDueDate()).isEqualTo(dueDate().plusDays(1));
+            assertThat(service.getQuotationById(original.id()).totalAmount()).isEqualTo(updated.totalAmount());
+            assertThat(itemRepository.findByQuotationIdOrderByIdAsc(original.id())).hasSize(1);
+            assertThat(quotationRepository.count()).isEqualTo(1);
+            try (var reader = new org.openpdf.text.pdf.PdfReader(pdfService.generate(updated))) {
+                assertThat(new org.openpdf.text.pdf.parser.PdfTextExtractor(reader).getTextFromPage(1))
+                        .contains("거래처 담당자", included ? "500,000" : "550,000");
+            }
+        }
+    }
+
+    @Test
+    void replacesRemovedAndAddedDraftProductsAndPreservesOriginalWriter() {
+        Long otherProductId = tx().execute(status -> {
+            Product other = Product.create("TEST-002", "다른 품목", em.find(Product.class, productId).getDevice(),
+                    "설명", 3000L);
+            em.persist(other);
+            return other.getId();
+        });
+        var original = service.create(request(List.of(item(100, 1000L))), userId);
+        service.updateDraft(original.id(), request(List.of(item(100, 1000L),
+                new QuotationItemDto.CreateRequest(otherProductId, 100, 3000L))), userId);
+        assertThat(itemRepository.findByQuotationIdOrderByIdAsc(original.id())).hasSize(2);
+
+        Long editorId = tx().execute(status -> {
+            User editor = User.builder().name("다른 직원").email("editor@example.com")
+                    .phone("010-2222-3333").password("encoded").role(UserRole.ORDER_MANAGER).build();
+            editor.changePassword("encoded");
+            em.persist(editor);
+            return editor.getId();
+        });
+        var updated = service.updateDraft(original.id(), request(List.of(
+                new QuotationItemDto.CreateRequest(otherProductId, 200, 3000L))), editorId);
+        assertThat(updated.userId()).isEqualTo(original.userId());
+        assertThat(updated.totalAmount()).isEqualTo(660000L);
+        assertThat(itemRepository.findByQuotationIdOrderByIdAsc(original.id()))
+                .extracting(item -> item.getProduct().getId()).containsExactly(otherProductId);
+    }
+
+    @Test
+    void invalidDraftEditRollsBackQuotationItemsAndNewClient() {
+        var original = service.create(request(List.of(item(100, 1000L))), userId);
+        var before = service.getQuotationById(original.id());
+        var itemsBefore = itemRepository.findByQuotationIdOrderByIdAsc(original.id());
+        var invalid = newClientRequest("롤백 거래처", List.of(
+                new QuotationItemDto.CreateRequest(Long.MAX_VALUE, 200, 2000L)));
+        assertThatThrownBy(() -> service.updateDraft(original.id(), invalid, userId))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("생산품목");
+        assertThat(service.getQuotationById(original.id())).isEqualTo(before);
+        assertThat(itemRepository.findByQuotationIdOrderByIdAsc(original.id()))
+                .extracting(item -> item.getId()).containsExactly(itemsBefore.getFirst().getId());
+        assertThat(clientRepository.count()).isEqualTo(1);
+        assertThat(quotationRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void rejectsEveryNonDraftStatusAndMissingQuotationOnEdit() {
+        var original = service.create(request(List.of(item(100, 1000L))), userId);
+        for (QuotationStatus status : QuotationStatus.values()) {
+            if (status == QuotationStatus.DRAFT) {
+                continue;
+            }
+            tx().executeWithoutResult(transaction ->
+                    ReflectionTestUtils.setField(em.find(Quotation.class, original.id()), "status", status));
+            assertThatThrownBy(() -> service.updateDraft(original.id(), request(List.of(item(200, 2000L))), userId))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("초안");
+            assertThat(service.getQuotationById(original.id()).totalAmount()).isEqualTo(original.totalAmount());
+        }
+        assertThatThrownBy(() -> service.updateDraft(Long.MAX_VALUE, request(List.of(item(100, 1000L))), userId))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void draftEditRechecksRoleAccountAndNestedInputs() {
+        var original = service.create(request(List.of(item(100, 1000L))), userId);
+        for (UserRole role : List.of(UserRole.PRODUCTION_MANAGER, UserRole.INQUIRY_MANAGER)) {
+            authenticateAs(role);
+            assertThatThrownBy(() -> service.updateDraft(original.id(), request(List.of(item(200, 2000L))), userId))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+        authenticateAs(UserRole.ORDER_MANAGER);
+        assertThatThrownBy(() -> service.updateDraft(original.id(), request(List.of(item(50, 1000L))), userId))
+                .isInstanceOf(ConstraintViolationException.class);
+        assertThatThrownBy(() -> service.updateDraft(original.id(), request(List.of(item(100, 1000L))), Long.MAX_VALUE))
+                .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
+        tx().executeWithoutResult(status -> em.find(User.class, userId).deactivate());
+        assertThatThrownBy(() -> service.updateDraft(original.id(), request(List.of(item(200, 2000L))), userId))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThat(service.getQuotationById(original.id()).totalAmount()).isEqualTo(original.totalAmount());
+    }
+
+    @Test
+    void pdfFailureAfterEditKeepsCommittedChangesAndCanRegenerateWithoutNewDraft() {
+        var original = service.create(new QuotationDto.CreateRequest(clientId, dueDate(), today().plusDays(7),
+                false, List.of(item(100, 1000L)), null), userId);
+        var failingPdf = org.mockito.Mockito.mock(QuotationPdfService.class);
+        org.mockito.Mockito.when(failingPdf.generate(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new RuntimeException("PDF 실패"));
+        var controller = new QuotationController(service, null, null, failingPdf);
+        var principal = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        assertThatThrownBy(() -> controller.updatePdf(original.id(), principal,
+                request(List.of(item(300, 2000L))), new MockHttpServletResponse()))
+                .isInstanceOf(RuntimeException.class).hasMessage("PDF 실패");
+        var updated = service.getQuotationById(original.id());
+        assertThat(updated.totalAmount()).isEqualTo(660000L);
+        assertThat(updated.validUntil()).isEqualTo(original.validUntil());
+        assertThat(updated.quotationNo()).isEqualTo(original.quotationNo());
+        assertThat(quotationRepository.count()).isEqualTo(1);
+        assertThat(pdfService.generate(updated)).isNotEmpty();
+    }
+
+    @Test
+    void switchingDraftClientCopiesSelectedClientsEmployeeAndKeepsQuotationNumber() {
+        var original = service.create(request(List.of(item(100, 1000L))), userId);
+        var updated = service.updateDraft(original.id(), newClientRequest("변경 거래처", List.of(item(200, 1000L))), userId);
+        assertThat(updated.id()).isEqualTo(original.id());
+        assertThat(updated.quotationNo()).isEqualTo(original.quotationNo());
+        assertThat(updated.clientName()).isEqualTo("신규 담당자");
+        assertThat(updated.clientEmail()).isEqualTo("new@example.com");
+        assertThat(quotationRepository.findById(original.id()).orElseThrow().getClientName())
+                .isEqualTo(clientRepository.findById(updated.clientId()).orElseThrow().getEmployee());
+        assertThat(clientRepository.count()).isEqualTo(2);
+        assertThat(quotationRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void supplierContactKeepsCreatedByAfterWriterNameChanges() throws Exception {
+        var created = service.create(request(List.of(item(100, 1000L))), userId);
+        assertThat(created.createdBy()).isEqualTo("서도윤");
+        tx().executeWithoutResult(status ->
+                ReflectionTestUtils.setField(em.find(User.class, userId), "name", "변경된 이름"));
+        var detail = service.getQuotationById(created.id());
+        assertThat(detail.userName()).isEqualTo("변경된 이름");
+        assertThat(detail.createdBy()).isEqualTo("서도윤");
+        try (var reader = new org.openpdf.text.pdf.PdfReader(pdfService.generate(detail))) {
+            assertThat(new org.openpdf.text.pdf.parser.PdfTextExtractor(reader).getTextFromPage(1))
+                    .contains("담당자: 서도윤").doesNotContain("변경된 이름");
+        }
+    }
+
+    private QuotationDto.DetailResponse createSentQuotation(List<QuotationItemDto.CreateRequest> items) {
+        var created = service.create(request(items), userId);
+        tx().executeWithoutResult(status -> em.find(Quotation.class, created.id()).sent());
+        return service.getQuotationById(created.id());
+    }
     private QuotationDto.CreateRequest request(List<QuotationItemDto.CreateRequest> items) {
-        return new QuotationDto.CreateRequest(clientId, dueDate(), null, false, items, null, "견적 담당자");
+        return new QuotationDto.CreateRequest(clientId, dueDate(), null, false, items, null);
     }
 
     private QuotationDto.CreateRequest newClientRequest(String company, List<QuotationItemDto.CreateRequest> items) {
-        var client = new QuotationDto.ClientRequest(company, "대표자", "new@example.com", "010-1111-2222",
+        var client = new QuotationDto.ClientRequest(company, "신규 담당자", "new@example.com", "010-1111-2222",
                 "12345", "서울 테스트로 1", "3층");
-        return new QuotationDto.CreateRequest(null, dueDate(), null, false, items, client, "견적 담당자");
+        return new QuotationDto.CreateRequest(null, dueDate(), null, false, items, client);
     }
 
     private QuotationItemDto.CreateRequest item(int quantity, Long unitPrice) {

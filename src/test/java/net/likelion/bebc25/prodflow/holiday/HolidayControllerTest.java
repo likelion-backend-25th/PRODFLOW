@@ -106,11 +106,17 @@ class HolidayControllerTest {
     @Test
     void rejectsMissingOrInvalidYearBeforeCallingService() throws Exception {
         mvc.perform(post("/api/v1/holidays/import").with(user("관리자").roles("SUPER_ADMIN")))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.status").value(400));
         for (String year : new String[]{"", "abc", "0", "-1", "10000", "999999999999"}) {
             mvc.perform(post("/api/v1/holidays/import").param("year", year)
                             .with(user("관리자").roles("SUPER_ADMIN")))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.timestamp").isNotEmpty())
+                    .andExpect(jsonPath("$.errors").isEmpty());
         }
         verifyNoInteractions(service);
     }

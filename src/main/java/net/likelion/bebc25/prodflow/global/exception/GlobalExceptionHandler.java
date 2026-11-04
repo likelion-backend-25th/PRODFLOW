@@ -3,22 +3,41 @@ package net.likelion.bebc25.prodflow.global.exception;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import net.likelion.bebc25.prodflow.auth.exception.AuthException;
-import org.apache.tomcat.websocket.AuthenticationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // 요청 파라미터 타입 변환 실패 시 호출됨 (400 Bad Request 응답)
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String message = ex.getName() + " 파라미터 형식을 확인해주세요.";
+        Class<?> requiredType = ex.getRequiredType();
+        if (requiredType != null && requiredType.isEnum()) {
+            String allowedValues = Arrays.stream(requiredType.getEnumConstants())
+                    .map(value -> ((Enum<?>) value).name())
+                    .collect(Collectors.joining(", "));
+            message = ex.getName() + " 값은 " + allowedValues + " 중 하나여야 합니다.";
+        }
+        ApiErrorResponse response = ApiErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, message);
+        return ResponseEntity.status(ErrorCode.INVALID_INPUT_VALUE.getHttpStatus()).body(response);
+    }
 
     // 서비스 메서드 입력 검증 실패 시 400 응답
     @ExceptionHandler(ConstraintViolationException.class)
@@ -27,6 +46,7 @@ public class GlobalExceptionHandler {
                 .body(ApiErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE));
     }
 
+    // 인증 관련 업무 예외 발생 시 지정된 상태 코드와 오류 메시지 반환
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<Map<String, String>> handleAuthException(AuthException ex) {
         return ResponseEntity.status(ex.getStatus())
@@ -78,6 +98,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.FORBIDDEN_OPERATION.getHttpStatus()).body(response);
     }
 
+    // 권한이 없는 리소스 접근시 호출됨 (403 Forbidden 응답)
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAuthorizationDeniedException(AccessDeniedException ex) {
+        ApiErrorResponse response = ApiErrorResponse.of(ErrorCode.FORBIDDEN_OPERATION, ex.getMessage());
+        return ResponseEntity.status(ErrorCode.FORBIDDEN_OPERATION.getHttpStatus()).body(response);
+    }
+
     // 권한이 부족할 때 (403 Forbidden 응답)
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalStateException(IllegalStateException ex) {
@@ -107,6 +134,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus()).body(response);
     }
 
+    // 외부 API 호출 또는 응답 처리 실패 시 호출됨 (502 Bad Gateway 응답)
+    @ExceptionHandler(ExternalApiException.class)
+    public ResponseEntity<ApiErrorResponse> handleExternalApiException(ExternalApiException ex) {
+        log.error("외부 API 연동 실패: {}", ex.getMessage(), ex);
+        ApiErrorResponse response = ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR);
+        return ResponseEntity.status(ErrorCode.EXTERNAL_API_ERROR.getHttpStatus()).body(response);
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, String>> handleResponseStatus(ResponseStatusException ex) {
         return ResponseEntity.status(ex.getStatusCode()).body(Map.of(
@@ -114,9 +149,11 @@ public class GlobalExceptionHandler {
                 "message", ex.getReason() == null ? "요청을 처리할 수 없습니다." : ex.getReason()));
     }
 
+    // 요청 본문을 읽거나 변환할 수 없을 때 호출됨 (400 Bad Request 응답)
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Map<String, String>> handleInvalidBody(HttpMessageNotReadableException ex) {
-        return ResponseEntity.badRequest().body(Map.of("code", "INVALID_REQUEST", "message", "요청 본문 형식을 확인해주세요."));
+    public ResponseEntity<ApiErrorResponse> handleInvalidBody(HttpMessageNotReadableException ex) {
+        ApiErrorResponse response = ApiErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, "요청 본문 형식을 확인해주세요.");
+        return ResponseEntity.status(ErrorCode.INVALID_INPUT_VALUE.getHttpStatus()).body(response);
     }
 
 }
