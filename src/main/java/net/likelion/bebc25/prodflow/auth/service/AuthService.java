@@ -118,13 +118,6 @@ public class AuthService {
         // 기존 Access Token은 만료 전까지 유효할 수 있으므로 운영 시 짧은 만료시간을 사용해야 한다.
     }
 
-    public AuthDto.MeResponse me(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> AuthException.unauthorized("사용자를 찾을 수 없습니다."));
-        requireActive(user);
-        return AuthDto.MeResponse.from(user);
-    }
-
     private void saveOrRotateRefreshToken(User user, String rawToken) {
         String tokenHash = hash(rawToken);
         LocalDateTime expiresAt = refreshExpiry();

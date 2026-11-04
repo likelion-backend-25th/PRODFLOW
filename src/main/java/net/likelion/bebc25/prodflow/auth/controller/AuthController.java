@@ -15,7 +15,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -130,16 +133,6 @@ public class AuthController {
                 .build();
     }
 
-    // 현재 로그인한 사용자 정보 조회
-    @GetMapping("/me")
-    public ResponseEntity<AuthDto.MeResponse> me(
-            @AuthenticationPrincipal CustomUserDetails principal
-    ) {
-        // 인증된 사용자 ID로 사용자 정보 조회
-        return ResponseEntity.ok(
-                authService.me(principal.getUserId())
-        );
-    }
 
     // 쿠키에서 리프레쉬토큰 찾기
     private String readRefreshCookie(HttpServletRequest request) {

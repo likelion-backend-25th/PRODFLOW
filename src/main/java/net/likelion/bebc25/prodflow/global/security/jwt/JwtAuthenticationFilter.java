@@ -85,7 +85,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private boolean isPasswordChangeAllowed(HttpServletRequest request) {
         String path = request.getServletPath();
         return (path.equals("/api/v1/auth/change-password") && "POST".equalsIgnoreCase(request.getMethod()))
-                || (path.equals("/api/v1/auth/me") && "GET".equalsIgnoreCase(request.getMethod()));
+                || (path.equals("/api/v1/users/me") && "GET".equalsIgnoreCase(request.getMethod()));
     }
 
     private void unauthorized(HttpServletResponse response) throws IOException {
