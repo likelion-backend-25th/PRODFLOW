@@ -56,4 +56,22 @@ public class Shipment {
 
     @Column
     private LocalDateTime deliveredAt;
+
+    public void applyTracking(
+            Integer level,
+            String result,
+            Boolean complete,
+            String estimate
+    ) {
+        this.level = level;
+        this.result = result;
+        this.complete = complete;
+        this.estimate = estimate;
+
+        // 배송 완료인데 완료 시각이 없으면 지금 시각으로 기록
+        if (Boolean.TRUE.equals(complete) && this.deliveredAt == null) {
+            this.deliveredAt = LocalDateTime.now();
+        }
+    }
+
 }
