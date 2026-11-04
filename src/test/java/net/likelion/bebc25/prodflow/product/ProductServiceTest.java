@@ -102,4 +102,26 @@ class ProductServiceTest {
         assertThat(result.available()).isFalse();
         assertThat(result.modelCode()).isEqualTo("PF-CS-A100");
     }
+
+    @Test
+    @DisplayName("새 기종명으로 품목 등록 — 기종 자동 생성")
+    void createProduct_withNewDeviceName() {
+        Response created = productService.create(
+                new ProductDto.CreateRequest(
+                        "PF-CS-NEW01",
+                        "신규 테스트 케이스",
+                        null,
+                        "iPhone 17 Pro Max",
+                        "새 기종 자동등록 테스트",
+                        15000L
+                )
+        );
+
+        assertThat(created.id()).isNotNull();
+        assertThat(created.modelCode()).isEqualTo("PF-CS-NEW01");
+        assertThat(created.productName()).isEqualTo("신규 테스트 케이스");
+        assertThat(created.deviceName()).isEqualTo("iPhone 17 Pro Max");
+        assertThat(created.currentPrice()).isEqualTo(15000L);
+        assertThat(created.status()).isEqualTo(ProductStatus.AVAILABLE);
+    }
 }

@@ -40,4 +40,19 @@ public class CommonCode {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private CodeStatus status;
+
+    public static CommonCode create(
+            CodeGroup codeGroup,
+            String code,
+            String name,
+            Integer sortOrder
+    ) {
+        CommonCode commonCode = new CommonCode();
+        commonCode.codeGroup = codeGroup;
+        commonCode.code = code;
+        commonCode.name = name;
+        commonCode.sortOrder = sortOrder;
+        commonCode.status = CodeStatus.ACTIVE;
+        return commonCode;
+    }
 }

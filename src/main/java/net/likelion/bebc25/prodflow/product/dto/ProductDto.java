@@ -18,9 +18,9 @@ public class ProductDto {
             String modelCode,
             String productName,
             Long deviceCode,
+            String deviceName,
             String productDescription,
             Long currentPrice
-
     ) {
     }
 
