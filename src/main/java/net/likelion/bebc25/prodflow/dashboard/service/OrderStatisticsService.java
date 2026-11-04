@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.dashboard.service;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
 import net.likelion.bebc25.prodflow.dashboard.repository.OrderStatisticsRepository;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,4 +56,12 @@ public class OrderStatisticsService {
     public List<DashboardDto.OrderStatusStatisticsResponse> getOrderStatusStatistics() {
         return orderStatisticsRepository.findOrderStatusStatistics();
     }
+
+    // 미입금 금액 통계 조회
+    public long getUnpaidAmount() {
+        return orderStatisticsRepository.sumUnpaidAmount(
+                PaymentStatus.PAID
+        );
+    }
+
 }

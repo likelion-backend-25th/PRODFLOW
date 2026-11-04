@@ -1,5 +1,7 @@
 package net.likelion.bebc25.prodflow.dashboard.dto;
 
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -66,9 +68,9 @@ public class DashboardDto {
 
     // 납기 이행률 통계 응답
     public record DeliveryPerformanceResponse(
-            long totalOrderCount,  // 집계 대상 수주 건수
-            long onTimeOrderCount, // 납기 내 완료된 수주 건수
-            double onTimeDeliveryRate // 납기 이행률 (%)
+            long totalOrderCount,
+            long onTimeOrderCount,
+            double onTimeDeliveryRate
     ) {
     }
 
@@ -127,21 +129,29 @@ public class DashboardDto {
             String orderNo,
             String customerName,
             String productName,
+            int quantity,
             LocalDate requestedDueDate,
             LocalDate plannedEndDate,
             Long statusCode,
             String riskType,
-            String riskReason
+            String riskReason,
+            OrderPaymentStatus paymentStatus,
+            long paidAmount
     ) {
     }
 
-    // 대시보드 전체 응답
+    // STAT-01 대시보드 통합 조회 응답
     public record DashboardResponse(
             SummaryResponse summary,
-            List<OrderStatusResponse> orderStatuses,
+            OrderStatisticsResponse orderStatistics,
+            List<OrderStatusStatisticsResponse> orderStatusStatistics,
             List<ProductionResponse> productionStatistics,
+            List<MonthlyProductionResponse> monthlyProductionStatistics,
+            List<WeeklyProductionResponse> weeklyProductionStatistics,
+            DeliveryPerformanceResponse deliveryPerformance,
             List<ProductProductionResponse> productStatistics,
-            List<DeliveryRiskResponse> deliveryRisks
+            ProductProductionShareResponse productProductionShare,
+            DeliveryRiskStatisticsResponse deliveryRiskStatistics
     ) {
     }
 }

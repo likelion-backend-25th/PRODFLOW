@@ -15,7 +15,7 @@ public class DeliveryRiskController {
 
     private final DeliveryRiskService deliveryRiskService;
 
-    //납기 위험 현황 조회
+    // 납기 위험 현황 조회
     @GetMapping("/delivery-risks")
     public ResponseEntity<DashboardDto.DeliveryRiskStatisticsResponse> getDeliveryRisk() {
         return ResponseEntity.ok(deliveryRiskService.getDeliveryRisks());
