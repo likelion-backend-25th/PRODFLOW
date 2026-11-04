@@ -30,11 +30,11 @@ public class ClientDto {
             String employee,
             String phone,
             String email,
-            int totalOrder,
+            Long totalOrder,
             Long totalAmount,
             LocalDateTime recentOrderedAt
     ) {
-        public static Response from(Client client, int totalOrder, Long totalAmount, LocalDateTime recentOrderedAt) {
+        public static Response from(Client client, Long totalOrder, Long totalAmount, LocalDateTime recentOrderedAt) {
             return new Response(
                     client.getId(),
                     client.getCompany(),
@@ -57,11 +57,11 @@ public class ClientDto {
             String address,
             String userName,
             String userPhone,
-            int totalOrder,
+            Long totalOrder,
             Long totalAmount,
-            int ongoingOrders
+            Long ongoingOrders
     ) {
-        public static DetailResponse from(Client client, int totalOrder, Long totalAmount, int ongoingOrders) {
+        public static DetailResponse from(Client client, Long totalOrder, Long totalAmount, Long ongoingOrders) {
             return new DetailResponse(
                     client.getId(),
                     client.getCompany(),

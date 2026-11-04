@@ -5,6 +5,7 @@ import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
 import net.likelion.bebc25.prodflow.client.service.ClientService;
 import net.likelion.bebc25.prodflow.common.domain.Address;
+import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -42,7 +44,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -54,6 +55,9 @@ public class ClientServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private CustomerOrderRepository customerOrderRepository;
 
     @InjectMocks
     private ClientService clientService;
@@ -99,6 +103,10 @@ public class ClientServiceTest {
         ReflectionTestUtils.setField(secondClient, "id", 2L);
         given(clientRepository.findAll(pageable))
                 .willReturn(new PageImpl<>(List.of(firstClient, secondClient), pageable, 5L));
+        given(customerOrderRepository.countByClientId(3L)).willReturn(8L);
+        given(customerOrderRepository.sumTotalAmountByClientId(3L)).willReturn(98000000L);
+        given(customerOrderRepository.countByClientId(2L)).willReturn(0L);
+        given(customerOrderRepository.sumTotalAmountByClientId(2L)).willReturn(0L);
 
         // when
         LocalDateTime before = LocalDateTime.now();
@@ -113,10 +121,11 @@ public class ClientServiceTest {
                         tuple(3L, "한빛케이스(주)", "최민재", "02-6000-1101", "contact@hanbit-case.example"),
                         tuple(2L, "세원모바일(주)", "오지훈", "031-210-2202", "sales@sewon-mobile.example")
                 );
-        // 주문 통계와 최근 주문일은 현재 서비스에 정의된 임시값을 검증한다.
+        assertThat(response.getContent())
+                .extracting(ClientDto.Response::totalOrder, ClientDto.Response::totalAmount)
+                .containsExactly(tuple(8L, 98000000L), tuple(0L, 0L));
+        // 최근 주문일은 현재 서비스에서 조회 시각을 반환한다.
         assertThat(response.getContent()).allSatisfy(client -> {
-            assertThat(client.totalOrder()).isEqualTo(3);
-            assertThat(client.totalAmount()).isEqualTo(12340000L);
             assertThat(client.recentOrderedAt()).isBetween(before, after);
         });
         assertThat(response.getPageable()).isEqualTo(pageable);
@@ -127,6 +136,11 @@ public class ClientServiceTest {
         assertThat(response.getTotalPages()).isEqualTo(3);
         assertThat(response.hasNext()).isTrue();
         verify(clientRepository).findAll(pageable);
+        verify(customerOrderRepository).countByClientId(3L);
+        verify(customerOrderRepository).sumTotalAmountByClientId(3L);
+        verify(customerOrderRepository).countByClientId(2L);
+        verify(customerOrderRepository).sumTotalAmountByClientId(2L);
+        verifyNoMoreInteractions(customerOrderRepository);
         verifyNoMoreInteractions(clientRepository);
         verifyNoInteractions(userRepository);
     }
@@ -145,6 +159,8 @@ public class ClientServiceTest {
         ReflectionTestUtils.setField(client, "id", 2L);
         given(clientRepository.findByKeyword(keyword, pageable))
                 .willReturn(new PageImpl<>(List.of(client), pageable, 3L));
+        given(customerOrderRepository.countByClientId(2L)).willReturn(6L);
+        given(customerOrderRepository.sumTotalAmountByClientId(2L)).willReturn(45000000L);
 
         // when
         LocalDateTime before = LocalDateTime.now();
@@ -158,9 +174,8 @@ public class ClientServiceTest {
             assertThat(result.employee()).isEqualTo("최민재");
             assertThat(result.phone()).isEqualTo("02-6000-1101");
             assertThat(result.email()).isEqualTo("contact@hanbit-case.example");
-            // 주문 통계와 최근 주문일은 현재 서비스에 정의된 임시값을 검증한다.
-            assertThat(result.totalOrder()).isEqualTo(3);
-            assertThat(result.totalAmount()).isEqualTo(12340000L);
+            assertThat(result.totalOrder()).isEqualTo(6L);
+            assertThat(result.totalAmount()).isEqualTo(45000000L);
             assertThat(result.recentOrderedAt()).isBetween(before, after);
         });
         assertThat(response.getPageable()).isEqualTo(pageable);
@@ -170,6 +185,9 @@ public class ClientServiceTest {
         assertThat(response.getTotalPages()).isEqualTo(3);
         assertThat(response.hasNext()).isTrue();
         verify(clientRepository).findByKeyword(keyword, pageable);
+        verify(customerOrderRepository).countByClientId(2L);
+        verify(customerOrderRepository).sumTotalAmountByClientId(2L);
+        verifyNoMoreInteractions(customerOrderRepository);
         verifyNoMoreInteractions(clientRepository);
         verifyNoInteractions(userRepository);
     }
@@ -202,13 +220,18 @@ public class ClientServiceTest {
             verify(clientRepository).findByKeyword(keyword, pageable);
         }
         verifyNoMoreInteractions(clientRepository);
-        verifyNoInteractions(userRepository);
+        verifyNoInteractions(userRepository, customerOrderRepository);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SUPER_ADMIN", "ORDER_MANAGER"})
-    @DisplayName("최고관리자와 수주관리자는 거래처를 등록하고 상세 정보와 초기 주문 통계를 받는다")
-    void createClient(String role) {
+    @CsvSource({
+            "SUPER_ADMIN, 0, 0, 0",
+            "ORDER_MANAGER, 0, 0, 0",
+            "SUPER_ADMIN, 5, 45000000, 2",
+            "ORDER_MANAGER, 5, 45000000, 2"
+    })
+    @DisplayName("거래처 등록 후 저장된 ID로 집계한 주문 통계와 상세 정보를 반환한다")
+    void createClient(String role, Long totalOrder, Long totalAmount, Long ongoingOrders) {
         // given
         authenticate(role);
         Long userId = 2L;
@@ -227,6 +250,7 @@ public class ClientServiceTest {
             ReflectionTestUtils.setField(client, "id", 10L);
             return client;
         });
+        givenOrderStatistics(10L, totalOrder, totalAmount, ongoingOrders);
 
         // when
         ClientDto.DetailResponse response = securedClientService.createClient(request);
@@ -253,10 +277,11 @@ public class ClientServiceTest {
         assertThat(response.address()).isEqualTo("서울특별시 강남구 테헤란로 152, 12층");
         assertThat(response.userName()).isEqualTo("이서준");
         assertThat(response.userPhone()).isEqualTo("010-2000-0002");
-        assertThat(response.totalOrder()).isZero();
-        assertThat(response.totalAmount()).isEqualTo(0L);
-        assertThat(response.ongoingOrders()).isZero();
+        assertThat(response.totalOrder()).isEqualTo(totalOrder);
+        assertThat(response.totalAmount()).isEqualTo(totalAmount);
+        assertThat(response.ongoingOrders()).isEqualTo(ongoingOrders);
         verify(userRepository).findById(userId);
+        verifyOrderStatistics(10L);
     }
 
     @ParameterizedTest
@@ -278,7 +303,7 @@ public class ClientServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("존재하지 않은 사용자입니다. id = " + userId);
         verify(userRepository).findById(userId);
-        verifyNoInteractions(clientRepository);
+        verifyNoInteractions(clientRepository, customerOrderRepository);
     }
 
     @ParameterizedTest
@@ -296,7 +321,7 @@ public class ClientServiceTest {
         // when & then
         assertThatThrownBy(() -> securedClientService.createClient(request))
                 .isInstanceOf(AccessDeniedException.class);
-        verifyNoInteractions(userRepository, clientRepository);
+        verifyNoInteractions(userRepository, clientRepository, customerOrderRepository);
     }
 
     @Test
@@ -312,7 +337,7 @@ public class ClientServiceTest {
         // when & then
         assertThatThrownBy(() -> securedClientService.createClient(request))
                 .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
-        verifyNoInteractions(userRepository, clientRepository);
+        verifyNoInteractions(userRepository, clientRepository, customerOrderRepository);
     }
 
     @ParameterizedTest
@@ -327,6 +352,7 @@ public class ClientServiceTest {
         User newUser = User.builder().name("박하은").phone("010-3000-0003").build();
         given(clientRepository.findById(clientId)).willReturn(Optional.of(client));
         given(userRepository.findById(request.userId())).willReturn(Optional.of(newUser));
+        givenOrderStatistics(clientId, 9L, 78000000L, 4L);
 
         // when
         ClientDto.DetailResponse response = securedClientService.updateClient(clientId, request);
@@ -348,12 +374,12 @@ public class ClientServiceTest {
         assertThat(response.address()).isEqualTo("경기도 수원시 영통구 삼성로 129, 본관 3층");
         assertThat(response.userName()).isEqualTo("박하은");
         assertThat(response.userPhone()).isEqualTo("010-3000-0003");
-        // 주문 통계는 현재 서비스에 정의된 임시값을 검증한다.
-        assertThat(response.totalOrder()).isEqualTo(3);
-        assertThat(response.totalAmount()).isEqualTo(12340000L);
-        assertThat(response.ongoingOrders()).isEqualTo(1);
+        assertThat(response.totalOrder()).isEqualTo(9L);
+        assertThat(response.totalAmount()).isEqualTo(78000000L);
+        assertThat(response.ongoingOrders()).isEqualTo(4L);
         verify(clientRepository).findById(clientId);
         verify(userRepository).findById(request.userId());
+        verifyOrderStatistics(clientId);
         verifyNoMoreInteractions(clientRepository, userRepository);
     }
 
@@ -371,6 +397,7 @@ public class ClientServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("존재하지 않는 거래처 입니다. id = " + clientId);
         verify(clientRepository).findById(clientId);
+        verifyOrderStatistics(clientId);
         verifyNoMoreInteractions(clientRepository);
         verifyNoInteractions(userRepository);
     }
@@ -401,6 +428,7 @@ public class ClientServiceTest {
         assertThat(client.getUser()).isSameAs(originalUser);
         verify(clientRepository).findById(clientId);
         verify(userRepository).findById(request.userId());
+        verifyOrderStatistics(clientId);
         verifyNoMoreInteractions(clientRepository, userRepository);
     }
 
@@ -415,7 +443,7 @@ public class ClientServiceTest {
         // when & then
         assertThatThrownBy(() -> securedClientService.updateClient(1L, request))
                 .isInstanceOf(AccessDeniedException.class);
-        verifyNoInteractions(clientRepository, userRepository);
+        verifyNoInteractions(clientRepository, userRepository, customerOrderRepository);
     }
 
     @Test
@@ -427,7 +455,20 @@ public class ClientServiceTest {
         // when & then
         assertThatThrownBy(() -> securedClientService.updateClient(1L, request))
                 .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
-        verifyNoInteractions(clientRepository, userRepository);
+        verifyNoInteractions(clientRepository, userRepository, customerOrderRepository);
+    }
+
+    private void givenOrderStatistics(Long clientId, Long totalOrder, Long totalAmount, Long ongoingOrders) {
+        given(customerOrderRepository.countByClientId(clientId)).willReturn(totalOrder);
+        given(customerOrderRepository.sumTotalAmountByClientId(clientId)).willReturn(totalAmount);
+        given(customerOrderRepository.countActiveOrdersByClientId(clientId)).willReturn(ongoingOrders);
+    }
+
+    private void verifyOrderStatistics(Long clientId) {
+        verify(customerOrderRepository).countByClientId(clientId);
+        verify(customerOrderRepository).sumTotalAmountByClientId(clientId);
+        verify(customerOrderRepository).countActiveOrdersByClientId(clientId);
+        verifyNoMoreInteractions(customerOrderRepository);
     }
 
     private Client existingClientForUpdate(Long clientId) {
@@ -447,30 +488,22 @@ public class ClientServiceTest {
         );
     }
 
-    @Test
-    @DisplayName("거래처 상세 조회 시 거래처 정보와 담당자 정보, 주문 통계를 반환한다")
-    void getClientDetail() {
+    @ParameterizedTest
+    @CsvSource({"7, 98000000, 2", "0, 0, 0", "3000000000, 9000000000, 2500000000"})
+    @DisplayName("거래처 상세 조회 시 거래처 정보와 담당자 정보, 집계된 Long 주문 통계를 반환한다")
+    void getClientDetail(Long totalOrder, Long totalAmount, Long ongoingOrders) {
         // given
         Long clientId = 1L;
-        Client client = mock(Client.class);
-        Address address = new Address("06236", "서울특별시 강남구 테헤란로 152", "12층");
-        User user = User.builder()
-                .name("이서준")
-                .phone("010-2000-0002")
-                .build();
+        Client client = existingClientForUpdate(clientId);
 
         given(clientRepository.findById(clientId)).willReturn(Optional.of(client));
-        given(client.getCompany()).willReturn("한빛케이스(주)");
-        given(client.getEmployee()).willReturn("최민재");
-        given(client.getEmail()).willReturn("contact@hanbit-case.example");
-        given(client.getPhone()).willReturn("02-6000-1101");
-        given(client.getAddress()).willReturn(address);
-        given(client.getUser()).willReturn(user);
+        givenOrderStatistics(clientId, totalOrder, totalAmount, ongoingOrders);
 
         // when
         ClientDto.DetailResponse response = clientService.getClientDetail(clientId);
 
         // then
+        assertThat(response.id()).isEqualTo(clientId);
         assertThat(response.company()).isEqualTo("한빛케이스(주)");
         assertThat(response.employee()).isEqualTo("최민재");
         assertThat(response.email()).isEqualTo("contact@hanbit-case.example");
@@ -479,11 +512,13 @@ public class ClientServiceTest {
         assertThat(response.userName()).isEqualTo("이서준");
         assertThat(response.userPhone()).isEqualTo("010-2000-0002");
 
-        // 주문 통계는 현재 서비스에 정의된 임시값을 검증한다.
-        assertThat(response.totalOrder()).isEqualTo(3);
-        assertThat(response.totalAmount()).isEqualTo(12340000L);
-        assertThat(response.ongoingOrders()).isEqualTo(1);
+        assertThat(response.totalOrder()).isEqualTo(totalOrder);
+        assertThat(response.totalAmount()).isEqualTo(totalAmount);
+        assertThat(response.ongoingOrders()).isEqualTo(ongoingOrders);
         verify(clientRepository).findById(clientId);
+        verifyOrderStatistics(clientId);
+        verifyNoMoreInteractions(clientRepository);
+        verifyNoInteractions(userRepository);
     }
 
     @Test
@@ -498,5 +533,8 @@ public class ClientServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("존재하지 않은 거래처 입니다. id = " + clientId);
         verify(clientRepository).findById(clientId);
+        verifyOrderStatistics(clientId);
+        verifyNoMoreInteractions(clientRepository);
+        verifyNoInteractions(userRepository);
     }
 }
