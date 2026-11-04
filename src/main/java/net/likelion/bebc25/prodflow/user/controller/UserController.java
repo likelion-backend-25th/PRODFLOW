@@ -2,9 +2,12 @@ package net.likelion.bebc25.prodflow.user.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.auth.dto.AuthDto;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.user.dto.UserDto;
 import net.likelion.bebc25.prodflow.user.service.UserService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -52,4 +55,14 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUser(id, request));
     }
 
+    // 현재 로그인한 사용자 정보 조회
+    @GetMapping("/me")
+    public ResponseEntity<AuthDto.MeResponse> me(
+            @AuthenticationPrincipal CustomUserDetails principal
+    ) {
+        // 인증된 사용자 ID로 사용자 정보 조회
+        return ResponseEntity.ok(
+                userService.me(principal.getUserId())
+        );
+    }
 }

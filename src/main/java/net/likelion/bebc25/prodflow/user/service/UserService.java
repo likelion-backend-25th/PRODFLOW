@@ -2,6 +2,8 @@ package net.likelion.bebc25.prodflow.user.service;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.auth.dto.AuthDto;
+import net.likelion.bebc25.prodflow.auth.exception.AuthException;
 import net.likelion.bebc25.prodflow.auth.repository.RefreshTokenRepository;
 import net.likelion.bebc25.prodflow.user.dto.UserDto;
 import net.likelion.bebc25.prodflow.user.entity.User;
@@ -145,6 +147,14 @@ public class UserService {
         return UserDto.Response.from(findUserByIdOrThrow(id));
     }
 
+    // 내 정보 조회
+    public AuthDto.MeResponse me(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> AuthException.unauthorized("사용자를 찾을 수 없습니다."));
+        requireActive(user);
+        return AuthDto.MeResponse.from(user);
+    }
+
     // ID로 직원 조회
     // 공통으로 사용하므로 getUserById()에서 작성하지 않고 분리
     private User findUserByIdOrThrow(Long id) {
@@ -157,6 +167,13 @@ public class UserService {
     private void validateNotDeleted(User user) {
         if (user.getStatus() == UserStatus.DELETED) {
             throw new IllegalStateException("삭제된 직원은 수정할 수 없습니다.");
+        }
+    }
+
+    // 사용/비활성 사용자 검증
+    private void requireActive(User user) {
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw AuthException.forbidden("사용할 수 없는 계정입니다. 관리자에게 문의해주세요.");
         }
     }
 
