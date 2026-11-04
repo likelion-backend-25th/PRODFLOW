@@ -22,6 +22,8 @@ public interface CommonCodeRepository extends JpaRepository<CommonCode, Long> {
             String groupCode,
             String code,
             CodeStatus status
+    );
+
     // 드롭다운 목록
     @Query("""
             SELECT c FROM CommonCode c
