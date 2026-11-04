@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.dashboard;
 
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
 import net.likelion.bebc25.prodflow.dashboard.service.DeliveryRiskService;
 import org.junit.jupiter.api.DisplayName;
@@ -48,8 +49,7 @@ class DeliveryRiskServiceTest {
                 .anySatisfy(item -> {
                     assertThat(item.orderNo()).isEqualTo(orderNo);
                     assertThat(item.riskType()).isEqualTo("URGENT");
-                    assertThat(item.requestedDueDate())
-                            .isEqualTo(LocalDate.of(2026, 11, 6));
+                    assertThat(item.requestedDueDate()).isEqualTo(LocalDate.of(2026, 11, 6));
                 });
     }
 
@@ -84,8 +84,7 @@ class DeliveryRiskServiceTest {
                 .map(DashboardDto.DeliveryRiskStatisticsItemResponse::requestedDueDate)
                 .toList();
 
-        assertThat(dueDates)
-                .isSortedAccordingTo(LocalDate::compareTo);
+        assertThat(dueDates).isSortedAccordingTo(LocalDate::compareTo);
     }
 
     @Test
@@ -100,8 +99,7 @@ class DeliveryRiskServiceTest {
                 .map(DashboardDto.DeliveryRiskStatisticsItemResponse::orderId)
                 .toList();
 
-        assertThat(orderIds)
-                .doesNotHaveDuplicates();
+        assertThat(orderIds).doesNotHaveDuplicates();
     }
 
     @Test
@@ -112,7 +110,45 @@ class DeliveryRiskServiceTest {
                 deliveryRiskService.getDeliveryRisks();
 
         // then
-        assertThat(response.totalRiskOrderCount())
-                .isEqualTo(response.items().size());
+        assertThat(response.totalRiskOrderCount()).isEqualTo(response.items().size());
+    }
+
+    @Test
+    @DisplayName("납기 위험 수주에 결제 상태와 결제 금액이 포함된다")
+    void getDeliveryRiskPaymentInfo() {
+        // when
+        DashboardDto.DeliveryRiskStatisticsResponse response =
+                deliveryRiskService.getDeliveryRisks();
+
+        // then
+        assertThat(response.items())
+                .allSatisfy(item -> {
+                    assertThat(item.paymentStatus()).isNotNull();
+                    assertThat(item.paidAmount()).isGreaterThanOrEqualTo(0);
+                });
+    }
+
+    @Test
+    @DisplayName("결제 완료 상태가 납기 위험 수주에 포함된다")
+    void getDeliveryRiskPaidStatus() {
+        // given
+        String orderNo = "PF-2026-009";
+
+        // when
+        DashboardDto.DeliveryRiskStatisticsResponse response =
+                deliveryRiskService.getDeliveryRisks();
+
+        // then
+        assertThat(response.items())
+                .anySatisfy(item -> {
+                    if (item.orderNo().equals(orderNo)) {
+                        assertThat(item.paymentStatus())
+                                .isIn(
+                                        OrderPaymentStatus.UNPAID,
+                                        OrderPaymentStatus.PARTIALLY_PAID,
+                                        OrderPaymentStatus.PAID
+                                );
+                    }
+                });
     }
 }

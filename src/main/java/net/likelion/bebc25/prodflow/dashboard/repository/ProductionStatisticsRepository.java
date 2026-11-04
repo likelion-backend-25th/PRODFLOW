@@ -53,14 +53,14 @@ public interface ProductionStatisticsRepository
 
     // 날짜별 생산 완료량
     @Query("""
-            SELECT w.completedAt, SUM(w.quantity)
+            SELECT FUNCTION('DATE', w.completedAt), SUM(w.quantity)
             FROM WorkOrder w
             JOIN w.commonCode c
             WHERE w.completedAt >= :from
               AND w.completedAt < :to
               AND c.code = 'PACK_DONE'
-            GROUP BY w.completedAt
-            ORDER BY w.completedAt
+            GROUP BY FUNCTION('DATE', w.completedAt)
+            ORDER BY FUNCTION('DATE', w.completedAt)
             """)
     List<Object[]> findDailyCompletedQuantity(
             @Param("from") LocalDate from,

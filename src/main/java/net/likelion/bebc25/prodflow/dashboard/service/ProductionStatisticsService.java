@@ -21,6 +21,70 @@ public class ProductionStatisticsService {
 
     private final ProductionStatisticsRepository productionStatisticsRepository;
 
+    // 날짜별 생산 계획량 및 완료량 조회
+    public List<DashboardDto.ProductionResponse> getDailyProduction(
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        validateDateRange(startDate, endDate);
+
+        // Repository의 종료일은 미포함이므로 종료일 다음 날 전달
+        LocalDate to = endDate.plusDays(1);
+
+        // 일별 계획량 조회
+        List<Object[]> plannedRows =
+                productionStatisticsRepository.findDailyPlannedQuantity(
+                        startDate,
+                        to
+                );
+
+        // 일별 완료량 조회
+        List<Object[]> completedRows =
+                productionStatisticsRepository.findDailyCompletedQuantity(
+                        startDate,
+                        to
+                );
+
+        // 날짜별 생산량 집계
+        Map<LocalDate, DailyQuantity> dailyMap = new TreeMap<>();
+
+        // 계획량 집계
+        for (Object[] row : plannedRows) {
+            LocalDate date = toLocalDate(row[0]);
+            long quantity = ((Number) row[1]).longValue();
+
+            dailyMap.putIfAbsent(date, new DailyQuantity());
+            dailyMap.get(date).plannedQuantity += quantity;
+        }
+
+        // 완료량 집계
+        for (Object[] row : completedRows) {
+            LocalDate date = toLocalDate(row[0]);
+            long quantity = ((Number) row[1]).longValue();
+
+            dailyMap.putIfAbsent(date, new DailyQuantity());
+            dailyMap.get(date).completedQuantity += quantity;
+        }
+
+        // 조회 기간 내 데이터가 없는 날짜도 0으로 포함
+        for (LocalDate date = startDate;
+             !date.isAfter(endDate);
+             date = date.plusDays(1)) {
+
+            dailyMap.putIfAbsent(date, new DailyQuantity());
+        }
+
+        // DTO 변환
+        return dailyMap.entrySet()
+                .stream()
+                .map(entry -> new DashboardDto.ProductionResponse(
+                        entry.getKey(),
+                        entry.getValue().plannedQuantity,
+                        entry.getValue().completedQuantity
+                ))
+                .toList();
+    }
+
     // 선택한 월의 전체 생산량 통계
     public DashboardDto.MonthlyProductionResponse getMonthlyProduction(
             int year,
@@ -58,16 +122,25 @@ public class ProductionStatisticsService {
 
         // 일별 계획량과 완료량 조회
         List<Object[]> plannedRows =
-                productionStatisticsRepository.findDailyPlannedQuantity(monthStart, to);
+                productionStatisticsRepository.findDailyPlannedQuantity(
+                        monthStart,
+                        to
+                );
 
         List<Object[]> completedRows =
-                productionStatisticsRepository.findDailyCompletedQuantity(monthStart, to);
+                productionStatisticsRepository.findDailyCompletedQuantity(
+                        monthStart,
+                        to
+                );
 
         // 주차별 집계 데이터
         Map<Integer, WeeklyQuantity> weeklyMap = new TreeMap<>();
 
         // 월의 날짜를 기준으로 주차 초기화
-        for (LocalDate date = monthStart; !date.isAfter(monthEnd); date = date.plusDays(1)) {
+        for (LocalDate date = monthStart;
+             !date.isAfter(monthEnd);
+             date = date.plusDays(1)) {
+
             int week = getWeekOfMonth(date, monthStart);
 
             LocalDate weekStart = date.with(DayOfWeek.MONDAY);
@@ -84,7 +157,7 @@ public class ProductionStatisticsService {
 
         // 일별 계획량을 주차별로 합산
         for (Object[] row : plannedRows) {
-            LocalDate date = (LocalDate) row[0];
+            LocalDate date = toLocalDate(row[0]);
             long quantity = ((Number) row[1]).longValue();
 
             int week = getWeekOfMonth(date, monthStart);
@@ -93,14 +166,14 @@ public class ProductionStatisticsService {
 
         // 일별 완료량을 주차별로 합산
         for (Object[] row : completedRows) {
-            LocalDate date = (LocalDate) row[0];
+            LocalDate date = toLocalDate(row[0]);
             long quantity = ((Number) row[1]).longValue();
 
             int week = getWeekOfMonth(date, monthStart);
             weeklyMap.get(week).completedQuantity += quantity;
         }
 
-        // DTO로 변환
+        // DTO 변환
         List<DashboardDto.WeeklyProductionResponse> result = new ArrayList<>();
 
         weeklyMap.forEach((week, quantity) ->
@@ -130,6 +203,20 @@ public class ProductionStatisticsService {
         ) + 1;
     }
 
+    // 조회 기간 유효성 검사
+    private void validateDateRange(
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("시작일과 종료일은 필수입니다.");
+        }
+
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("시작일은 종료일보다 늦을 수 없습니다.");
+        }
+    }
+
     // 연도와 월 유효성 검사
     private void validateMonth(int year, int month) {
         if (month < 1 || month > 12) {
@@ -139,6 +226,29 @@ public class ProductionStatisticsService {
         if (year < 1) {
             throw new IllegalArgumentException("올바른 연도를 입력해야 합니다.");
         }
+    }
+
+    // Query 결과의 날짜 타입 변환
+    private LocalDate toLocalDate(Object value) {
+        if (value instanceof LocalDate date) {
+            return date;
+        }
+
+        if (value instanceof java.sql.Date date) {
+            return date.toLocalDate();
+        }
+
+        if (value instanceof java.time.LocalDateTime dateTime) {
+            return dateTime.toLocalDate();
+        }
+
+        throw new IllegalArgumentException("지원하지 않는 날짜 타입입니다: " + value.getClass().getName());
+    }
+
+    // 일별 집계를 위한 내부 클래스
+    private static class DailyQuantity {
+        private long plannedQuantity;
+        private long completedQuantity;
     }
 
     // 주차별 집계를 위한 내부 클래스
