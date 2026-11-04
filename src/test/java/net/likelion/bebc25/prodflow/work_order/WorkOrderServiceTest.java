@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
@@ -429,6 +430,27 @@ class WorkOrderServiceTest {
                 });
         // 상태 변경은 라인·담당자 변경 이력에 들어가지 않는다.
         assertThat(workOrderHistoryRepository.count()).isEqualTo(assignmentHistoryCount);
+    }
+
+    @Test
+    @DisplayName("같은 라인에 생산 중인 작업이 있으면 생산을 시작하지 않는다")
+    void rejectProduceWhenAnotherWorkIsProducing() {
+        // 시드 A라인. 6번은 생산 중이고 1번은 준비다.
+        WorkOrder producing = workOrderRepository.findById(6L).orElseThrow();
+        WorkOrder waiting = workOrderRepository.findById(1L).orElseThrow();
+        assertThat(producing.getCommonCode().getCode()).isEqualTo("PRODUCE");
+        assertThat(producing.getLine().getId()).isEqualTo(waiting.getLine().getId());
+        assertThat(waiting.getCommonCode().getCode()).isEqualTo("PREPARE");
+        // 시작 예정일이 오늘보다 뒤면 생산 중 검증보다 날짜 검증이 먼저 난다.
+        ReflectionTestUtils.setField(waiting, "plannedStartDate", LocalDate.now());
+
+        assertThatThrownBy(() -> workOrderService.changeStatus(
+                waiting.getId(), new UpdateStatusRequest("PRODUCE"), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("이 라인에서 이미 생산 중인 작업이 있습니다.");
+
+        assertThat(waiting.getCommonCode().getCode()).isEqualTo("PREPARE");
+        assertThat(producing.getCommonCode().getCode()).isEqualTo("PRODUCE");
     }
 
     @Test
