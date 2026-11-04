@@ -79,9 +79,6 @@ public class ClientController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestPart(value = "file") MultipartFile multipartFile
     ) {
-        if (multipartFile == null) {
-            throw new IllegalArgumentException("파일이 존재하지 않습니다.");
-        }
         List<ClientDto.ImportResponse> list = clientService.registerClients(multipartFile);
         return ResponseEntity.created(URI.create("/api/v1/clients/")).body(list);
     }
