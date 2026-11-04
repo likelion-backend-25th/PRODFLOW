@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.product.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 
@@ -8,12 +9,14 @@ import java.time.LocalDateTime;
 public class ProductDto {
 
 
+    @Schema(name = "ProductUpdateStatusRequest")
     public record UpdateStatusRequest(
             ProductStatus status
     ) {
 
     }
 
+    @Schema(name = "ProductCreateRequest")
     public record CreateRequest(
             String modelCode,
             String productName,
@@ -25,6 +28,7 @@ public class ProductDto {
     }
 
 
+    @Schema(name = "ProductResponse")
     public record Response(
             Long id,
             String modelCode,
@@ -51,6 +55,7 @@ public class ProductDto {
         }
     }
 
+    @Schema(name = "ProductUpdateRequest")
     public record UpdateRequest(
             String productName,
             Long deviceCode,
@@ -59,6 +64,7 @@ public class ProductDto {
     ) {
     }
 
+    @Schema(name = "ProductModelCodeExistsResponse")
     public record ModelCodeExistsResponse(
             String modelCode,
             boolean available
