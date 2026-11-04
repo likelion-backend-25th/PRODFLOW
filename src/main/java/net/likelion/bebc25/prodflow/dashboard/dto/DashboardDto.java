@@ -114,6 +114,27 @@ public class DashboardDto {
     ) {
     }
 
+    // 납기 위험 현황 조회 응답
+    public record DeliveryRiskStatisticsResponse(
+            long totalRiskOrderCount,
+            List<DeliveryRiskStatisticsItemResponse> items
+    ) {
+    }
+
+    // 납기 위험 수주 상세 항목
+    public record DeliveryRiskStatisticsItemResponse(
+            Long orderId,
+            String orderNo,
+            String customerName,
+            String productName,
+            LocalDate requestedDueDate,
+            LocalDate plannedEndDate,
+            Long statusCode,
+            String riskType,
+            String riskReason
+    ) {
+    }
+
     // 대시보드 전체 응답
     public record DashboardResponse(
             SummaryResponse summary,
