@@ -1,0 +1,11 @@
+info:
+  name: 견적서
+  type: folder
+<<<<<<< Updated upstream
+  seq: 5
+=======
+  seq: 6
+>>>>>>> Stashed changes
+
+request:
+  auth: inherit

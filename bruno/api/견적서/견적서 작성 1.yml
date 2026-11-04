@@ -1,0 +1,62 @@
+info:
+  name: 견적서 작성
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/quotations"
+  body:
+    type: json
+    data: |2-
+       //기존 거래처로 작성 
+        { 
+          "clientId": 1, 
+          "contactName": "최민재", 
+          "requestedDueDate": "2026-12-15", 
+          "vatIncluded": false, 
+          "items": [ 
+            { 
+              "productId": 1, 
+              "quantity": 100, 
+              "unitPrice": 10000 
+            }, 
+            { 
+              "productId": 2, 
+              "quantity": 200, 
+              "unitPrice": 8000 
+            } 
+          ]
+        }
+
+
+      //  //신규 거래처로 작성 
+      //   { 
+      //     "newClient": { 
+      //       "company": "브루노 테스트 회사", 
+      //       "representativeName": "김대표", 
+      //       "email": "test@example.com", 
+      //       "phone": "010-1234-5678", 
+      //       "zipcode": "06236", 
+      //       "roadAddress": "서울특별시 강남구 테헤란로 152", 
+      //       "detailAddress": "3층" 
+      //     }, 
+      //     "contactName": "김담당", 
+      //     "requestedDueDate": "2026-12-15", 
+      //     "vatIncluded": false, 
+      //     "items": [ 
+      //       { 
+      //         "productId": 1, 
+      //         "quantity": 100, 
+      //         "unitPrice": 10000 
+      //       } 
+      //     ]
+      //   }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

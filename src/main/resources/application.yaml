@@ -1,3 +1,84 @@
 spring:
   application:
     name: PRODFLOW
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_DB_HOST}:${MYSQL_DB_PORT}/${MYSQL_DATABASE}?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASSWORD}
+
+  # JPA 및 하이버네이트 설정
+  jpa:
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+        use_sql_comments: true
+    # Hibernate가 스키마(ddl)를 생성한 다음 SQL 초기화 스크립트 로드 및 실행
+    defer-datasource-initialization: true
+
+  # 데이터베이스 초기화설정
+  sql:
+    init:
+      mode: always
+
+
+# Springdoc OpenAPI 및 Swagger UI 설정
+springdoc:
+  # 기본 응답 미디어 타입을 application/json으로 지정
+  default-produces-media-type: application/json
+  swagger-ui:
+    # Swagger UI 엔드포인트 커스텀 경로 설정
+    path: /swagger-ui.html
+    # 태그 그룹 정렬 기준 (옵션: alpha - 태그명 알파벳/가나다 사전순)
+    tags-sorter: alpha
+    # 개별 API 엔드포인트 정렬 기준 (옵션: alpha - URI 경로 사전순, method - HTTP 메서드명 알파벳순)
+    operations-sorter: alpha
+  api-docs:
+    # OpenAPI 문서 자동 생성 활성화 및 엔드포인트 경로
+    enabled: true
+    path: /v3/api-docs
+
+logging:
+  level:
+    # 스프링 시큐리티 전체 로그를 디버그 레벨로 활성화
+    org.springframework.security: DEBUG
+
+    # 더 세부적인 필터 체인 통과 흐름을 보려면 TRACE 지정 가능
+    # org.springframework.security.web.FilterChainProxy: TRACE
+
+holiday:
+  api:
+    base-url: https://date.nager.at
+  initialization:
+    # 운영 서버에서 true로 설정하면 시작 시 올해·다음 해 데이터를 수집
+    enabled: ${HOLIDAY_INITIALIZATION_ENABLED:true}
+
+
+# 배송조회 외부 API (스마트택배 연동)
+shipment:
+  tracking:
+    api:
+      base-url: https://info.sweettracker.co.kr
+      key: ${SHIPMENT_TRACKING_API_KEY:}
+    # 미완료 운송장 주기 조회 on/off
+    refresh-enabled: ${SHIPMENT_TRACKING_REFRESH_ENABLED:true}
+    # 이전 실행 종료 후 대기 시간(ms). 기본 10분
+    refresh-interval-ms: ${SHIPMENT_TRACKING_REFRESH_INTERVAL_MS:600000}
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
+  refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}
+
+  # 품목 도면 S3
+aws:
+  region: ${AWS_REGION:ap-northeast-2}
+  s3:
+    bucket: ${AWS_S3_BUCKET:}

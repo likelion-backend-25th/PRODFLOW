@@ -19,6 +19,10 @@ repositories {
 }
 
 dependencies {
+
+    // 테스트 환경용 H2 인메모리 DB
+    testRuntimeOnly 'com.h2database:h2'
+
     // ... 기존 의존성 ...
 
     // Swagger / OpenAPI
@@ -28,11 +32,21 @@ dependencies {
     implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // Source: https://mvnrepository.com/artifact/org.apache.poi/poi
+    implementation 'org.apache.poi:poi:6.0.0'
+    // Source: https://mvnrepository.com/artifact/org.apache.poi/poi-ooxml
+    implementation 'org.apache.poi:poi-ooxml:6.0.0'
+
+    // AWS S3 (품목 도면 업로드)
+    implementation platform('software.amazon.awssdk:bom:2.31.50')
+    implementation 'software.amazon.awssdk:s3'
+
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
@@ -49,4 +63,5 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    jvmArgs('-XX:+EnableDynamicAgentLoading', '-Xshare:off')
 }

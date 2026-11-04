@@ -1,0 +1,28 @@
+info:
+  name: USER-03 사용자 추가
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/users"
+  body:
+    type: json
+    data: |-
+      {
+        "temporaryPassword": "Abcd123456!?",
+        "name": "임민교",
+        "email": "minjun@exaddmple.com",
+        "phone": "010-2000-0002",
+        "role": "ORDER_MANAGER"
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwcm9kZmxvdyIsImp0aSI6ImEwMmE1YjBmLTFiYWUtNDUwZS04Zjk1LWZkZGE0ZThhZDVlNiIsInN1YiI6IjEiLCJlbWFpbCI6ImFkbWluQHByb2RmbG93LmxvY2FsIiwicm9sZSI6IlNVUEVSX0FETUlOIiwidHlwZSI6IkFDQ0VTUyIsImlhdCI6MTc5MzYwNzczMSwiZXhwIjoxNzkzNjA5NTMxfQ.1xCZb40k32GzMb-qKvuQ6_CqE-osa-S0tJJAL4mtY68
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
