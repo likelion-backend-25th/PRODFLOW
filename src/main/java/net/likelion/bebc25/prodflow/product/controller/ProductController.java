@@ -1,6 +1,10 @@
 package net.likelion.bebc25.prodflow.product.controller;
 
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.product.dto.ProductDrawingDto;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto;
@@ -33,6 +37,13 @@ public class ProductController {
     private final ProductDrawingService productDrawingService;
 
 
+    @Operation(
+            summary = "생산품목 등록",
+            description = "RequestBody로 생산품목 정보를 받아 등록한 뒤 상세 정보를 반환한다. 기존 기종 ID(deviceCode) 또는 새 기종명(deviceName) 중 하나만 입력한다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "등록 성공")
+    })
     @PostMapping
     public ResponseEntity<ProductDto.Response> create(@RequestBody ProductDto.CreateRequest request) {
         ProductDto.Response response = productService.create(request);
@@ -41,31 +52,66 @@ public class ProductController {
                 .body(response);
     }
 
+    @Operation(
+            summary = "생산품목 리스트 조회",
+            description = "생산품목 목록을 조회한다. status로 생산가능/생산중단을 필터할 수 있다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
     @GetMapping
     public ResponseEntity<List<ProductDto.Response>> getList(
+            @Parameter(description = "생산품목 상태", example = "AVAILABLE")
             @RequestParam(required = false) ProductStatus status
     ) {
         List<ProductDto.Response> response = productService.getList(status);
         return ResponseEntity.ok(response);
     }
 
+    @Operation(
+            summary = "생산품목 상세 조회",
+            description = "생산품목 ID로 상세 정보를 조회하여 반환한다"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<ProductDto.Response> getDetail(@PathVariable Long id) {
+    public ResponseEntity<ProductDto.Response> getDetail(
+            @Parameter(description = "생산품목 ID", example = "1")
+            @PathVariable Long id
+    ) {
         ProductDto.Response response = productService.getDetail(id);
         return ResponseEntity.ok(response);
     }
 
+    @Operation(
+            summary = "생산품목 검색",
+            description = "키워드와 상태로 생산품목을 검색한다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
     @GetMapping("/search")
     public ResponseEntity<List<ProductDto.Response>> search(
+            @Parameter(description = "검색 키워드", example = "쉬폰")
             @RequestParam(required = false) String keyword,
+            @Parameter(description = "생산품목 상태", example = "AVAILABLE")
             @RequestParam(required = false) ProductStatus status
     ) {
         List<ProductDto.Response> response = productService.productSearch(keyword, status);
         return ResponseEntity.ok(response);
     }
 
+    @Operation(
+            summary = "생산품목 상태 변경",
+            description = "생산품목의 생산가능/생산중단 상태를 변경한다"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "변경 성공")
+    })
     @PatchMapping("/{id}/status")
     public ResponseEntity<ProductDto.Response> updateStatus(
+            @Parameter(description = "생산품목 ID", example = "1")
             @PathVariable Long id,
             @RequestBody ProductDto.UpdateStatusRequest request
     ) {
@@ -74,8 +120,16 @@ public class ProductController {
     }
 
 
+    @Operation(
+            summary = "생산품목 도면 업로드",
+            description = "RequestPart로 도면 파일을 받아 해당 생산품목에 업로드한다"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "업로드 성공")
+    })
     @PostMapping(value = "/{id}/drawings", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ProductDrawingDto.Response> uploadDrawing(
+            @Parameter(description = "생산품목 ID", example = "1")
             @PathVariable Long id,
             @RequestPart("file") MultipartFile file
     ) {
@@ -85,13 +139,31 @@ public class ProductController {
                 .body(response);
     }
 
+    @Operation(
+            summary = "생산품목 현재 도면 조회",
+            description = "생산품목의 현재 도면 파일 목록을 조회한다"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
     @GetMapping("/{id}/drawings/current")
-    public ResponseEntity<List<ProductDrawingDto.Response>> getCurrentDrawings(@PathVariable Long id) {
+    public ResponseEntity<List<ProductDrawingDto.Response>> getCurrentDrawings(
+            @Parameter(description = "생산품목 ID", example = "1")
+            @PathVariable Long id
+    ) {
         return ResponseEntity.ok(productDrawingService.getCurrentFiles(id));
     }
 
+    @Operation(
+            summary = "생산품목 정보 수정",
+            description = "RequestBody로 생산품목 정보를 받아 수정한 뒤 상세 정보를 반환한다"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "수정 성공")
+    })
     @PutMapping("/{id}")
     public ResponseEntity<ProductDto.Response> update(
+            @Parameter(description = "생산품목 ID", example = "1")
             @PathVariable Long id,
             @RequestBody ProductDto.UpdateRequest request
     ) {
@@ -99,8 +171,16 @@ public class ProductController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(
+            summary = "모델코드 중복 검사",
+            description = "모델코드 사용 가능 여부를 반환한다. available=true이면 등록 가능"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
     @GetMapping("/model-code/exists")
     public ResponseEntity<ProductDto.ModelCodeExistsResponse> checkModelCodeExists(
+            @Parameter(description = "모델코드", example = "IP16-CASE-001")
             @RequestParam String modelCode
     ) {
         ProductDto.ModelCodeExistsResponse response = productService.checkModelCodeExists(modelCode);
