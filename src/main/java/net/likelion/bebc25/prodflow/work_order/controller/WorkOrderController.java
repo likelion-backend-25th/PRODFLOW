@@ -129,4 +129,28 @@ public class WorkOrderController {
                 workOrderService.update(workOrderId, request, userDetails.getUserId())
         );
     }
+
+    @Operation(
+            summary = "작업지시 상태 변경",
+            description = "로그인한 사용자가 작업 상태를 바꾼다. 허용된 전이만 가능하고, 변경 내용은 status_history에 남긴다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "상태 변경 성공",
+            content = @Content(schema = @Schema(implementation = WorkOrderDto.DetailResponse.class))
+    )
+    @ApiResponse(responseCode = "400", description = "같은 상태, 허용되지 않은 전이, 작업 상태 코드 없음, 시작 예정일 전, 대기 수주")
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "404", description = "작업지시를 찾을 수 없음")
+    @PatchMapping("/{workOrderId}/status")
+    public ResponseEntity<WorkOrderDto.DetailResponse> changeStatus(
+            @Parameter(description = "작업지시 ID", example = "1")
+            @PathVariable Long workOrderId,
+            @RequestBody WorkOrderDto.UpdateStatusRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(
+                workOrderService.changeStatus(workOrderId, request, userDetails.getUserId())
+        );
+    }
 }
