@@ -4,7 +4,6 @@ import net.likelion.bebc25.prodflow.global.security.handler.CustomAccessDeniedHa
 import net.likelion.bebc25.prodflow.global.security.jwt.JwtAuthenticationFilter;
 import net.likelion.bebc25.prodflow.global.security.jwt.JwtProvider;
 import net.likelion.bebc25.prodflow.global.security.service.CustomUserDetailsService;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -20,6 +20,7 @@ import java.io.ByteArrayInputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.NoSuchElementException;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -101,8 +102,10 @@ public class QuotationPdfStorageService {
             } catch (RuntimeException ex) {
                 log.warn("견적 PDF 삭제 실패, 같은 키에 업로드합니다. quotationId={}", quotationId, ex);
             }
-            storageClient.upload(key, new ByteArrayInputStream(pdf), "application/pdf", pdf.length);
-            QuotationPdfDto.PreviewResponse response = previewResponse(draft, key);
+            String token = QuotationDocumentFingerprint.create(draft, pdf);
+            storageClient.upload(key, new ByteArrayInputStream(pdf), "application/pdf", pdf.length,
+                    Map.of(QuotationDocumentFingerprint.METADATA_KEY, token));
+            QuotationPdfDto.PreviewResponse response = previewResponse(draft, key, token);
             quotation.changePdfObjectKey(key);
             return new PreparationResult(response, null);
         } catch (RuntimeException ex) {
@@ -121,7 +124,19 @@ public class QuotationPdfStorageService {
                         "PDF 준비가 완료되지 않았습니다. 재생성 후 확인해주세요.", null);
             }
             try {
-                return previewResponse(quotationService.getQuotationById(quotationId), quotation.getPdfObjectKey());
+                var draft = quotationService.getQuotationById(quotationId);
+                var file = storageClient.read(quotation.getPdfObjectKey());
+                boolean valid = quotation.getStatus() == QuotationStatus.DRAFT
+                        ? QuotationDocumentFingerprint.matches(draft, file)
+                        : QuotationDocumentFingerprint.hasValidContent(file);
+                if (!valid) {
+                    throw new QuotationPdfPreparationException(quotationId, HttpStatus.CONFLICT, "PDF_CHANGED",
+                            "견적 내용과 PDF가 일치하지 않습니다. PDF를 재생성해주세요.", null);
+                }
+                return previewResponse(draft, quotation.getPdfObjectKey(),
+                        file.metadata().get(QuotationDocumentFingerprint.METADATA_KEY));
+            } catch (QuotationPdfPreparationException ex) {
+                throw ex;
             } catch (RuntimeException ex) {
                 throw new QuotationPdfPreparationException(quotationId, ex);
             }
@@ -149,10 +164,12 @@ public class QuotationPdfStorageService {
     }
 
     // 조회 URL 발급 및 미리보기 응답 변환
-    private QuotationPdfDto.PreviewResponse previewResponse(QuotationDto.DetailResponse draft, String key) {
+    private QuotationPdfDto.PreviewResponse previewResponse(
+            QuotationDto.DetailResponse draft, String key, String token
+    ) {
         Instant expiresAt = Instant.now().plus(PREVIEW_EXPIRATION);
         String url = storageClient.createPresignedGetUrl(key, PREVIEW_EXPIRATION);
-        return QuotationPdfDto.PreviewResponse.from(draft, url, expiresAt);
+        return QuotationPdfDto.PreviewResponse.from(draft, url, expiresAt, token);
     }
 
     private record PreparationResult(QuotationPdfDto.PreviewResponse response, RuntimeException failure) {

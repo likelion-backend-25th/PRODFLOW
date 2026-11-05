@@ -1,0 +1,7 @@
+info:
+  name: 거래처
+  type: folder
+  seq: 6
+
+request:
+  auth: inherit

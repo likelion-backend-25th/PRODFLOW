@@ -11,12 +11,15 @@ public class QuotationPdfDto {
             String clientCompany,
             String clientEmail,
             String previewUrl,
-            Instant expiresAt
+            Instant expiresAt,
+            String confirmationToken
     ) {
         // PDF 미리보기 응답 변환
-        public static PreviewResponse from(QuotationDto.DetailResponse draft, String previewUrl, Instant expiresAt) {
+        public static PreviewResponse from(
+                QuotationDto.DetailResponse draft, String previewUrl, Instant expiresAt, String confirmationToken
+        ) {
             return new PreviewResponse(draft.id(), draft.quotationNo(), draft.clientCompany(),
-                    draft.clientEmail(), previewUrl, expiresAt);
+                    draft.clientEmail(), previewUrl, expiresAt, confirmationToken);
         }
     }
 

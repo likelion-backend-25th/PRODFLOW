@@ -39,12 +39,14 @@ import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationPdfDto;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationRescheduleDto;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationScheduleDto;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationSortType;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationRescheduleService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationSchedulePreviewService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationSendService;
 
 @RestController
 @RequestMapping("/api/v1/quotations")
@@ -55,6 +57,32 @@ public class QuotationController {
     private final QuotationSchedulePreviewService quotationSchedulePreviewService;
     private final QuotationRescheduleService quotationRescheduleService;
     private final QuotationPdfStorageService quotationPdfStorageService;
+    private final QuotationSendService quotationSendService;
+
+    // 확인한 견적 PDF 발송
+    @Operation(summary = "견적 발송 확정 및 PDF 이메일 전송",
+            description = "미리보기의 confirmationToken으로 확인한 PDF를 발송한다. "
+                    + "SENT 커밋 후 이메일을 전송하며, 중복 요청은 다시 전송하지 않는다. "
+                    + "emailStatus로 SENT·FAILED·UNKNOWN을 구분한다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "견적 확정 및 이메일 처리 결과. 중복 요청 포함"),
+            @ApiResponse(responseCode = "400", description = "확인값 입력 오류", content = @Content),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "403", description = "발송 권한 또는 계정 조건 미충족", content = @Content),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 견적", content = @Content),
+            @ApiResponse(responseCode = "409", description = "견적·PDF·납기·유효기간 재확인 필요", content = @Content),
+            @ApiResponse(responseCode = "502", description = "발송 확정 전 PDF 읽기 실패", content = @Content)
+    })
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    @PostMapping("/{quotationId}/send")
+    public ResponseEntity<QuotationSendDto.Response> send(
+            @PathVariable Long quotationId,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody QuotationSendDto.Request request
+    ) {
+        QuotationSendDto.Response response = quotationSendService.send(quotationId, request, userDetails.getUserId());
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store").body(response);
+    }
 
     // 견적 상태 입력 변환
     @InitBinder
