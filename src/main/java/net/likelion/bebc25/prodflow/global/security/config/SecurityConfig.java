@@ -152,17 +152,35 @@ public class SecurityConfig {
                                 "/api/v1/users/**"
                         ).hasRole("SUPER_ADMIN")
 
-                        // 생산 라인 등록은 최고 관리자 또는 발주 관리자만 허용
+                        // 생산 라인 등록은 최고 관리자 또는 수주 관리자만 허용
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/lines"
                         ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
 
-                        // 생산 라인 수정은 최고 관리자 또는 발주 관리자만 허용
+                        // 생산 라인 상태는 최고 관리자, 수주 관리자, 생산 현장 관리자가 허용
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/lines/*/status"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER", "PRODUCTION_MANAGER")
+
+                        // 생산 라인 수정은 최고 관리자 또는 수주 관리자만 허용. 이름 변경은 서비스에서 최고 관리자만 받는다.
                         .requestMatchers(
                                 HttpMethod.PATCH,
                                 "/api/v1/lines/*"
                         ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
+                        // 작업 상태 변경은 최고 관리자 또는 생산 현장 관리자만 허용. 배정된 담당자인지는 서비스에서 본다.
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/work-orders/*/status"
+                        ).hasAnyRole("SUPER_ADMIN", "PRODUCTION_MANAGER")
+
+                        // 라인 변경과 담당자 변경은 역할이 다르다. 어느 항목인지는 서비스에서 가른다.
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/work-orders/*"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER", "PRODUCTION_MANAGER")
 
                         // 거래처 등록은 최고 관리자 또는 발주 관리자만 허용
                         .requestMatchers(
