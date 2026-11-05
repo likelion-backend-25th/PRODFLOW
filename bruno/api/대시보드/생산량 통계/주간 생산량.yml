@@ -1,0 +1,23 @@
+info:
+  name: 주간 생산량
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/statistics/production/weekly?year=2026&month=10"
+  params:
+    - name: year
+      value: "2026"
+      type: query
+    - name: month
+      value: "10"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
