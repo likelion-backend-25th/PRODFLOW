@@ -14,6 +14,7 @@ import net.likelion.bebc25.prodflow.product.dto.ProductDto.Response;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.product.repository.ProductRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class ProductService {
     private final OrderProductRepository orderProductRepository;
 
     @Transactional
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public Response create(ProductDto.CreateRequest request) {
 
         //modelCode 중복이면 예외
@@ -117,6 +119,7 @@ public class ProductService {
         return responses;
     }
 
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public Response updateStatus(Long id, ProductDto.UpdateStatusRequest request) {
         Optional<Product> optionalProduct = productRepository.findById(id);
         if (optionalProduct.isEmpty()) {
@@ -130,6 +133,7 @@ public class ProductService {
 
     }
 
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public Response update(Long id, ProductDto.UpdateRequest request) {
         Optional<Product> optionalProduct = productRepository.findById(id);
         if (optionalProduct.isEmpty()) {
