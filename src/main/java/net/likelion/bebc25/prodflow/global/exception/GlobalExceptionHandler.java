@@ -15,6 +15,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -152,6 +153,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleExternalApiException(ExternalApiException ex) {
         log.error("외부 API 연동 실패: {}", ex.getMessage(), ex);
         ApiErrorResponse response = ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR);
+        return ResponseEntity.status(ErrorCode.EXTERNAL_API_ERROR.getHttpStatus()).body(response);
+    }
+
+    // RestClient를 통한 외부 API 호출 또는 응답 처리 실패 시 호출됨 (502 Bad Gateway 응답)
+    @ExceptionHandler(RestClientResponseException.class)
+    public ResponseEntity<ApiErrorResponse> handleRestClientResponseException(RestClientResponseException ex) {
+        log.error("RestClient 외부 API 연동 실패: {}", ex.getMessage(), ex);
+        ApiErrorResponse response = ex.getMessage().isEmpty()
+                ? ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR)
+                : ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR, ex.getMessage());
         return ResponseEntity.status(ErrorCode.EXTERNAL_API_ERROR.getHttpStatus()).body(response);
     }
 
