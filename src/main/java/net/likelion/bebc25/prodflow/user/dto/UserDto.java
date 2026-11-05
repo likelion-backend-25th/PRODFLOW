@@ -138,4 +138,39 @@ public class UserDto {
         }
     }
 
+    // 계정관리 통계 (DELETED 제외)
+    @Schema(description = "직원 계정 통계 응답 DTO")
+    public record StatsResponse(
+            @Schema(description = "전체 계정 수(ACTIVE + INACTIVE)", example = "13")
+            long totalAccounts,
+
+            @Schema(description = "활성 계정 수", example = "12")
+            long activeAccounts,
+
+            @Schema(description = "비활성 계정 수", example = "1")
+            long inactiveAccounts
+    ) {
+    }
+
+    // 내 정보 조회
+    public record MeResponse(
+            @Schema(description = "직원 ID", example = "1")
+            Long userId,
+            @Schema(description = "직원 이름", example = "김철수")
+            String name,
+            @Schema(description = "직원 이메일", example = "employee@prodflow.local")
+            String email,
+            @Schema(description = "직원 권한", example = "ORDER_MANAGER")
+            UserRole role,
+            @Schema(description = "계정 상태", example = "ACTIVE")
+            UserStatus status,
+            @Schema(description = "최초 비밀번호 변경 필요 여부", example = "false")
+            boolean mustChangePassword
+    ) {
+        public static MeResponse from(User user) {
+            return new MeResponse(user.getId(), user.getName(), user.getEmail(), user.getRole(),
+                    user.getStatus(), user.isMustChangePassword());
+        }
+    }
+
 }

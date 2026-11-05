@@ -1,13 +1,14 @@
 package net.likelion.bebc25.prodflow.user.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import net.likelion.bebc25.prodflow.auth.dto.AuthDto;
 import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.user.dto.UserDto;
+import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.service.UserService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -36,14 +37,20 @@ public class UserController {
         return ResponseEntity.created(URI.create("/api/v1/users/" + response.id())).body(response);
     }
 
-    // 직원 목록 조회 (페이징)
+    // 직원 검색 + 사용/비활성 필터 + 페이징 처리
     @Operation(
-            summary = "직원 목록 조회",
-            description = "직원 목록을 페이지 단위로 조회합니다. "
-                    + "SUPER_ADMIN 권한이 필요합니다."
+            summary = "직원 목록 검색 및 페이징 조회",
+            description = "SUPER_ADMIN 전용. keyword는 이름·이메일·전화번호에서 검색하고 "
+                    + "status는 ACTIVE/INACTIVE 중 선택합니다. 삭제 계정은 제외합니다. "
+                    + "두 필터는 선택이며 page는 0부터 시작합니다."
     )
     @GetMapping
     public ResponseEntity<PageResponse<UserDto.Response>> getUsers(
+            @Parameter(description = "이름, 이메일, 전화번호 검색어 (선택)", example = "김민준")
+            @RequestParam(required = false) String keyword,
+
+            @Parameter(description = "계정 상태: ACTIVE 또는 INACTIVE. 미지정 시 전체", example = "ACTIVE")
+            @RequestParam(required = false) UserStatus status,
 
             @PageableDefault(
                     page = 0,
@@ -51,11 +58,18 @@ public class UserController {
                     sort = "id",
                     direction = Sort.Direction.DESC
             ) Pageable pageable
-
     ) {
-        return ResponseEntity.ok(
-                userService.getUsers(pageable)
-        );
+        return ResponseEntity.ok(userService.getUsers(keyword, status, pageable));
+    }
+
+    // 전체 직원 통계 (검색/필터와 관계없이 ACTIVE + INACTIVE 기준)
+    @Operation(
+            summary = "계정관리 상단 통계 조회",
+            description = "SUPER_ADMIN 전용. 삭제된 계정을 제외한 전체·활성·비활성 직원 수를 반환합니다."
+    )
+    @GetMapping("/stats")
+    public ResponseEntity<UserDto.StatsResponse> getUserStats() {
+        return ResponseEntity.ok(userService.getUserStats());
     }
 
     // 직원 상세 조회
@@ -80,7 +94,7 @@ public class UserController {
     // 현재 로그인한 사용자 정보 조회
     @Operation(summary = "내 정보 조회", description = "로그인한 직원이 JWT 인증 정보의 사용자 ID를 기준으로 본인 정보를 조회합니다. 다른 직원 ID를 직접 지정할 수 없습니다.")
     @GetMapping("/me")
-    public ResponseEntity<AuthDto.MeResponse> me(
+    public ResponseEntity<UserDto.MeResponse> me(
             @AuthenticationPrincipal CustomUserDetails principal
     ) {
         // 인증된 사용자 ID로 사용자 정보 조회
