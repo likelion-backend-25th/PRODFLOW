@@ -53,10 +53,7 @@ public abstract class BaseTimeEntity { // 추상 클래스 new 생성 안됨
     @PreUpdate
     public void preUpdate() {
         updatedAt = LocalDateTime.now();
-
-        if (!"SYSTEM".equals(getPrincipalUserName())) {
-            updatedBy = getPrincipalUserName();
-        }
+        updatedBy = getPrincipalUserName();
     }
 
     private String getPrincipalUserName() {
