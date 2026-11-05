@@ -29,8 +29,7 @@ public class PaymentHistory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
-            name = "virtual_account_id",
-            nullable = false
+            name = "virtual_account_id"
     )
     private VirtualAccount virtualAccount;
 
