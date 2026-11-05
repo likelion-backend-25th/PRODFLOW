@@ -10,6 +10,7 @@ import net.likelion.bebc25.prodflow.line.dto.LineDto;
 import net.likelion.bebc25.prodflow.line.serivce.LineService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,6 +27,36 @@ public class LineController {
 
     private final LineService lineService; // 등록 로직은 서비스
 
+    @Operation(
+            summary = "생산라인 목록",
+            description = "모든 라인을 조회한다. 생산 중인 작업이 없으면 작업 번호, 품목, 수주, 담당자는 null이다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "조회 성공",
+            content = @Content(schema = @Schema(implementation = LineDto.ListResponse.class))
+    )
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @GetMapping
+    public ResponseEntity<LineDto.ListResponse> findAll() {
+        return ResponseEntity.ok(lineService.findAll());
+    }
+
+    @Operation(
+            summary = "생산라인 상세",
+            description = "라인 정보, 현재 생산 작업, 배정된 작업지시, 생산량 변경 이력을 조회한다. 생산 중인 작업이 없으면 현재 작업 정보는 null이다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "조회 성공",
+            content = @Content(schema = @Schema(implementation = LineDto.DetailResponse.class))
+    )
+    @ApiResponse(responseCode = "400", description = "라인을 찾을 수 없음")
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @GetMapping("/{lineId}")
+    public ResponseEntity<LineDto.DetailResponse> findByLineId(@PathVariable Long lineId) {
+        return ResponseEntity.ok(lineService.findByLineId(lineId));
+    }
 
     @Operation(
             summary = "생산라인 등록",

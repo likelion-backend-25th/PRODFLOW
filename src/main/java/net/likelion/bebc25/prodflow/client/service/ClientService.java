@@ -6,6 +6,7 @@ import net.likelion.bebc25.prodflow.client.dto.ClientDto;
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
 import net.likelion.bebc25.prodflow.common.domain.Address;
+import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import org.apache.poi.ss.usermodel.Row;
@@ -31,26 +32,29 @@ import java.util.List;
 public class ClientService {
     private final ClientRepository clientRepository;
     private final UserRepository userRepository;
-
+    private final CustomerOrderRepository customerOrderRepository;
 
     @Transactional
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public ClientDto.DetailResponse createClient(ClientDto.Request request) {
-        // Order 관련 임시값
-        int totalOrder = 0;
-        Long totalAmount = 0L;
-        int ongoingOrders = 0;
-
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않은 사용자입니다. id = " + request.userId()));
 
         Client client = clientRepository.save(request.toEntity(user));
+
+        Long totalOrder = customerOrderRepository.countByClientId(client.getId());
+        Long totalAmount = customerOrderRepository.sumTotalAmountByClientId(client.getId());
+        Long ongoingOrders = customerOrderRepository.countActiveOrdersByClientId(client.getId());
+
         return ClientDto.DetailResponse.from(client, totalOrder, totalAmount, ongoingOrders);
     }
 
     @Transactional
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public List<ClientDto.ImportResponse> registerClients(MultipartFile multipartFile) {
+        if (multipartFile == null) {
+            throw new IllegalArgumentException("파일이 존재하지 않습니다.");
+        }
         if (!multipartFile.getOriginalFilename().endsWith(".xlsx")
                 && !multipartFile.getOriginalFilename().endsWith(".xls")) {
             throw new IllegalArgumentException("엑셀 파일(.xlsx, .xls)이 아닙니다.");
@@ -86,10 +90,9 @@ public class ClientService {
     @Transactional
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public ClientDto.DetailResponse updateClient(Long clientId, ClientDto.Request request) {
-        // Order 관련 임시값
-        int totalOrder = 3;
-        Long totalAmount = 12340000L;
-        int ongoingOrders = 1;
+        Long totalOrder = customerOrderRepository.countByClientId(clientId);
+        Long totalAmount = customerOrderRepository.sumTotalAmountByClientId(clientId);
+        Long ongoingOrders = customerOrderRepository.countActiveOrdersByClientId(clientId);
 
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 거래처 입니다. id = " + clientId));
@@ -110,10 +113,9 @@ public class ClientService {
     }
 
     public ClientDto.DetailResponse getClientDetail(Long clientId) {
-        // Order 관련 임시값
-        int totalOrder = 3;
-        Long totalAmount = 12340000L;
-        int ongoingOrders = 1;
+        Long totalOrder = customerOrderRepository.countByClientId(clientId);
+        Long totalAmount = customerOrderRepository.sumTotalAmountByClientId(clientId);
+        Long ongoingOrders = customerOrderRepository.countActiveOrdersByClientId(clientId);
 
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않은 거래처 입니다. id = " + clientId));
@@ -128,9 +130,8 @@ public class ClientService {
                 : clientRepository.findAll(pageable);
 
         return clients.map(client -> {
-            // Order 관련 임시값
-            int totalOrder = 3;
-            Long totalAmount = 12340000L;
+            Long totalOrder = customerOrderRepository.countByClientId(client.getId());
+            Long totalAmount = customerOrderRepository.sumTotalAmountByClientId(client.getId());
             LocalDateTime recentOrderedAt = LocalDateTime.now();
 
             return ClientDto.Response.from(

@@ -6,14 +6,12 @@ import net.likelion.bebc25.prodflow.holiday.dto.HolidayImportResponse;
 import net.likelion.bebc25.prodflow.holiday.dto.HolidayResponse;
 import net.likelion.bebc25.prodflow.holiday.service.HolidayService;
 import net.likelion.bebc25.prodflow.holiday.service.HolidaySyncService;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -30,7 +28,7 @@ public class HolidayController {
         return ResponseEntity.ok(holidayService.findCurrentYearHolidays());
     }
 
-    @Operation(summary = "연도별 공휴일 수집", description = "최고 관리자가 Nager.Date의 한국 공휴일을 수집해 신규 날짜만 저장한다.")
+    @Operation(summary = "연도별 공휴일 수집", description = "최고 관리자가 공공데이터포털 한국천문연구원 특일 정보의 공휴일을 수집해 신규 날짜만 저장한다.")
     @PostMapping("/import")
     public ResponseEntity<HolidayImportResponse> importHolidays(
             @RequestParam(name = "year", required = false) String year
@@ -40,10 +38,10 @@ public class HolidayController {
         try {
             requestedYear = Integer.parseInt(year);
         } catch (NumberFormatException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연도는 1~9999의 정수로 입력해주세요.");
+            throw new IllegalArgumentException("연도는 1~9999의 정수로 입력해주세요.", e);
         }
         if (requestedYear < 1 || requestedYear > 9999) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연도는 1~9999의 정수로 입력해주세요.");
+            throw new IllegalArgumentException("연도는 1~9999의 정수로 입력해주세요.");
         }
 
         int addedCount = holidaySyncService.importHolidays(requestedYear);

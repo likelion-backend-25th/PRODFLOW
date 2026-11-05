@@ -37,7 +37,7 @@ public class Payment {
     private CustomerOrder order;
 
     @Enumerated(EnumType.STRING)
-    @Column
+    @Column(nullable = false)
     private PaymentMethod paymentMethod = PaymentMethod.VA;
 
     @Column(nullable = false)

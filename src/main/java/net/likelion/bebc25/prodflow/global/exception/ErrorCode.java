@@ -34,6 +34,12 @@ public enum ErrorCode {
             HttpStatus.FORBIDDEN
     ),
 
+    EXTERNAL_API_ERROR(
+            "EXTERNAL_API_ERROR",
+            "외부 서비스 연동에 실패했습니다. 잠시 후 다시 시도해주세요.",
+            HttpStatus.BAD_GATEWAY
+    ),
+
     INTERNAL_SERVER_ERROR(
             "INTERNAL_SERVER_ERROR",
             "서버 내부 처리 중 오류가 발생했습니다.",

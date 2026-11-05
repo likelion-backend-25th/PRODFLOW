@@ -199,10 +199,10 @@ class QuotationSeedTest {
             long expectedTotal = items.findByQuotationIdOrderByIdAsc(quotation.getId()).stream()
                     .mapToLong(item -> item.getLineAmount()).sum();
             assertThat(quotation.getTotalAmount()).isEqualTo(expectedTotal);
-            assertThat(quotation.getContactName()).isNotBlank();
-            assertThat(quotation.getAddress()).isNotBlank();
-            assertThat(quotation.getEmail()).isNotBlank();
-            assertThat(quotation.getPhone()).isNotBlank();
+            assertThat(quotation.getClientName()).isNotBlank();
+            assertThat(quotation.getClientAddress()).isNotBlank();
+            assertThat(quotation.getClientEmail()).isNotBlank();
+            assertThat(quotation.getClientPhone()).isNotBlank();
         });
         var orders = schedules.findActiveOrders();
         assertThat(orders).anyMatch(order -> "PRODUCTION_READY".equals(order.getStatusCode().getCode()));

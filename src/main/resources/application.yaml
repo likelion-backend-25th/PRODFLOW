@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: PRODFLOW
   servlet:
@@ -28,6 +30,22 @@ spring:
     init:
       mode: always
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
 
 # Springdoc OpenAPI 및 Swagger UI 설정
 springdoc:
@@ -55,7 +73,8 @@ logging:
 
 holiday:
   api:
-    base-url: https://date.nager.at
+    base-url: https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService
+    service-key: ${HOLIDAY_API_KEY:}
   initialization:
     # 운영 서버에서 true로 설정하면 시작 시 올해·다음 해 데이터를 수집
     enabled: ${HOLIDAY_INITIALIZATION_ENABLED:true}

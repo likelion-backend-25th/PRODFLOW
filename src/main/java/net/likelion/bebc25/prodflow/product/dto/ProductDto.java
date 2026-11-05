@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class ProductDto {
@@ -68,6 +69,22 @@ public class ProductDto {
     public record ModelCodeExistsResponse(
             String modelCode,
             boolean available
+    ) {
+    }
+
+    @Schema(name = "ProductOrderHistoryResponse")
+    public record OrderHistoryResponse(
+            Long orderId,
+            String orderNo,
+            String clientName,
+            String productName,
+            int quantity,
+            Long unitPrice,
+            Long lineAmount,
+            Long totalAmount,
+            LocalDate estimatedDueDate,
+            String statusCode,
+            String statusName
     ) {
     }
 
