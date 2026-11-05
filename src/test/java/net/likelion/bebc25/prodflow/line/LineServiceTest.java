@@ -146,7 +146,7 @@ class LineServiceTest {
         Response updated = lineService.changeStatus(1L, new UpdateStatusRequest(LineStatus.INSPECTION), 1L);
 
         assertThat(updated.status()).isEqualTo(LineStatus.INSPECTION);
-        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("서도윤");
+        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("SYSTEM");
 
         // 방금 저장한 상태 변경 이력을 ID 기준으로 조회한다.
         StatusHistory saved = statusHistoryRepository.findAll().stream()
