@@ -143,17 +143,7 @@ class LineServiceTest {
     @DisplayName("라인 상태를 바꾸면 enum 이름이 status_history에 남는다")
     void changeLineStatus() {
         // 시드 A라인은 OPERATING이다. 직원 1의 이름은 서도윤이다.
-        long historyCount = statusHistoryRepository.findAll().stream()
-                .filter(history -> history.getEntity() == HistoryEntityType.LINE
-                        && history.getEntityId().equals(1L)
-                        && "INSPECTION".equals(history.getToStatus()))
-                .count();
-
-        Response updated = lineService.changeStatus(
-                1L,
-                new UpdateStatusRequest(LineStatus.INSPECTION),
-                1L
-        );
+        Response updated = lineService.changeStatus(1L, new UpdateStatusRequest(LineStatus.INSPECTION), 1L);
 
         assertThat(updated.status()).isEqualTo(LineStatus.INSPECTION);
         assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("SYSTEM");
