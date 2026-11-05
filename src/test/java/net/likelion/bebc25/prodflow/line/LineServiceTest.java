@@ -148,33 +148,21 @@ class LineServiceTest {
     }
 
 
-    // 생산라인 상태 알림 구현으로 인한 일부 수정
     @Test
     @DisplayName("라인 상태를 바꾸면 enum 이름이 status_history에 남는다")
     void changeLineStatus() {
         // 시드 A라인은 OPERATING이다. 직원 1의 이름은 서도윤이다.
-        long historyCount = statusHistoryRepository.findAll().stream()
-                .filter(history -> history.getEntity() == HistoryEntityType.LINE
-                        && history.getEntityId().equals(1L)
-                        && "INSPECTION".equals(history.getToStatus()))
-                .count();
-
-        Response updated = lineService.changeStatus(
-                1L,
-                new UpdateStatusRequest(LineStatus.INSPECTION),
-                1L
-        );
+        Response updated = lineService.changeStatus(1L, new UpdateStatusRequest(LineStatus.INSPECTION), 1L);
 
         assertThat(updated.status()).isEqualTo(LineStatus.INSPECTION);
-        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy())
-                .isEqualTo("서도윤");
+        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("서도윤");
 
+        // 방금 저장한 상태 변경 이력을 ID 기준으로 조회한다.
         StatusHistory saved = statusHistoryRepository.findAll().stream()
                 .filter(history -> history.getEntity() == HistoryEntityType.LINE
                         && history.getEntityId().equals(1L)
                         && "INSPECTION".equals(history.getToStatus()))
-                .skip(historyCount)
-                .findFirst()
+                .max((a, b) -> a.getId().compareTo(b.getId()))
                 .orElseThrow();
 
         // name() 결과가 이력의 변경 전, 변경 후 문자열이다.
