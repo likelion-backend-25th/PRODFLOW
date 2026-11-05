@@ -182,6 +182,9 @@ public class Quotation extends BaseTimeEntity {
 
     // 승인 상태 변경
     public void approve() {
+        if (status != QuotationStatus.SENT) {
+            throw new IllegalArgumentException("발송완료 견적만 승인할 수 있습니다.");
+        }
         this.status = QuotationStatus.APPROVED;
     }
 

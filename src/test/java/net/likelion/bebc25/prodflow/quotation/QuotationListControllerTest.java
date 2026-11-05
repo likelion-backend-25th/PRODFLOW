@@ -71,7 +71,7 @@ class QuotationListControllerTest {
 
     @Test
     void invalidStatusReturns400WithoutCallingService() throws Exception {
-        for (String invalid : List.of("UNKNOWN", "approved", "", " ")) {
+        for (String invalid : List.of("UNKNOWN", "approved")) {
             mvc.perform(get("/api/v1/quotations").param("status", invalid))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
                     .andExpect(jsonPath("$.status").value(400))
@@ -80,6 +80,15 @@ class QuotationListControllerTest {
                     .andExpect(jsonPath("$.message").value("status 값은 DRAFT, SENT, APPROVED, REJECTED, CANCELLED, EXPIRED 중 하나여야 합니다."));
         }
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void emptyAndWhitespaceStatusUseAllStatuses() throws Exception {
+        for (String value : List.of("", " ", "\t")) {
+            mvc.perform(get("/api/v1/quotations").param("status", value))
+                    .andExpect(status().isOk());
+        }
+        verify(service, times(3)).getQuotationList(isNull(), isNull(), eq(QuotationSortType.CREATED_AT), any(Pageable.class));
     }
 
     @Test

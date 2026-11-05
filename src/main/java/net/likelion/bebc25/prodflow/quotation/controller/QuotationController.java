@@ -23,6 +23,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.InitBinder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -77,6 +78,25 @@ public class QuotationController {
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         QuotationStatusDto.ExpirationResponse response = quotationStatusService.expireQuotations(userDetails.getUserId());
+        return ResponseEntity.ok(response);
+    }
+
+    // 거래처의 견적 승인 반영
+    @Operation(summary = "견적 승인", description = "유효기간 내 SENT 견적을 APPROVED로 변경한다. 이미 승인된 견적은 현재 상세를 반환하며 수주를 생성하지 않는다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "승인 처리 완료 및 견적 상세 반환"),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "403", description = "권한 또는 계정 조건 미충족", content = @Content),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 견적", content = @Content),
+            @ApiResponse(responseCode = "409", description = "처리 불가 상태 또는 유효기간 경과", content = @Content)
+    })
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    @PatchMapping("/{quotationId}/approve")
+    public ResponseEntity<QuotationDto.DetailResponse> approve(
+            @PathVariable Long quotationId,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        QuotationDto.DetailResponse response = quotationStatusService.approve(quotationId, userDetails.getUserId());
         return ResponseEntity.ok(response);
     }
 
@@ -150,9 +170,28 @@ public class QuotationController {
             // 견적 상태 문자열 변환
             @Override
             public void setAsText(String text) {
-                setValue(QuotationStatus.valueOf(text));
+                setValue(text == null || text.isBlank() ? null : QuotationStatus.valueOf(text));
             }
         });
+    }
+
+    // 견적 초안 삭제
+    @Operation(summary = "견적 초안 삭제", description = "DRAFT 견적과 품목을 삭제하고 PDF를 정리한다. 거래처는 유지한다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "초안 삭제 완료"),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "403", description = "권한 또는 계정 조건 미충족", content = @Content),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 견적", content = @Content),
+            @ApiResponse(responseCode = "409", description = "초안이 아닌 견적", content = @Content)
+    })
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    @DeleteMapping("/{quotationId}")
+    public ResponseEntity<Void> deleteDraft(
+            @PathVariable Long quotationId,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        quotationStatusService.deleteDraft(quotationId, userDetails.getUserId());
+        return ResponseEntity.noContent().build();
     }
 
     // 견적 초안 저장 및 PDF 준비
@@ -255,7 +294,7 @@ public class QuotationController {
     // 견적 목록 조회
     @Operation(
             summary = "견적 목록 조회",
-            description = "검색어와 상태로 견적 목록을 조회한다. 상태를 생략하면 전체 상태를 조회한다. "
+            description = "검색어와 상태로 견적 목록을 조회한다. 상태를 생략하거나 빈 값·공백이면 DRAFT를 포함한 전체 상태를 조회한다. "
                     + "선택한 날짜 기준 내림차순으로 정렬하고, 같은 날짜는 ID 내림차순으로 정렬한다. "
                     + "기간은 startDate와 endDate로 입력하며 날짜 형식은 yyyy-MM-dd이다. 생략하거나 빈 값이면 날짜 조건을 지정하지 않은 것으로 본다. "
                     + "현재 기간 파라미터는 입력 형식 검증만 수행하며 실제 조회 조건 연결은 후속 단계에서 적용한다. "
@@ -270,7 +309,7 @@ public class QuotationController {
             @Parameter(description = "검색어 (견적번호, 거래처명, 작성자)", example = "QT-20261103")
             @RequestParam(required = false) String keyword, // 값없으면 null
             @Parameter(description = "견적 상태 (생략 시 전체)",
-                    schema = @Schema(allowableValues = {"SENT", "APPROVED", "REJECTED", "CANCELLED", "EXPIRED"}))
+                    schema = @Schema(allowableValues = {"DRAFT", "SENT", "APPROVED", "REJECTED", "CANCELLED", "EXPIRED"}))
             @RequestParam(required = false) QuotationStatus status,
             @Parameter(description = "정렬 기준 (작성일, 희망 납기일, 예상 납기일, 유효기간)", schema = @Schema(defaultValue = "CREATED_AT",
                     allowableValues = {"CREATED_AT", "REQUESTED_DUE_DATE", "ESTIMATED_DUE_DATE", "VALID_UNTIL"}))

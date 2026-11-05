@@ -5,7 +5,23 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/v1/quotations"
+  url: "{{baseUrl}}/api/v1/quotations?keyword=&status=&sortType=CREATED_AT&page=0&size=12"
+  params:
+    - name: keyword
+      value: ""
+      type: query
+    - name: status
+      value: ""
+      type: query
+    - name: sortType
+      value: CREATED_AT
+      type: query
+    - name: page
+      value: "0"
+      type: query
+    - name: size
+      value: "12"
+      type: query
   auth: inherit
 
 settings:

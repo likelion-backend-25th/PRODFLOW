@@ -1,0 +1,20 @@
+info:
+  name: 견적 삭제
+  type: http
+  seq: 13
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/quotations/:quotationId"
+  params:
+    - name: quotationId
+      value: "13"
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
