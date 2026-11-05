@@ -349,8 +349,67 @@ class QuotationCreateTest {
     }
 
     @Test
-    void rejectionAndCancellationPreserveDocumentAndRepeatedRequestIsIdempotent() {
-        for (QuotationStatus target : List.of(QuotationStatus.REJECTED, QuotationStatus.CANCELLED)) {
+    void deletesDraftItemsAndPdfAfterCommitWhilePreservingNewClient() {
+        var draft = pdfStorageService.create(newClientRequest("삭제 후 유지할 거래처", List.of(item(100, 1000L))), userId);
+        Long id = draft.quotationId();
+        var client = quotationRepository.findById(id).orElseThrow().getClient();
+        String key = quotationRepository.findById(id).orElseThrow().getPdfObjectKey();
+        org.mockito.Mockito.clearInvocations(storageClient, mailService);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            assertThat(quotationRepository.existsById(id)).isFalse();
+            files.remove(key);
+            return null;
+        }).when(storageClient).delete(key);
+        statusService.deleteDraft(id, userId);
+        assertThat(quotationRepository.existsById(id)).isFalse();
+        assertThat(itemRepository.findByQuotationIdOrderByIdAsc(id)).isEmpty();
+        assertThat(clientRepository.existsById(client.getId())).isTrue();
+        assertThat(files).doesNotContainKey(key);
+        org.mockito.Mockito.verify(storageClient).delete(key);
+        org.mockito.Mockito.verifyNoInteractions(mailService);
+    }
+
+    @Test
+    void deletesDraftWithNullPdfKeyAndIgnoresStorageFailure() {
+        var draft = service.create(request(List.of(item(100, 1000L))), userId);
+        String key = "quotations/" + draft.quotationNo() + ".pdf";
+        org.mockito.Mockito.doThrow(new IllegalStateException("S3 삭제 실패")).when(storageClient).delete(key);
+        statusService.deleteDraft(draft.id(), userId);
+        assertThat(quotationRepository.existsById(draft.id())).isFalse();
+        assertThat(itemRepository.findByQuotationIdOrderByIdAsc(draft.id())).isEmpty();
+        org.mockito.Mockito.verify(storageClient).delete(key);
+    }
+
+    @Test
+    void deletionRejectsEveryNonDraftStateAndMissingQuotation() {
+        for (QuotationStatus source : QuotationStatus.values()) {
+            if (source == QuotationStatus.DRAFT) {
+                continue;
+            }
+            Long id = createStatusFixture(source, today());
+            assertStatusConflict(() -> statusService.deleteDraft(id, userId));
+            assertThat(quotationRepository.findById(id).orElseThrow().getStatus()).isEqualTo(source);
+            assertThat(itemRepository.findByQuotationIdOrderByIdAsc(id)).isNotEmpty();
+        }
+        assertThatThrownBy(() -> statusService.deleteDraft(Long.MAX_VALUE, userId)).isInstanceOf(NoSuchElementException.class);
+        org.mockito.Mockito.verifyNoInteractions(storageClient, mailService);
+    }
+
+    @Test
+    void draftDeletionRequiresPermissionAndActiveAccount() {
+        Long id = createStatusFixture(QuotationStatus.DRAFT, today());
+        authenticateAs(UserRole.INQUIRY_MANAGER);
+        assertThatThrownBy(() -> statusService.deleteDraft(id, userId)).isInstanceOf(AccessDeniedException.class);
+        authenticateAs(UserRole.ORDER_MANAGER);
+        tx().executeWithoutResult(status -> em.find(User.class, userId).deactivate());
+        assertThatThrownBy(() -> statusService.deleteDraft(id, userId)).isInstanceOf(AccessDeniedException.class);
+        assertThat(quotationRepository.existsById(id)).isTrue();
+        org.mockito.Mockito.verifyNoInteractions(storageClient);
+    }
+
+    @Test
+    void approvalRejectionAndCancellationPreserveDocumentAndRepeatedRequestIsIdempotent() {
+        for (QuotationStatus target : List.of(QuotationStatus.APPROVED, QuotationStatus.REJECTED, QuotationStatus.CANCELLED)) {
             var preview = pdfStorageService.create(request(List.of(item(100, 1000L))), userId);
             Long id = preview.quotationId();
             tx().executeWithoutResult(status -> em.find(Quotation.class, id).sent());
@@ -359,13 +418,19 @@ class QuotationCreateTest {
             byte[] pdf = files.get(key).content().clone();
             org.mockito.Mockito.clearInvocations(storageClient, mailService);
 
-            var result = target == QuotationStatus.REJECTED
-                    ? statusService.reject(id, userId) : statusService.cancel(id, userId);
+            var result = switch (target) {
+                case APPROVED -> statusService.approve(id, userId);
+                case REJECTED -> statusService.reject(id, userId);
+                default -> statusService.cancel(id, userId);
+            };
             assertThat(result).usingRecursiveComparison().ignoringFields("status", "updatedAt").isEqualTo(before);
             assertThat(result.status()).isEqualTo(target);
             var changedAt = quotationRepository.findById(id).orElseThrow().getUpdatedAt();
-            var duplicate = target == QuotationStatus.REJECTED
-                    ? statusService.reject(id, userId) : statusService.cancel(id, userId);
+            var duplicate = switch (target) {
+                case APPROVED -> statusService.approve(id, userId);
+                case REJECTED -> statusService.reject(id, userId);
+                default -> statusService.cancel(id, userId);
+            };
             assertThat(duplicate.status()).isEqualTo(target);
             assertThat(quotationRepository.findById(id).orElseThrow().getUpdatedAt()).isEqualTo(changedAt);
             assertThat(quotationRepository.findById(id).orElseThrow().getPdfObjectKey()).isEqualTo(key);
@@ -381,6 +446,9 @@ class QuotationCreateTest {
                 continue;
             }
             var draft = createStatusFixture(source, today().plusDays(1));
+            if (source != QuotationStatus.APPROVED) {
+                assertStatusConflict(() -> statusService.approve(draft, userId));
+            }
             if (source != QuotationStatus.REJECTED) {
                 assertStatusConflict(() -> statusService.reject(draft, userId));
             }
@@ -391,16 +459,53 @@ class QuotationCreateTest {
         }
         assertThatThrownBy(() -> statusService.reject(Long.MAX_VALUE, userId))
                 .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> statusService.approve(Long.MAX_VALUE, userId))
+                .isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
     void expiredSentCannotBeManuallyRejectedOrCancelledButLastValidDayIsAllowed() {
         Long expired = createStatusFixture(QuotationStatus.SENT, today().minusDays(1));
+        assertStatusConflict(() -> statusService.approve(expired, userId));
         assertStatusConflict(() -> statusService.reject(expired, userId));
         assertStatusConflict(() -> statusService.cancel(expired, userId));
         assertThat(quotationRepository.findById(expired).orElseThrow().getStatus()).isEqualTo(QuotationStatus.SENT);
         Long valid = createStatusFixture(QuotationStatus.SENT, today());
         assertThat(statusService.reject(valid, userId).status()).isEqualTo(QuotationStatus.REJECTED);
+        Long lastDay = createStatusFixture(QuotationStatus.SENT, today());
+        assertThat(statusService.approve(lastDay, userId).status()).isEqualTo(QuotationStatus.APPROVED);
+        Long alreadyApproved = createStatusFixture(QuotationStatus.APPROVED, today().minusDays(1));
+        assertThat(statusService.approve(alreadyApproved, userId).status()).isEqualTo(QuotationStatus.APPROVED);
+    }
+
+    @Test
+    void entityApprovalRejectsEveryNonSentState() {
+        for (QuotationStatus source : QuotationStatus.values()) {
+            var quotation = instantiate(Quotation.class);
+            ReflectionTestUtils.setField(quotation, "status", source);
+            if (source == QuotationStatus.SENT) {
+                quotation.approve();
+                assertThat(quotation.getStatus()).isEqualTo(QuotationStatus.APPROVED);
+            } else {
+                assertThatThrownBy(quotation::approve).isInstanceOf(IllegalArgumentException.class);
+                assertThat(quotation.getStatus()).isEqualTo(source);
+            }
+        }
+    }
+
+    @Test
+    void approvalRequiresPasswordChangeAndAllowsSuperAdmin() {
+        Long id = createStatusFixture(QuotationStatus.SENT, today());
+        tx().executeWithoutResult(status -> ReflectionTestUtils.setField(
+                em.find(User.class, userId), "mustChangePassword", true));
+        assertThatThrownBy(() -> statusService.approve(id, userId)).isInstanceOf(AccessDeniedException.class);
+        tx().executeWithoutResult(status -> {
+            var user = em.find(User.class, userId);
+            user.changePassword("changed");
+            ReflectionTestUtils.setField(user, "role", UserRole.SUPER_ADMIN);
+        });
+        authenticateAs(UserRole.SUPER_ADMIN);
+        assertThat(statusService.approve(id, userId).status()).isEqualTo(QuotationStatus.APPROVED);
     }
 
     @Test
@@ -464,11 +569,13 @@ class QuotationCreateTest {
     void statusActionsCheckMethodPermissionAndCurrentDatabaseAccount() {
         Long id = createStatusFixture(QuotationStatus.SENT, today());
         authenticateAs(UserRole.INQUIRY_MANAGER);
+        assertThatThrownBy(() -> statusService.approve(id, userId)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> statusService.reject(id, userId)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> statusService.cancel(id, userId)).isInstanceOf(AccessDeniedException.class);
         authenticateAs(UserRole.ORDER_MANAGER);
         tx().executeWithoutResult(status -> ReflectionTestUtils.setField(
                 em.find(User.class, userId), "role", UserRole.INQUIRY_MANAGER));
+        assertThatThrownBy(() -> statusService.approve(id, userId)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> statusService.reject(id, userId)).isInstanceOf(AccessDeniedException.class);
         tx().executeWithoutResult(status -> {
             var user = em.find(User.class, userId);
@@ -477,6 +584,7 @@ class QuotationCreateTest {
         });
         assertThatThrownBy(() -> statusService.cancel(id, userId)).isInstanceOf(AccessDeniedException.class);
         assertThat(quotationRepository.findById(id).orElseThrow().getStatus()).isEqualTo(QuotationStatus.SENT);
+        assertThatThrownBy(() -> statusService.approve(id, userId)).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
