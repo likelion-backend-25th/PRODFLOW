@@ -11,10 +11,13 @@ import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.line.repsitory.LineCapacityLogRepository;
 import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
+import net.likelion.bebc25.prodflow.work_order.serivce.WorkOrderService;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,7 @@ public class LineService {
     private final UserRepository userRepository;
     private final LineCapacityLogRepository lineCapacityLogRepository; // 라인 변경시 이력을 저장
     private final StatusHistoryRepository statusHistoryRepository; // 상태 변경시 이력을 저장
+    private final WorkOrderService workOrderService;
 
     // 생산라인 목록. 카드 한 장과 상단 집계를 한 응답으로 만든다.
     public LineDto.ListResponse findAll() {
@@ -204,6 +208,14 @@ public class LineService {
         boolean isNameChanged = !line.getLineName().equals(lineName);
         // 생산량을 수정했는지 여부
         boolean isCapacityChanged = line.getProductionCapacity() != request.productionCapacity();
+        // 하루 생산량은 수주 관리자도 바꾸지만, 라인 이름은 최고 관리자만 바꾼다.
+        if (isNameChanged && user.getRole() != UserRole.SUPER_ADMIN) {
+            throw new AccessDeniedException("라인 이름은 최고 관리자만 수정할 수 있습니다.");
+        }
+        // 줄어든 생산능력이 기존 계획을 담지 못하면 라인과 이력을 바꾸지 않는다.
+        if (isCapacityChanged && request.productionCapacity() < line.getProductionCapacity()) {
+            workOrderService.assertPlansWithinCapacity(line.getId(), request.productionCapacity());
+        }
 
         if (isNameChanged && isCapacityChanged) {
             line.changeName(lineName);
