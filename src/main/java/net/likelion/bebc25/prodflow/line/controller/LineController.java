@@ -83,7 +83,7 @@ public class LineController {
 
     @Operation(
             summary = "생산라인 수정",
-            description = "최고 관리자, 수주 관리자가 라인 이름과 하루 생산량을 수정한다. 생산량이 바뀔 때만 변경 이력을 남긴다."
+            description = "최고 관리자, 수주 관리자가 하루 생산량을 수정한다. 라인 이름은 최고 관리자만 수정한다. 생산량이 바뀔 때만 변경 이력을 남긴다."
     )
     @ApiResponse(
             responseCode = "200",

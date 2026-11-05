@@ -4,10 +4,15 @@ import net.likelion.bebc25.prodflow.product.dto.ProductDto;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto.Response;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.product.service.ProductService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -20,6 +25,22 @@ class ProductServiceTest {
 
     @Autowired
     ProductService productService;
+
+    @BeforeEach
+    void authenticateAsOrderManager() {
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(
+                        "test-user",
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_ORDER_MANAGER"))
+                )
+        );
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     @DisplayName("품목 상세 및 목록 조회")

@@ -7,7 +7,7 @@ import net.likelion.bebc25.prodflow.quotation.dto.QuotationScheduleDto;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationRescheduleService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationSchedulePreviewService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationService;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -30,7 +30,7 @@ class QuotationRescheduleControllerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new QuotationController(mock(QuotationService.class),
-                        mock(QuotationSchedulePreviewService.class), service, mock(QuotationPdfService.class)))
+                        mock(QuotationSchedulePreviewService.class), service, mock(QuotationPdfStorageService.class), null, null))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 

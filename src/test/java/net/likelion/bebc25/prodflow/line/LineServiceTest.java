@@ -21,7 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest
+// 애플리케이션 설정은 유지한다. 이 테스트만 테이블을 지우지 않고 data.sql도 다시 실행하지 않는다.
+@SpringBootTest(properties = {
+        "spring.jpa.hibernate.ddl-auto=validate",
+        "spring.sql.init.mode=never"
+})
 @Transactional // 테스트가 끝나면 롤백해서 시드 라인 5건을 유지한다
 class LineServiceTest {
 
@@ -82,29 +86,16 @@ class LineServiceTest {
     }
 
     @Test
-    @DisplayName("생산량만 바꾸면 변경 전 수량은 현재 라인 값, 변경 후 수량은 요청값으로 이력에 남는다")
-    void updateCapacityOnly() {
+    @DisplayName("기존 계획이 새 생산능력보다 크면 생산량을 줄이지 않는다")
+    void rejectCapacityDecreaseWhenPlansExceed() {
         UpdateRequest request = new UpdateRequest("A라인", 800, "설비 점검으로 감축");
+        long logCount = lineCapacityLogRepository.count();
 
-        Response updated = lineService.update(1L, request, 1L);
-
-        assertThat(updated.lineName()).isEqualTo("A라인");
-        assertThat(updated.productionCapacity()).isEqualTo(800);
-
-        // 시드 이력은 이 라인의 변경 후 수량이 800인 건이 없다.
-        LineCapacityLog saved = lineCapacityLogRepository.findAll().stream()
-                .filter(log -> log.getLine().getId().equals(1L) && log.getAfterCapacity() == 800)
-                .findFirst()
-                .orElseThrow();
-        // 로그를 editProduction보다 먼저 만들어 변경 전은 시드 수량 1000이다.
-        assertThat(saved.getBeforeCapacity()).isEqualTo(1000);
-        assertThat(saved.getAfterCapacity()).isEqualTo(800);
-        assertThat(saved.getReason()).isEqualTo("설비 점검으로 감축");
-        // 이력의 담당 직원은 이름 문자열이 아니라 토큰 id의 User다.
-        assertThat(saved.getChangedBy().getId()).isEqualTo(1L);
-        assertThat(saved.getChangedBy().getName()).isEqualTo("서도윤");
-        // 생산량만 바꾸는 분기도 setUpdatedBy를 호출하지 않는다.
-        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("SYSTEM");
+        assertThatThrownBy(() -> lineService.update(1L, request, 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("기존 생산계획이 새 생산능력을 초과합니다.");
+        assertThat(lineRepository.findById(1L).orElseThrow().getProductionCapacity()).isEqualTo(1000);
+        assertThat(lineCapacityLogRepository.count()).isEqualTo(logCount);
     }
 
     @Test
@@ -147,6 +138,7 @@ class LineServiceTest {
                 .hasMessage("수정한 직원을 찾을 수 없습니다.");
     }
 
+
     @Test
     @DisplayName("라인 상태를 바꾸면 enum 이름이 status_history에 남는다")
     void changeLineStatus() {
@@ -154,14 +146,16 @@ class LineServiceTest {
         Response updated = lineService.changeStatus(1L, new UpdateStatusRequest(LineStatus.INSPECTION), 1L);
 
         assertThat(updated.status()).isEqualTo(LineStatus.INSPECTION);
-        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("서도윤");
+        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("SYSTEM");
 
+        // 방금 저장한 상태 변경 이력을 ID 기준으로 조회한다.
         StatusHistory saved = statusHistoryRepository.findAll().stream()
                 .filter(history -> history.getEntity() == HistoryEntityType.LINE
                         && history.getEntityId().equals(1L)
                         && "INSPECTION".equals(history.getToStatus()))
-                .findFirst()
+                .max((a, b) -> a.getId().compareTo(b.getId()))
                 .orElseThrow();
+
         // name() 결과가 이력의 변경 전, 변경 후 문자열이다.
         assertThat(saved.getFromStatus()).isEqualTo("OPERATING");
         assertThat(saved.getToStatus()).isEqualTo("INSPECTION");

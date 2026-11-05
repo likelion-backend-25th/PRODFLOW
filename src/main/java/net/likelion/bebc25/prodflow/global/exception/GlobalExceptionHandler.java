@@ -3,6 +3,9 @@ package net.likelion.bebc25.prodflow.global.exception;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import net.likelion.bebc25.prodflow.auth.exception.AuthException;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationPdfDto;
+import net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -12,10 +15,12 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
+import java.net.URI;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
@@ -23,6 +28,15 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(QuotationPdfPreparationException.class)
+    public ResponseEntity<QuotationPdfDto.FailureResponse> handlePdfFailure(QuotationPdfPreparationException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .header("X-Quotation-Id", ex.getQuotationId().toString())
+                .location(URI.create("/api/v1/quotations/" + ex.getQuotationId()))
+                .body(QuotationPdfDto.FailureResponse.from(ex));
+    }
 
     // 요청 파라미터 타입 변환 실패 시 호출됨 (400 Bad Request 응답)
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -139,6 +153,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleExternalApiException(ExternalApiException ex) {
         log.error("외부 API 연동 실패: {}", ex.getMessage(), ex);
         ApiErrorResponse response = ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR);
+        return ResponseEntity.status(ErrorCode.EXTERNAL_API_ERROR.getHttpStatus()).body(response);
+    }
+
+    // RestClient를 통한 외부 API 호출 또는 응답 처리 실패 시 호출됨 (502 Bad Gateway 응답)
+    @ExceptionHandler(RestClientResponseException.class)
+    public ResponseEntity<ApiErrorResponse> handleRestClientResponseException(RestClientResponseException ex) {
+        log.error("RestClient 외부 API 연동 실패: {}", ex.getMessage(), ex);
+        ApiErrorResponse response = ex.getMessage().isEmpty()
+                ? ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR)
+                : ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR, ex.getMessage());
         return ResponseEntity.status(ErrorCode.EXTERNAL_API_ERROR.getHttpStatus()).body(response);
     }
 

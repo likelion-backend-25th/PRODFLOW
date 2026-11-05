@@ -6,6 +6,7 @@ import net.likelion.bebc25.prodflow.holiday.repository.HolidayRepository;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.work_order.dto.ProductionPlanDto;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.CreateRequest;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.DetailResponse;
@@ -86,6 +87,7 @@ class WorkOrderServiceTest {
         assertThat(created).hasSize(1);
         assertThat(created.getFirst().workNo()).isEqualTo(workNo);
         assertThat(created.getFirst().note()).isEqualTo("디자인 A 투명 케이스 A라인 " + start + " ~ " + end);
+        assertResponsePlans(created.getFirst(), List.of(start, end), List.of(1000, 500));
 
         WorkOrder saved = workOrderRepository.findById(created.getFirst().id()).orElseThrow();
         assertThat(saved.getOrderProduct().getId()).isEqualTo(15L);
@@ -105,6 +107,7 @@ class WorkOrderServiceTest {
         assertThat(plans).extracting(ProductionPlan::getPlanDate).containsExactly(start, end);
         assertThat(plans).extracting(ProductionPlan::getQuantity).containsExactly(1000, 500);
         assertThat(plans).allMatch(plan -> plan.getOrderProduct().getId().equals(15L));
+        assertThat(plans).allMatch(plan -> "이서준".equals(plan.getCreatedBy()) && "이서준".equals(plan.getUpdatedBy()));
         // 등록은 준비 상태만 채우고 상태 변경 이력은 남기지 않는다.
         assertThat(statusHistoryRepository.count()).isEqualTo(historyCount);
         assertThat(statusHistoryRepository.findAll())
@@ -126,6 +129,8 @@ class WorkOrderServiceTest {
         assertThat(created).hasSize(2);
         assertThat(created).extracting(Response::workNo)
                 .containsExactly(workNo(firstNo), workNo(firstNo + 1));
+        assertResponsePlans(created.getFirst(), List.of(start, end), List.of(1000, 1000));
+        assertResponsePlans(created.get(1), List.of(start), List.of(500));
 
         WorkOrder first = workOrderRepository.findById(created.getFirst().id()).orElseThrow();
         WorkOrder second = workOrderRepository.findById(created.get(1).id()).orElseThrow();
@@ -151,6 +156,7 @@ class WorkOrderServiceTest {
         List<Response> created = workOrderService.create(request, 1L);
 
         assertThat(created).hasSize(1);
+        assertResponsePlans(created.getFirst(), List.of(friday, monday), List.of(1000, 500));
         List<ProductionPlan> plans = plansOf(created.getFirst().id());
         assertThat(plans).extracting(ProductionPlan::getPlanDate).containsExactly(friday, monday);
         assertThat(plans).extracting(ProductionPlan::getQuantity).containsExactly(1000, 500);
@@ -169,6 +175,7 @@ class WorkOrderServiceTest {
 
         List<Response> created = workOrderService.create(request, 1L);
 
+        assertResponsePlans(created.getFirst(), List.of(before, after), List.of(1000, 500));
         List<ProductionPlan> plans = plansOf(created.getFirst().id());
         assertThat(plans).extracting(ProductionPlan::getPlanDate).containsExactly(before, after);
         assertThat(plans).extracting(ProductionPlan::getPlanDate).doesNotContain(holiday);
@@ -278,6 +285,12 @@ class WorkOrderServiceTest {
         assertThat(detail.status()).isEqualTo("PREPARE");
         assertThat(detail.note()).isEqualTo("디자인 A 투명 케이스 2,000개. A라인 10-27 1,000개, 10-28 1,000개");
         assertThat(detail.estimatedDueDate()).isEqualTo(date(2026, 10, 30));
+        assertThat(detail.plans()).extracting(ProductionPlanDto.Response::planDate)
+                .containsExactly(date(2026, 10, 27), date(2026, 10, 28));
+        assertThat(detail.plans()).extracting(ProductionPlanDto.Response::quantity)
+                .containsExactly(1000, 1000);
+        assertThat(detail.plans()).extracting(ProductionPlanDto.Response::workOrderId)
+                .containsOnly(1L);
 
         // 시드 12번은 포장 완료라 완료일이 있다.
         DetailResponse packed = workOrderService.getDetail(12L);
@@ -393,6 +406,12 @@ class WorkOrderServiceTest {
         assertThat(updated.lineId()).isEqualTo(availableLineId);
         assertThat(updated.assignedId()).isEqualTo(4L);
         assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getLine().getId()).isEqualTo(availableLineId);
+        // 계획 행의 날짜와 수량은 그대로다. 합계는 작업지시의 현재 라인을 본다.
+        List<ProductionPlan> plans = plansOf(workOrderId);
+        assertThat(plans).extracting(ProductionPlan::getPlanDate).containsExactly(day);
+        assertThat(plans).extracting(ProductionPlan::getQuantity).containsExactly(100);
+        assertThat(productionPlanRepository.sumQuantityByLineAndDate(1L, day)).isZero();
+        assertThat(productionPlanRepository.sumQuantityByLineAndDate(availableLineId, day)).isEqualTo(100);
     }
 
     @Test
@@ -415,7 +434,7 @@ class WorkOrderServiceTest {
 
         // 준비에서 생산 중지로 바꾼다. 시작 예정일과 상관없이 허용되는 전이다.
         DetailResponse changed = workOrderService.changeStatus(
-                workOrderId, new UpdateStatusRequest("HALT"), 1L);
+                workOrderId, new UpdateStatusRequest("HALT", null), 1L);
 
         assertThat(changed.status()).isEqualTo("HALT");
         assertThat(statusHistoryRepository.findAll())
@@ -445,7 +464,7 @@ class WorkOrderServiceTest {
         ReflectionTestUtils.setField(waiting, "plannedStartDate", LocalDate.now());
 
         assertThatThrownBy(() -> workOrderService.changeStatus(
-                waiting.getId(), new UpdateStatusRequest("PRODUCE"), 1L))
+                waiting.getId(), new UpdateStatusRequest("PRODUCE", null), 1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("이 라인에서 이미 생산 중인 작업이 있습니다.");
 
@@ -579,7 +598,14 @@ class WorkOrderServiceTest {
     }
 
     private String workNo(long sequence) {
-        return "WI-" + Year.now().getValue() + "-" + String.format("%03d", sequence);
+        return "WO-" + Year.now().getValue() + "-" + String.format("%03d", sequence);
+    }
+
+    // 등록 응답의 하루 계획이 날짜, 수량, 작업지시 번호와 맞는지 본다.
+    private void assertResponsePlans(Response response, List<LocalDate> dates, List<Integer> quantities) {
+        assertThat(response.plans()).extracting(ProductionPlanDto.Response::planDate).containsExactlyElementsOf(dates);
+        assertThat(response.plans()).extracting(ProductionPlanDto.Response::quantity).containsExactlyElementsOf(quantities);
+        assertThat(response.plans()).extracting(ProductionPlanDto.Response::workOrderId).containsOnly(response.id());
     }
 
     private LocalDate date(int year, int month, int day) {

@@ -36,7 +36,6 @@ import org.springframework.security.authentication.AuthenticationCredentialsNotF
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -55,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.datasource.username=sa", "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.sql.init.mode=never",
         "spring.jpa.properties.hibernate.show_sql=false",
+        "quotation.expiration.enabled=false",
         "jwt.secret=cXVvdGF0aW9uLXRlc3Qtc2VjcmV0LW11c3QtYmUtMzItYnl0ZXM=",
         "jwt.access-token-expiration=60000", "jwt.refresh-token-expiration=120000"
 })
@@ -68,7 +68,21 @@ class QuotationCreateTest {
     @Autowired
     QuotationPdfService pdfService;
     @Autowired
+    net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService pdfStorageService;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    net.likelion.bebc25.prodflow.common.storage.StorageClient storageClient;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    net.likelion.bebc25.prodflow.mail.service.MailService mailService;
+    @Autowired
+    net.likelion.bebc25.prodflow.quotation.service.QuotationSendService sendService;
+    @Autowired
+    net.likelion.bebc25.prodflow.client_notification.repository.ClientNotiLogRepository notificationRepository;
+    private final java.util.Map<String, net.likelion.bebc25.prodflow.common.storage.StorageClient.StoredFile> files
+            = new java.util.concurrent.ConcurrentHashMap<>();
+    @Autowired
     QuotationRescheduleService rescheduleService;
+    @Autowired
+    net.likelion.bebc25.prodflow.quotation.service.QuotationStatusService statusService;
     @Autowired
     Validator validator;
     @Autowired
@@ -83,8 +97,24 @@ class QuotationCreateTest {
 
     @BeforeEach
     void setUp() {
+        files.clear();
+        org.mockito.Mockito.doAnswer(this::storePdf).when(storageClient).upload(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyMap());
+        org.mockito.Mockito.when(storageClient.read(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(invocation -> {
+                    var file = files.get(invocation.getArgument(0, String.class));
+                    if (file == null) {
+                        throw new IllegalStateException("저장된 파일 없음");
+                    }
+                    return file;
+                });
+        org.mockito.Mockito.when(storageClient.createPresignedGetUrl(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn("https://example.com/preview.pdf");
         CustomUserDetails principal = tx().execute(status -> {
-            for (String entity : new String[]{"ProductionPlan", "WorkOrder", "OrderProduct", "CustomerOrder",
+            for (String entity : new String[]{"ClientNotiLog", "ProductionPlan", "WorkOrder", "OrderProduct", "CustomerOrder",
                     "QuotationItem", "Quotation", "Client", "Product", "Line", "CommonCode", "CodeGroup", "User", "Holiday"}) {
                 em.createQuery("delete from " + entity).executeUpdate();
             }
@@ -119,6 +149,491 @@ class QuotationCreateTest {
                 UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
     }
 
+
+    private Object storePdf(org.mockito.invocation.InvocationOnMock invocation) throws java.io.IOException {
+        java.io.InputStream input = invocation.getArgument(1);
+        java.util.Map<String, String> metadata = invocation.getArgument(4);
+        files.put(invocation.getArgument(0),
+                new net.likelion.bebc25.prodflow.common.storage.StorageClient.StoredFile(
+                        input.readAllBytes(), java.util.Map.copyOf(metadata)));
+        return null;
+    }
+
+    @Test
+    void sendsStoredPdfAfterCommitAndRecordsActualRecipient() {
+        var preview = pdfStorageService.create(request(List.of(item(100, 1000L))), userId);
+        var confirmed = service.getQuotationById(preview.quotationId());
+        byte[] expected = files.get("quotations/" + preview.quotationNo() + ".pdf").content();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            assertThat(quotationRepository.findById(preview.quotationId()).orElseThrow().getStatus())
+                    .isEqualTo(QuotationStatus.SENT);
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager
+                    .isActualTransactionActive()).isFalse();
+            assertThat(invocation.getArgument(0, String.class)).isEqualTo("client@example.com");
+            assertThat(invocation.getArgument(1, String.class))
+                    .isEqualTo("[PRODFLOW] 기존 회사 견적서 안내 (" + preview.quotationNo() + ")");
+            assertThat(invocation.getArgument(2, String.class)).contains(
+                    "안녕하세요, 기존 회사 담당자님.",
+                    "견적번호: " + preview.quotationNo(),
+                    "견적금액: 110,000원 (VAT 포함)",
+                    "예상 납기일: " + confirmed.estimatedDueDate(),
+                    "견적 유효기간: " + confirmed.validUntil() + "까지",
+                    "본 메일로 회신 부탁드립니다.",
+                    "실제 수주 등록 시 생산 일정에 따라 조정될 수 있습니다.",
+                    "PRODFLOW 드림");
+            assertThat(invocation.getArgument(4, byte[].class)).containsExactly(expected);
+            return null;
+        }).when(mailService).sendAttachment(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+
+        var response = sendService.send(preview.quotationId(),
+                new net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request(preview.confirmationToken()), userId);
+        assertThat(response.status()).isEqualTo(QuotationStatus.SENT);
+        assertThat(response.emailStatus()).isEqualTo("SENT");
+        assertThat(response.duplicateRequest()).isFalse();
+        var recorded = notificationRepository.findAll().getFirst();
+        assertThat(recorded.getRecipient()).isEqualTo("client@example.com");
+        assertThat(recorded.getKind()).isEqualTo("QUOTATION");
+        assertThat(recorded.getChannel()).isEqualTo("EMAIL");
+        assertThat(recorded.getErrorMessage()).isNull();
+        assertThat(notificationRepository.count()).isEqualTo(1);
+        assertThat(pdfStorageService.getPreview(preview.quotationId()).confirmationToken())
+                .isEqualTo(preview.confirmationToken());
+        assertThatThrownBy(() -> pdfStorageService.prepare(preview.quotationId()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void mailFailureKeepsSentAndPdfAndDuplicateDoesNotResend() {
+        var preview = pdfStorageService.create(request(List.of(item(100, 1000L))), userId);
+        org.mockito.Mockito.doThrow(new RuntimeException("메일 실패".repeat(100))).when(mailService)
+                .sendAttachment(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any());
+        var request = new net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request(preview.confirmationToken());
+        var response = sendService.send(preview.quotationId(), request, userId);
+        assertThat(response.emailStatus()).isEqualTo("FAILED");
+        assertThat(quotationRepository.findById(preview.quotationId()).orElseThrow().getStatus())
+                .isEqualTo(QuotationStatus.SENT);
+        assertThat(quotationRepository.findById(preview.quotationId()).orElseThrow().getPdfObjectKey()).isNotNull();
+        assertThat(notificationRepository.findAll().getFirst().getErrorMessage()).hasSize(255);
+        var duplicate = sendService.send(preview.quotationId(), request, userId);
+        assertThat(duplicate.duplicateRequest()).isTrue();
+        assertThat(duplicate.emailStatus()).isEqualTo("FAILED");
+        org.mockito.Mockito.verify(mailService, org.mockito.Mockito.times(1)).sendAttachment(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any());
+        assertThat(notificationRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void staleConfirmationAndChangedClientCompanyCannotSendOldPdf() {
+        var preview = pdfStorageService.create(request(List.of(item(100, 1000L))), userId);
+        var stale = new net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request(
+                "a".repeat(64) + "." + "b".repeat(64));
+        assertSendConflict(preview.quotationId(), stale);
+        tx().executeWithoutResult(status -> ReflectionTestUtils.setField(
+                em.find(Client.class, clientId), "company", "변경된 회사"));
+        assertSendConflict(preview.quotationId(), new net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request(
+                preview.confirmationToken()));
+        assertThatThrownBy(() -> pdfStorageService.getPreview(preview.quotationId()))
+                .isInstanceOf(net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException.class);
+        org.mockito.Mockito.verifyNoInteractions(mailService);
+        assertThat(notificationRepository.count()).isZero();
+    }
+
+    @Test
+    void draftEditInvalidatesOldPdfAndLatestPreviewCanBeSent() {
+        var preview = pdfStorageService.create(request(List.of(item(100, 1000L))), userId);
+        service.updateDraft(preview.quotationId(), request(List.of(item(200, 2000L))), userId);
+        var old = new net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request(preview.confirmationToken());
+        assertSendConflict(preview.quotationId(), old);
+        var latest = pdfStorageService.prepare(preview.quotationId());
+        assertSendConflict(preview.quotationId(), old);
+        var response = sendService.send(preview.quotationId(),
+                new net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request(latest.confirmationToken()), userId);
+        assertThat(response.emailStatus()).isEqualTo("SENT");
+    }
+
+    @Test
+    void expiredQuotationAndChangedCapacityRequireReconfirmation() {
+        var preview = pdfStorageService.create(request(List.of(item(1500, 1000L))), userId);
+        var request = new net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request(preview.confirmationToken());
+        tx().executeWithoutResult(status -> ReflectionTestUtils.setField(
+                em.find(Quotation.class, preview.quotationId()), "validUntil", today().minusDays(1)));
+        assertSendConflict(preview.quotationId(), request);
+        tx().executeWithoutResult(status -> {
+            ReflectionTestUtils.setField(em.find(Quotation.class, preview.quotationId()), "validUntil", today().plusDays(14));
+            for (Line line : em.createQuery("select l from Line l", Line.class).getResultList()) {
+                line.editProduction(100);
+            }
+        });
+        assertSendConflict(preview.quotationId(), request);
+        org.mockito.Mockito.verifyNoInteractions(mailService);
+    }
+
+    @Test
+    void s3ReadFailureAndTamperedPdfDoNotConfirmOrSend() {
+        var preview = pdfStorageService.create(request(List.of(item(100, 1000L))), userId);
+        String key = "quotations/" + preview.quotationNo() + ".pdf";
+        var file = files.remove(key);
+        var request = new net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request(preview.confirmationToken());
+        assertThatThrownBy(() -> sendService.send(preview.quotationId(), request, userId))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        failure -> assertThat(failure.getStatusCode().value()).isEqualTo(502));
+        files.put(key, new net.likelion.bebc25.prodflow.common.storage.StorageClient.StoredFile(
+                new byte[]{1, 2, 3}, file.metadata()));
+        assertSendConflict(preview.quotationId(), request);
+        assertThat(notificationRepository.count()).isZero();
+        org.mockito.Mockito.verifyNoInteractions(mailService);
+    }
+
+    @Test
+    void sendRechecksCurrentAccountAndMethodPermission() {
+        var preview = pdfStorageService.create(request(List.of(item(100, 1000L))), userId);
+        var request = new net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request(preview.confirmationToken());
+        authenticateAs(UserRole.INQUIRY_MANAGER);
+        assertThatThrownBy(() -> sendService.send(preview.quotationId(), request, userId))
+                .isInstanceOf(AccessDeniedException.class);
+        authenticateAs(UserRole.ORDER_MANAGER);
+        tx().executeWithoutResult(status -> em.find(User.class, userId).deactivate());
+        assertThatThrownBy(() -> sendService.send(preview.quotationId(), request, userId))
+                .isInstanceOf(AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(mailService);
+    }
+
+    @Test
+    void duplicateWhileEmailIsRunningDoesNotStartAnotherSend() throws Exception {
+        var preview = pdfStorageService.create(request(List.of(item(100, 1000L))), userId);
+        var request = new net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request(preview.confirmationToken());
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            entered.countDown();
+            assertThat(release.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            return null;
+        }).when(mailService).sendAttachment(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            var first = executor.submit(() -> {
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                try {
+                    return sendService.send(preview.quotationId(), request, userId);
+                } finally {
+                    SecurityContextHolder.clearContext();
+                }
+            });
+            try {
+                assertThat(entered.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                var duplicate = sendService.send(preview.quotationId(), request, userId);
+                assertThat(duplicate.duplicateRequest()).isTrue();
+                assertThat(duplicate.emailStatus()).isEqualTo("UNKNOWN");
+            } finally {
+                release.countDown();
+            }
+            assertThat(first.get(10, java.util.concurrent.TimeUnit.SECONDS).emailStatus()).isEqualTo("SENT");
+        }
+        assertThat(notificationRepository.count()).isEqualTo(1);
+    }
+
+    private void assertSendConflict(Long quotationId,
+            net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request request) {
+        assertThatThrownBy(() -> sendService.send(quotationId, request, userId))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        failure -> assertThat(failure.getStatusCode().value()).isEqualTo(409));
+        assertThat(quotationRepository.findById(quotationId).orElseThrow().getStatus()).isEqualTo(QuotationStatus.DRAFT);
+    }
+
+    @Test
+    void deletesDraftItemsAndPdfAfterCommitWhilePreservingNewClient() {
+        var draft = pdfStorageService.create(newClientRequest("삭제 후 유지할 거래처", List.of(item(100, 1000L))), userId);
+        Long id = draft.quotationId();
+        var client = quotationRepository.findById(id).orElseThrow().getClient();
+        String key = quotationRepository.findById(id).orElseThrow().getPdfObjectKey();
+        org.mockito.Mockito.clearInvocations(storageClient, mailService);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            assertThat(quotationRepository.existsById(id)).isFalse();
+            files.remove(key);
+            return null;
+        }).when(storageClient).delete(key);
+        statusService.deleteDraft(id, userId);
+        assertThat(quotationRepository.existsById(id)).isFalse();
+        assertThat(itemRepository.findByQuotationIdOrderByIdAsc(id)).isEmpty();
+        assertThat(clientRepository.existsById(client.getId())).isTrue();
+        assertThat(files).doesNotContainKey(key);
+        org.mockito.Mockito.verify(storageClient).delete(key);
+        org.mockito.Mockito.verifyNoInteractions(mailService);
+    }
+
+    @Test
+    void deletesDraftWithNullPdfKeyAndIgnoresStorageFailure() {
+        var draft = service.create(request(List.of(item(100, 1000L))), userId);
+        String key = "quotations/" + draft.quotationNo() + ".pdf";
+        org.mockito.Mockito.doThrow(new IllegalStateException("S3 삭제 실패")).when(storageClient).delete(key);
+        statusService.deleteDraft(draft.id(), userId);
+        assertThat(quotationRepository.existsById(draft.id())).isFalse();
+        assertThat(itemRepository.findByQuotationIdOrderByIdAsc(draft.id())).isEmpty();
+        org.mockito.Mockito.verify(storageClient).delete(key);
+    }
+
+    @Test
+    void deletionRejectsEveryNonDraftStateAndMissingQuotation() {
+        for (QuotationStatus source : QuotationStatus.values()) {
+            if (source == QuotationStatus.DRAFT) {
+                continue;
+            }
+            Long id = createStatusFixture(source, today());
+            assertStatusConflict(() -> statusService.deleteDraft(id, userId));
+            assertThat(quotationRepository.findById(id).orElseThrow().getStatus()).isEqualTo(source);
+            assertThat(itemRepository.findByQuotationIdOrderByIdAsc(id)).isNotEmpty();
+        }
+        assertThatThrownBy(() -> statusService.deleteDraft(Long.MAX_VALUE, userId)).isInstanceOf(NoSuchElementException.class);
+        org.mockito.Mockito.verifyNoInteractions(storageClient, mailService);
+    }
+
+    @Test
+    void draftDeletionRequiresPermissionAndActiveAccount() {
+        Long id = createStatusFixture(QuotationStatus.DRAFT, today());
+        authenticateAs(UserRole.INQUIRY_MANAGER);
+        assertThatThrownBy(() -> statusService.deleteDraft(id, userId)).isInstanceOf(AccessDeniedException.class);
+        authenticateAs(UserRole.ORDER_MANAGER);
+        tx().executeWithoutResult(status -> em.find(User.class, userId).deactivate());
+        assertThatThrownBy(() -> statusService.deleteDraft(id, userId)).isInstanceOf(AccessDeniedException.class);
+        assertThat(quotationRepository.existsById(id)).isTrue();
+        org.mockito.Mockito.verifyNoInteractions(storageClient);
+    }
+
+    @Test
+    void approvalRejectionAndCancellationPreserveDocumentAndRepeatedRequestIsIdempotent() {
+        for (QuotationStatus target : List.of(QuotationStatus.APPROVED, QuotationStatus.REJECTED, QuotationStatus.CANCELLED)) {
+            var preview = pdfStorageService.create(request(List.of(item(100, 1000L))), userId);
+            Long id = preview.quotationId();
+            tx().executeWithoutResult(status -> em.find(Quotation.class, id).sent());
+            var before = service.getQuotationById(id);
+            String key = quotationRepository.findById(id).orElseThrow().getPdfObjectKey();
+            byte[] pdf = files.get(key).content().clone();
+            org.mockito.Mockito.clearInvocations(storageClient, mailService);
+
+            var result = switch (target) {
+                case APPROVED -> statusService.approve(id, userId);
+                case REJECTED -> statusService.reject(id, userId);
+                default -> statusService.cancel(id, userId);
+            };
+            assertThat(result).usingRecursiveComparison().ignoringFields("status", "updatedAt").isEqualTo(before);
+            assertThat(result.status()).isEqualTo(target);
+            var changedAt = quotationRepository.findById(id).orElseThrow().getUpdatedAt();
+            var duplicate = switch (target) {
+                case APPROVED -> statusService.approve(id, userId);
+                case REJECTED -> statusService.reject(id, userId);
+                default -> statusService.cancel(id, userId);
+            };
+            assertThat(duplicate.status()).isEqualTo(target);
+            assertThat(quotationRepository.findById(id).orElseThrow().getUpdatedAt()).isEqualTo(changedAt);
+            assertThat(quotationRepository.findById(id).orElseThrow().getPdfObjectKey()).isEqualTo(key);
+            assertThat(files.get(key).content()).containsExactly(pdf);
+            org.mockito.Mockito.verifyNoInteractions(storageClient, mailService);
+        }
+    }
+
+    @Test
+    void statusActionsRejectDraftApprovedAndOtherTerminalStates() {
+        for (QuotationStatus source : QuotationStatus.values()) {
+            if (source == QuotationStatus.SENT) {
+                continue;
+            }
+            var draft = createStatusFixture(source, today().plusDays(1));
+            if (source != QuotationStatus.APPROVED) {
+                assertStatusConflict(() -> statusService.approve(draft, userId));
+            }
+            if (source != QuotationStatus.REJECTED) {
+                assertStatusConflict(() -> statusService.reject(draft, userId));
+            }
+            if (source != QuotationStatus.CANCELLED) {
+                assertStatusConflict(() -> statusService.cancel(draft, userId));
+            }
+            assertThat(quotationRepository.findById(draft).orElseThrow().getStatus()).isEqualTo(source);
+        }
+        assertThatThrownBy(() -> statusService.reject(Long.MAX_VALUE, userId))
+                .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> statusService.approve(Long.MAX_VALUE, userId))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void expiredSentCannotBeManuallyRejectedOrCancelledButLastValidDayIsAllowed() {
+        Long expired = createStatusFixture(QuotationStatus.SENT, today().minusDays(1));
+        assertStatusConflict(() -> statusService.approve(expired, userId));
+        assertStatusConflict(() -> statusService.reject(expired, userId));
+        assertStatusConflict(() -> statusService.cancel(expired, userId));
+        assertThat(quotationRepository.findById(expired).orElseThrow().getStatus()).isEqualTo(QuotationStatus.SENT);
+        Long valid = createStatusFixture(QuotationStatus.SENT, today());
+        assertThat(statusService.reject(valid, userId).status()).isEqualTo(QuotationStatus.REJECTED);
+        Long lastDay = createStatusFixture(QuotationStatus.SENT, today());
+        assertThat(statusService.approve(lastDay, userId).status()).isEqualTo(QuotationStatus.APPROVED);
+        Long alreadyApproved = createStatusFixture(QuotationStatus.APPROVED, today().minusDays(1));
+        assertThat(statusService.approve(alreadyApproved, userId).status()).isEqualTo(QuotationStatus.APPROVED);
+    }
+
+    @Test
+    void entityApprovalRejectsEveryNonSentState() {
+        for (QuotationStatus source : QuotationStatus.values()) {
+            var quotation = instantiate(Quotation.class);
+            ReflectionTestUtils.setField(quotation, "status", source);
+            if (source == QuotationStatus.SENT) {
+                quotation.approve();
+                assertThat(quotation.getStatus()).isEqualTo(QuotationStatus.APPROVED);
+            } else {
+                assertThatThrownBy(quotation::approve).isInstanceOf(IllegalArgumentException.class);
+                assertThat(quotation.getStatus()).isEqualTo(source);
+            }
+        }
+    }
+
+    @Test
+    void approvalRequiresPasswordChangeAndAllowsSuperAdmin() {
+        Long id = createStatusFixture(QuotationStatus.SENT, today());
+        tx().executeWithoutResult(status -> ReflectionTestUtils.setField(
+                em.find(User.class, userId), "mustChangePassword", true));
+        assertThatThrownBy(() -> statusService.approve(id, userId)).isInstanceOf(AccessDeniedException.class);
+        tx().executeWithoutResult(status -> {
+            var user = em.find(User.class, userId);
+            user.changePassword("changed");
+            ReflectionTestUtils.setField(user, "role", UserRole.SUPER_ADMIN);
+        });
+        authenticateAs(UserRole.SUPER_ADMIN);
+        assertThat(statusService.approve(id, userId).status()).isEqualTo(QuotationStatus.APPROVED);
+    }
+
+    @Test
+    void expirationChangesOnlyPastSentAndRecordsSystemAuditWithoutTouchingPdf() {
+        var before = new java.util.HashMap<Long, QuotationDto.DetailResponse>();
+        Long expiredSent = null;
+        for (QuotationStatus source : QuotationStatus.values()) {
+            for (LocalDate date : List.of(today().minusDays(1), today(), today().plusDays(1))) {
+                Long id = createStatusFixture(source, date);
+                before.put(id, service.getQuotationById(id));
+                if (source == QuotationStatus.SENT && date.isBefore(today())) {
+                    expiredSent = id;
+                }
+            }
+        }
+        SecurityContextHolder.clearContext();
+        assertThat(statusService.expireQuotations()).isEqualTo(1);
+        assertThat(statusService.expireQuotations()).isZero();
+        for (var entry : before.entrySet()) {
+            var after = service.getQuotationById(entry.getKey());
+            if (entry.getKey().equals(expiredSent)) {
+                assertThat(after.status()).isEqualTo(QuotationStatus.EXPIRED);
+                assertThat(quotationRepository.findById(entry.getKey()).orElseThrow().getUpdatedBy()).isEqualTo("SYSTEM");
+            } else {
+                assertThat(after.status()).isEqualTo(entry.getValue().status());
+            }
+            assertThat(after).usingRecursiveComparison().ignoringFields("status", "updatedAt")
+                    .isEqualTo(entry.getValue());
+            assertThat(quotationRepository.findById(entry.getKey()).orElseThrow().getPdfObjectKey())
+                    .isEqualTo("quotations/status-test.pdf");
+        }
+        org.mockito.Mockito.verifyNoInteractions(storageClient, mailService);
+    }
+
+    @Test
+    void manualExpirationReusesDateRulesAndRepeatedRequestReturnsZero() {
+        Long pastSent = createStatusFixture(QuotationStatus.SENT, today().minusDays(1));
+        Long todaySent = createStatusFixture(QuotationStatus.SENT, today());
+        Long pastApproved = createStatusFixture(QuotationStatus.APPROVED, today().minusDays(1));
+        assertThat(statusService.expireQuotations(userId).expiredCount()).isEqualTo(1);
+        assertThat(statusService.expireQuotations(userId).expiredCount()).isZero();
+        assertThat(quotationRepository.findById(pastSent).orElseThrow().getStatus()).isEqualTo(QuotationStatus.EXPIRED);
+        assertThat(quotationRepository.findById(todaySent).orElseThrow().getStatus()).isEqualTo(QuotationStatus.SENT);
+        assertThat(quotationRepository.findById(pastApproved).orElseThrow().getStatus()).isEqualTo(QuotationStatus.APPROVED);
+        assertThat(quotationRepository.findById(pastSent).orElseThrow().getUpdatedBy()).isEqualTo("서도윤");
+        org.mockito.Mockito.verifyNoInteractions(storageClient, mailService);
+    }
+
+    @Test
+    void manualExpirationRequiresPermissionAndActiveDatabaseAccount() {
+        Long pastSent = createStatusFixture(QuotationStatus.SENT, today().minusDays(1));
+        authenticateAs(UserRole.INQUIRY_MANAGER);
+        assertThatThrownBy(() -> statusService.expireQuotations(userId)).isInstanceOf(AccessDeniedException.class);
+        authenticateAs(UserRole.ORDER_MANAGER);
+        tx().executeWithoutResult(status -> em.find(User.class, userId).deactivate());
+        assertThatThrownBy(() -> statusService.expireQuotations(userId)).isInstanceOf(AccessDeniedException.class);
+        assertThat(quotationRepository.findById(pastSent).orElseThrow().getStatus()).isEqualTo(QuotationStatus.SENT);
+    }
+
+    @Test
+    void statusActionsCheckMethodPermissionAndCurrentDatabaseAccount() {
+        Long id = createStatusFixture(QuotationStatus.SENT, today());
+        authenticateAs(UserRole.INQUIRY_MANAGER);
+        assertThatThrownBy(() -> statusService.approve(id, userId)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> statusService.reject(id, userId)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> statusService.cancel(id, userId)).isInstanceOf(AccessDeniedException.class);
+        authenticateAs(UserRole.ORDER_MANAGER);
+        tx().executeWithoutResult(status -> ReflectionTestUtils.setField(
+                em.find(User.class, userId), "role", UserRole.INQUIRY_MANAGER));
+        assertThatThrownBy(() -> statusService.approve(id, userId)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> statusService.reject(id, userId)).isInstanceOf(AccessDeniedException.class);
+        tx().executeWithoutResult(status -> {
+            var user = em.find(User.class, userId);
+            ReflectionTestUtils.setField(user, "role", UserRole.ORDER_MANAGER);
+            user.deactivate();
+        });
+        assertThatThrownBy(() -> statusService.cancel(id, userId)).isInstanceOf(AccessDeniedException.class);
+        assertThat(quotationRepository.findById(id).orElseThrow().getStatus()).isEqualTo(QuotationStatus.SENT);
+        assertThatThrownBy(() -> statusService.approve(id, userId)).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void concurrentRejectionAndCancellationAllowOnlyOneTransition() throws Exception {
+        Long id = createStatusFixture(QuotationStatus.SENT, today());
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var tasks = new java.util.ArrayList<java.util.concurrent.Future<QuotationStatus>>();
+            for (QuotationStatus target : List.of(QuotationStatus.REJECTED, QuotationStatus.CANCELLED)) {
+                tasks.add(executor.submit(() -> {
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    try {
+                        if (!start.await(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("동시 요청 대기 시간 초과");
+                        }
+                        return target == QuotationStatus.REJECTED
+                                ? statusService.reject(id, userId).status() : statusService.cancel(id, userId).status();
+                    } catch (org.springframework.web.server.ResponseStatusException ex) {
+                        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+                        return null;
+                    } finally {
+                        SecurityContextHolder.clearContext();
+                    }
+                }));
+            }
+            start.countDown();
+            var first = tasks.get(0).get(10, java.util.concurrent.TimeUnit.SECONDS);
+            var second = tasks.get(1).get(10, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat((first == null) != (second == null)).isTrue();
+            assertThat(quotationRepository.findById(id).orElseThrow().getStatus()).isEqualTo(first == null ? second : first);
+        }
+    }
+
+    private Long createStatusFixture(QuotationStatus source, LocalDate validUntil) {
+        var draft = service.create(request(List.of(item(100, 1000L))), userId);
+        tx().executeWithoutResult(status -> {
+            var quotation = em.find(Quotation.class, draft.id());
+            ReflectionTestUtils.setField(quotation, "status", source);
+            ReflectionTestUtils.setField(quotation, "validUntil", validUntil);
+            quotation.changePdfObjectKey("quotations/status-test.pdf");
+        });
+        return draft.id();
+    }
+
+    private void assertStatusConflict(org.assertj.core.api.ThrowableAssert.ThrowingCallable action) {
+        assertThatThrownBy(action).isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                failure -> assertThat(failure.getStatusCode().value()).isEqualTo(409));
+    }
 
     @AfterEach
     void clearAuthentication() {
@@ -614,15 +1129,16 @@ class QuotationCreateTest {
         var failingPdf = org.mockito.Mockito.mock(QuotationPdfService.class);
         org.mockito.Mockito.when(failingPdf.generate(org.mockito.ArgumentMatchers.any()))
                 .thenThrow(new RuntimeException("PDF 생성 실패"));
-        var controller = new QuotationController(service, null, null, failingPdf);
-        var response = new MockHttpServletResponse();
+        var failingStorage = new net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService(
+                quotationRepository, service, failingPdf, storageClient, transactionManager);
+        var controller = new QuotationController(service, null, null, failingStorage, null, null);
         var principal = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        assertThatThrownBy(() -> controller.createPdf(principal,
-                newClientRequest("PDF 실패 거래처", List.of(item(100, 1000L))), response))
-                .isInstanceOf(RuntimeException.class).hasMessage("PDF 생성 실패");
-
-        Long draftId = Long.valueOf(response.getHeader("X-Quotation-Id"));
+        var failure = org.junit.jupiter.api.Assertions.assertThrows(
+                net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException.class,
+                () -> controller.createPdf(principal,
+                        newClientRequest("PDF 실패 거래처", List.of(item(100, 1000L)))));
+        Long draftId = failure.getQuotationId();
         assertThat(quotationRepository.findById(draftId).orElseThrow().getStatus()).isEqualTo(QuotationStatus.DRAFT);
         assertThat(itemRepository.findByQuotationIdOrderByIdAsc(draftId)).hasSize(1);
         assertThat(clientRepository.count()).isEqualTo(2);
@@ -637,6 +1153,113 @@ class QuotationCreateTest {
             authenticateAs(role);
             assertThatThrownBy(() -> pdfService.generate(draft)).isInstanceOf(AccessDeniedException.class);
         }
+    }
+
+    @Test
+    void uploadsPdfAndStoresKeyOnlyAfterSuccess() {
+        var draft = service.create(request(List.of(item(100, 1000L))), userId);
+        String key = "quotations/" + draft.quotationNo() + ".pdf";
+        tx().executeWithoutResult(status -> em.find(Quotation.class, draft.id()).changePdfObjectKey(key));
+        org.mockito.Mockito.doAnswer(invocation -> {
+            var independent = new TransactionTemplate(transactionManager);
+            independent.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            String persistedKey = independent.execute(status ->
+                    quotationRepository.findById(draft.id()).orElseThrow().getPdfObjectKey());
+            assertThat(persistedKey).isNull();
+            return storePdf(invocation);
+        }).when(storageClient).upload(org.mockito.ArgumentMatchers.eq(key), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyMap());
+        org.mockito.Mockito.when(storageClient.createPresignedGetUrl(
+                org.mockito.ArgumentMatchers.eq(key), org.mockito.ArgumentMatchers.any()))
+                .thenReturn("https://example.com/preview.pdf");
+        var preview = pdfStorageService.prepare(draft.id());
+        assertThat(preview.quotationId()).isEqualTo(draft.id());
+        assertThat(preview.previewUrl()).isEqualTo("https://example.com/preview.pdf");
+        assertThat(quotationRepository.findById(draft.id()).orElseThrow().getPdfObjectKey()).isEqualTo(key);
+        var order = org.mockito.Mockito.inOrder(storageClient);
+        order.verify(storageClient).delete(key);
+        order.verify(storageClient).upload(org.mockito.ArgumentMatchers.eq(key), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq("application/pdf"), org.mockito.ArgumentMatchers.longThat(length -> length > 0), org.mockito.ArgumentMatchers.anyMap());
+        org.mockito.Mockito.clearInvocations(storageClient);
+        assertThat(pdfStorageService.getPreview(draft.id()).previewUrl()).isEqualTo(preview.previewUrl());
+        org.mockito.Mockito.verify(storageClient, org.mockito.Mockito.never()).delete(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(storageClient, org.mockito.Mockito.never()).upload(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyMap());
+        service.updateDraft(draft.id(), request(List.of(item(200, 1000L))), userId);
+        assertThat(quotationRepository.findById(draft.id()).orElseThrow().getPdfObjectKey()).isNull();
+        assertThatThrownBy(() -> pdfStorageService.getPreview(draft.id()))
+                .isInstanceOf(net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException.class);
+    }
+
+    @Test
+    void deletionAndUploadFailureClearPreviouslyStoredKeyAndRetryKeepsSameDraft() {
+        var draft = service.create(request(List.of(item(100, 1000L))), userId);
+        String key = "quotations/" + draft.quotationNo() + ".pdf";
+        tx().executeWithoutResult(status -> em.find(Quotation.class, draft.id()).changePdfObjectKey(key));
+        org.mockito.Mockito.doThrow(new RuntimeException("삭제 실패")).when(storageClient).delete(key);
+        org.mockito.Mockito.doThrow(new RuntimeException("업로드 실패")).when(storageClient).upload(
+                org.mockito.ArgumentMatchers.eq(key), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyMap());
+        for (int attempt = 0; attempt < 2; attempt++) {
+            assertThatThrownBy(() -> pdfStorageService.prepare(draft.id()))
+                    .isInstanceOf(net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException.class);
+            assertThat(quotationRepository.findById(draft.id()).orElseThrow().getPdfObjectKey()).isNull();
+            assertThatThrownBy(() -> pdfStorageService.getPreview(draft.id()))
+                    .isInstanceOf(net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException.class);
+        }
+        org.mockito.Mockito.doAnswer(this::storePdf).when(storageClient).upload(org.mockito.ArgumentMatchers.eq(key),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyMap());
+        org.mockito.Mockito.when(storageClient.createPresignedGetUrl(
+                org.mockito.ArgumentMatchers.eq(key), org.mockito.ArgumentMatchers.any())).thenReturn("https://example.com/retry.pdf");
+        assertThat(pdfStorageService.prepare(draft.id()).previewUrl()).isEqualTo("https://example.com/retry.pdf");
+        assertThat(quotationRepository.count()).isEqualTo(1);
+        assertThat(quotationRepository.findById(draft.id()).orElseThrow().getPdfObjectKey()).isEqualTo(key);
+    }
+
+    @Test
+    void pdfGenerationFailureCommitsNullKeyWithoutDeletingStoredFile() {
+        var draft = service.create(request(List.of(item(100, 1000L))), userId);
+        tx().executeWithoutResult(status -> em.find(Quotation.class, draft.id())
+                .changePdfObjectKey("quotations/old.pdf"));
+        var failingPdf = org.mockito.Mockito.mock(QuotationPdfService.class);
+        org.mockito.Mockito.when(failingPdf.generate(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new IllegalArgumentException("한 페이지 초과"));
+        var failingService = new net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService(
+                quotationRepository, service, failingPdf, storageClient, transactionManager);
+        assertThatThrownBy(() -> failingService.prepare(draft.id()))
+                .isInstanceOfSatisfying(net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException.class,
+                        failure -> assertThat(failure.getStatus()).isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST));
+        assertThat(quotationRepository.findById(draft.id()).orElseThrow().getPdfObjectKey()).isNull();
+        org.mockito.Mockito.verifyNoInteractions(storageClient);
+    }
+
+    @Test
+    void urlSigningFailureKeepsKeyNullEvenAfterUpload() {
+        var draft = service.create(request(List.of(item(100, 1000L))), userId);
+        org.mockito.Mockito.when(storageClient.createPresignedGetUrl(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new RuntimeException("URL 서명 실패"));
+        assertThatThrownBy(() -> pdfStorageService.prepare(draft.id()))
+                .isInstanceOf(net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException.class);
+        assertThat(quotationRepository.findById(draft.id()).orElseThrow().getPdfObjectKey()).isNull();
+        assertThat(quotationRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void storageOperationsRequirePermissionAndCannotOverwriteSentPdf() {
+        var draft = service.create(request(List.of(item(100, 1000L))), userId);
+        authenticateAs(UserRole.INQUIRY_MANAGER);
+        assertThatThrownBy(() -> pdfStorageService.prepare(draft.id())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> pdfStorageService.getPreview(draft.id())).isInstanceOf(AccessDeniedException.class);
+        authenticateAs(UserRole.ORDER_MANAGER);
+        tx().executeWithoutResult(status -> {
+            var quotation = em.find(Quotation.class, draft.id());
+            quotation.changePdfObjectKey("quotations/sent.pdf");
+            quotation.sent();
+        });
+        assertThatThrownBy(() -> pdfStorageService.prepare(draft.id())).isInstanceOf(IllegalArgumentException.class);
+        assertThat(quotationRepository.findById(draft.id()).orElseThrow().getPdfObjectKey()).isEqualTo("quotations/sent.pdf");
+        org.mockito.Mockito.verifyNoInteractions(storageClient);
     }
 
     @Test
@@ -751,11 +1374,15 @@ class QuotationCreateTest {
         var failingPdf = org.mockito.Mockito.mock(QuotationPdfService.class);
         org.mockito.Mockito.when(failingPdf.generate(org.mockito.ArgumentMatchers.any()))
                 .thenThrow(new RuntimeException("PDF 실패"));
-        var controller = new QuotationController(service, null, null, failingPdf);
+        var failingStorage = new net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService(
+                quotationRepository, service, failingPdf, storageClient, transactionManager);
+        var controller = new QuotationController(service, null, null, failingStorage, null, null);
         var principal = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         assertThatThrownBy(() -> controller.updatePdf(original.id(), principal,
-                request(List.of(item(300, 2000L))), new MockHttpServletResponse()))
-                .isInstanceOf(RuntimeException.class).hasMessage("PDF 실패");
+                request(List.of(item(300, 2000L)))))
+                .isInstanceOfSatisfying(
+                        net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException.class,
+                        failure -> assertThat(failure.getQuotationId()).isEqualTo(original.id()));
         var updated = service.getQuotationById(original.id());
         assertThat(updated.totalAmount()).isEqualTo(660000L);
         assertThat(updated.validUntil()).isEqualTo(original.validUntil());

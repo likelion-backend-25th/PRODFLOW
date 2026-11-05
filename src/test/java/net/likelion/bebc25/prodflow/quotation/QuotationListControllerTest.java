@@ -6,7 +6,7 @@ import net.likelion.bebc25.prodflow.quotation.controller.QuotationController;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationSortType;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationService;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationSchedulePreviewService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationRescheduleService;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +30,7 @@ class QuotationListControllerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new QuotationController(service,
-                        mock(QuotationSchedulePreviewService.class), mock(QuotationRescheduleService.class), mock(QuotationPdfService.class)))
+                        mock(QuotationSchedulePreviewService.class), mock(QuotationRescheduleService.class), mock(QuotationPdfStorageService.class), null, null))
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         when(service.getQuotationList(nullable(String.class), nullable(QuotationStatus.class),
@@ -71,7 +71,7 @@ class QuotationListControllerTest {
 
     @Test
     void invalidStatusReturns400WithoutCallingService() throws Exception {
-        for (String invalid : List.of("UNKNOWN", "approved", "", " ")) {
+        for (String invalid : List.of("UNKNOWN", "approved")) {
             mvc.perform(get("/api/v1/quotations").param("status", invalid))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
                     .andExpect(jsonPath("$.status").value(400))
@@ -80,6 +80,15 @@ class QuotationListControllerTest {
                     .andExpect(jsonPath("$.message").value("status 값은 DRAFT, SENT, APPROVED, REJECTED, CANCELLED, EXPIRED 중 하나여야 합니다."));
         }
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void emptyAndWhitespaceStatusUseAllStatuses() throws Exception {
+        for (String value : List.of("", " ", "\t")) {
+            mvc.perform(get("/api/v1/quotations").param("status", value))
+                    .andExpect(status().isOk());
+        }
+        verify(service, times(3)).getQuotationList(isNull(), isNull(), eq(QuotationSortType.CREATED_AT), any(Pageable.class));
     }
 
     @Test

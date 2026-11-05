@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.product.storage;
+package net.likelion.bebc25.prodflow.common.storage;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

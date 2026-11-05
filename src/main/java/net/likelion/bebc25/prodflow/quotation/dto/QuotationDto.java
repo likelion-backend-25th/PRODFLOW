@@ -1,6 +1,5 @@
 package net.likelion.bebc25.prodflow.quotation.dto;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -8,6 +7,12 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
@@ -15,11 +20,6 @@ import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
 import net.likelion.bebc25.prodflow.quotation.entity.QuotationItem;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.user.entity.User;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 public class QuotationDto {
 
@@ -34,7 +34,7 @@ public class QuotationDto {
             List<QuotationItemDto.@NotNull(message = "견적 품목은 비어 있을 수 없습니다.") @Valid CreateRequest> items,
             @Valid ClientRequest newClient
     ) {
-        // 예상 납기와 생산 일정은 서버에서 계산한 값을 전달받는다.
+        // 견적 초안 엔티티 변환
         public Quotation toEntity(
                 String quotationNo,
                 Client client,
@@ -71,6 +71,7 @@ public class QuotationDto {
             @NotBlank @Size(max = 100) String roadAddress,
             @NotBlank @Size(max = 100) String detailAddress
     ) {
+        // 거래처 주소 변환
         public Address toAddress() {
             return new Address(zipcode, roadAddress, detailAddress);
         }
@@ -93,6 +94,7 @@ public class QuotationDto {
             String userName,
             LocalDateTime createdAt
     ) {
+        // 견적 목록 응답 변환
         public static Response from(Quotation quotation, CustomerOrder customerOrder) {
             return new Response(
                     quotation.getId(),
@@ -145,7 +147,7 @@ public class QuotationDto {
             LocalDateTime updatedAt,
             String createdBy
     ) {
-        // 품목과 연결 수주는 별도로 조회하고, 금액은 서비스에서 계산해 전달한다.
+        // 견적 상세 응답 변환
         public static DetailResponse from(
                 Quotation quotation,
                 List<QuotationItem> items,

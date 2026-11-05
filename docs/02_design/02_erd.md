@@ -244,6 +244,7 @@ erDiagram
   quotation {
       bigint id PK "견적서 고유 ID"
       varchar quotation_no UK "견적번호"
+      varchar pdf_object_key "업로드 완료한 PDF의 S3 객체 키. 미준비·실패·수정 시 NULL"
       bigint client_id FK "거래처 ID"
       varchar client_name "거래처 측 담당자 이름"
       varchar client_email "거래처 이메일"
@@ -722,6 +723,7 @@ erDiagram
 |--------------------|--------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | id                 | BIGINT       | PK, AUTO_INCREMENT                                              | 견적서 고유 ID                                                                                                                           |
 | quotation_no       | VARCHAR(255) | UNIQUE, NOT NULL                                                | 견적번호                                                                                                                                |
+| pdf_object_key | VARCHAR(255) | NULL 허용 | 업로드 완료한 PDF의 S3 객체 키. 최초 저장·수정·재생성 시작·실패 시 NULL. NULL이면 조회 불가. |
 | client_id          | BIGINT       | FK, NOT NULL                                                    | 거래처 ID                                                                                                                              |
 | client_name        | VARCHAR(255) | NOT NULL                                                        | 거래처 측 담당자 이름                                                                                                                        |
 | client_email       | VARCHAR(255) | NOT NULL                                                        | 거래처 이메일                                                                                                                             |
