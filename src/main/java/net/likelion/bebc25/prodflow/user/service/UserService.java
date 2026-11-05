@@ -5,10 +5,13 @@ import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.auth.dto.AuthDto;
 import net.likelion.bebc25.prodflow.auth.exception.AuthException;
 import net.likelion.bebc25.prodflow.auth.repository.RefreshTokenRepository;
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.user.dto.UserDto;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -153,6 +156,26 @@ public class UserService {
                 .orElseThrow(() -> AuthException.unauthorized("사용자를 찾을 수 없습니다."));
         requireActive(user);
         return AuthDto.MeResponse.from(user);
+    }
+
+    // 직원 목록 페이징 조회
+    @Transactional(readOnly = true)
+    public PageResponse<UserDto.Response> getUsers(
+            Pageable pageable
+    ) {
+
+        // 1. 삭제된 직원을 제외하고 페이징 조회
+        Page<User> users = userRepository.findByStatusNot(
+                UserStatus.DELETED,
+                pageable
+        );
+
+        // 2. User 엔티티를 UserDto.Response로 변환
+        Page<UserDto.Response> responses =
+                users.map(UserDto.Response::from);
+
+        // 3. 공통 PageResponse로 변환
+        return PageResponse.from(responses);
     }
 
     // ID로 직원 조회
