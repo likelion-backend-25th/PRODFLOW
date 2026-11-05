@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.datasource.username=sa", "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.sql.init.mode=always",
         "spring.jpa.properties.hibernate.show_sql=false",
+        "quotation.expiration.enabled=false",
         "jwt.secret=cXVvdGF0aW9uLXRlc3Qtc2VjcmV0LW11c3QtYmUtMzItYnl0ZXM=",
         "jwt.access-token-expiration=60000", "jwt.refresh-token-expiration=120000"
 })

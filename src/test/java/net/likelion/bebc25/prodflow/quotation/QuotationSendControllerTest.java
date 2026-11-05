@@ -36,7 +36,7 @@ class QuotationSendControllerTest {
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new QuotationController(null, null, null, null, service))
+        mvc = MockMvcBuilders.standaloneSetup(new QuotationController(null, null, null, null, service, null))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         var principal = mock(CustomUserDetails.class);

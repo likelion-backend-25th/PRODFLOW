@@ -8,7 +8,7 @@ http:
   url: "{{baseUrl}}/api/v1/quotations/:id/pdf/regenerate"
   params:
     - name: id
-      value: "18"
+      value: "17"
       type: path
   auth: inherit
 

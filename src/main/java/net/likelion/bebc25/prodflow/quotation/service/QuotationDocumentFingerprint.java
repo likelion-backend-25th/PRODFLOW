@@ -1,17 +1,17 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
+import net.likelion.bebc25.prodflow.common.storage.StorageClient;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
-import net.likelion.bebc25.prodflow.common.storage.StorageClient;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
-
 public final class QuotationDocumentFingerprint {
     public static final String METADATA_KEY = "confirmation-token";
 
-    // 확인값 유틸리티 인스턴스 생성 차단
+    // 확인값 유틸리티 인스턴스 객체 생성 차단
     private QuotationDocumentFingerprint() {
     }
 

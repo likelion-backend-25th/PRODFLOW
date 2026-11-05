@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class QuotationPdfControllerTest {
     private final QuotationService quotations = mock(QuotationService.class);
     private final QuotationPdfStorageService pdfs = mock(QuotationPdfStorageService.class);
-    private final QuotationController controller = new QuotationController(quotations, null, null, pdfs, null);
+    private final QuotationController controller = new QuotationController(quotations, null, null, pdfs, null, null);
 
     @Test
     void createReturnsPreviewJsonAndSavedDraftLocation() {

@@ -16,9 +16,7 @@ http:
         "phone": "010-2000-0002",
         "role": "ORDER_MANAGER"
       }
-  auth:
-    type: bearer
-    token: eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwcm9kZmxvdyIsImp0aSI6ImEwMmE1YjBmLTFiYWUtNDUwZS04Zjk1LWZkZGE0ZThhZDVlNiIsInN1YiI6IjEiLCJlbWFpbCI6ImFkbWluQHByb2RmbG93LmxvY2FsIiwicm9sZSI6IlNVUEVSX0FETUlOIiwidHlwZSI6IkFDQ0VTUyIsImlhdCI6MTc5MzYwNzczMSwiZXhwIjoxNzkzNjA5NTMxfQ.1xCZb40k32GzMb-qKvuQ6_CqE-osa-S0tJJAL4mtY68
+  auth: inherit
 
 settings:
   encodeUrl: true

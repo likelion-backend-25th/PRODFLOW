@@ -40,6 +40,7 @@ import net.likelion.bebc25.prodflow.quotation.dto.QuotationPdfDto;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationRescheduleDto;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationScheduleDto;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationStatusDto;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationSortType;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService;
@@ -47,6 +48,7 @@ import net.likelion.bebc25.prodflow.quotation.service.QuotationRescheduleService
 import net.likelion.bebc25.prodflow.quotation.service.QuotationSchedulePreviewService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationSendService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationStatusService;
 
 @RestController
 @RequestMapping("/api/v1/quotations")
@@ -58,6 +60,63 @@ public class QuotationController {
     private final QuotationRescheduleService quotationRescheduleService;
     private final QuotationPdfStorageService quotationPdfStorageService;
     private final QuotationSendService quotationSendService;
+    private final QuotationStatusService quotationStatusService;
+
+    // 유효기간이 지난 견적 수동 만료
+    @Operation(summary = "견적 만료 처리 수동 실행",
+            description = "스케줄러와 동일한 조건으로 유효기간이 지난 SENT 견적을 EXPIRED로 변경한다. "
+                    + "유효기간 당일은 제외하며 실제 변경 건수를 반환한다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "만료 처리 완료 및 변경 건수 반환"),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "403", description = "권한 또는 계정 조건 미충족", content = @Content)
+    })
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    @PostMapping("/expire")
+    public ResponseEntity<QuotationStatusDto.ExpirationResponse> expireQuotations(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        QuotationStatusDto.ExpirationResponse response = quotationStatusService.expireQuotations(userDetails.getUserId());
+        return ResponseEntity.ok(response);
+    }
+
+    // 거래처의 견적 거절 반영
+    @Operation(summary = "견적 거절", description = "유효기간 내 SENT 견적을 REJECTED로 변경한다. 같은 요청은 현재 상태를 반환한다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "거절 처리 완료 및 견적 상세 반환"),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "403", description = "권한 또는 계정 조건 미충족", content = @Content),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 견적", content = @Content),
+            @ApiResponse(responseCode = "409", description = "처리 불가 상태 또는 유효기간 경과", content = @Content)
+    })
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    @PatchMapping("/{quotationId}/reject")
+    public ResponseEntity<QuotationDto.DetailResponse> reject(
+            @PathVariable Long quotationId,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        QuotationDto.DetailResponse response = quotationStatusService.reject(quotationId, userDetails.getUserId());
+        return ResponseEntity.ok(response);
+    }
+
+    // 발송한 견적 직접 취소
+    @Operation(summary = "견적 취소", description = "유효기간 내 SENT 견적을 CANCELLED로 변경한다. 연결 수주는 취소하지 않는다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "취소 처리 완료 및 견적 상세 반환"),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "403", description = "권한 또는 계정 조건 미충족", content = @Content),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 견적", content = @Content),
+            @ApiResponse(responseCode = "409", description = "처리 불가 상태 또는 유효기간 경과", content = @Content)
+    })
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    @PatchMapping("/{quotationId}/cancel")
+    public ResponseEntity<QuotationDto.DetailResponse> cancel(
+            @PathVariable Long quotationId,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        QuotationDto.DetailResponse response = quotationStatusService.cancel(quotationId, userDetails.getUserId());
+        return ResponseEntity.ok(response);
+    }
 
     // 확인한 견적 PDF 발송
     @Operation(summary = "견적 발송 확정 및 PDF 이메일 전송",

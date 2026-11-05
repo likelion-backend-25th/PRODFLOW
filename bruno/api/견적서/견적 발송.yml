@@ -8,13 +8,13 @@ http:
   url: "{{baseUrl}}/api/v1/quotations/:id/send"
   params:
     - name: id
-      value: "{{quotationId}}"
+      value: "17"
       type: path
   body:
     type: json
     data: |-
       {
-        "confirmationToken": "{{quotationConfirmationToken}}"
+        "confirmationToken": "ce82996f3e8cb4a16c94138a0b319bd61f120924a0f40c1e0d999d7f7e5e0626.16e537c976c7c241990eb34570dab71c331b33dd5f611cc4980721386c274247"
       }
   auth: inherit
 
