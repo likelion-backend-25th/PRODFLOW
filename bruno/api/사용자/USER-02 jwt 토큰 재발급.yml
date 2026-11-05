@@ -1,5 +1,5 @@
 info:
-  name: 토큰 재발급
+  name: USER-02 jwt 토큰 재발급
   type: http
   seq: 7
 

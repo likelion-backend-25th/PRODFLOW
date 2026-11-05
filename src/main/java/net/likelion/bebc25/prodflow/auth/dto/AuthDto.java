@@ -5,7 +5,6 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
-import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 
 public final class AuthDto {
     private AuthDto() {
@@ -57,24 +56,4 @@ public final class AuthDto {
     ) {
     }
 
-    // 과거 /api/v1/auth/me 응답 구조. 내 정보 조회를 UserDto로 완전히 옮겼다면 사용 여부를 확인할 것.
-    public record MeResponse(
-            @Schema(description = "직원 ID", example = "1")
-            Long userId,
-            @Schema(description = "직원 이름", example = "김철수")
-            String name,
-            @Schema(description = "직원 이메일", example = "employee@prodflow.local")
-            String email,
-            @Schema(description = "직원 권한", example = "ORDER_MANAGER")
-            UserRole role,
-            @Schema(description = "계정 상태", example = "ACTIVE")
-            UserStatus status,
-            @Schema(description = "최초 비밀번호 변경 필요 여부", example = "false")
-            boolean mustChangePassword
-    ) {
-        public static MeResponse from(User user) {
-            return new MeResponse(user.getId(), user.getName(), user.getEmail(), user.getRole(),
-                    user.getStatus(), user.isMustChangePassword());
-        }
-    }
 }
