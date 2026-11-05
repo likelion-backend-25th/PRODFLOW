@@ -30,7 +30,7 @@ class QuotationRescheduleControllerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new QuotationController(mock(QuotationService.class),
-                        mock(QuotationSchedulePreviewService.class), service, mock(QuotationPdfStorageService.class)))
+                        mock(QuotationSchedulePreviewService.class), service, mock(QuotationPdfStorageService.class), null))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 

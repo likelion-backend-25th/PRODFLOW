@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class QuotationPdfControllerTest {
     private final QuotationService quotations = mock(QuotationService.class);
     private final QuotationPdfStorageService pdfs = mock(QuotationPdfStorageService.class);
-    private final QuotationController controller = new QuotationController(quotations, null, null, pdfs);
+    private final QuotationController controller = new QuotationController(quotations, null, null, pdfs, null);
 
     @Test
     void createReturnsPreviewJsonAndSavedDraftLocation() {
@@ -255,7 +255,7 @@ class QuotationPdfControllerTest {
     private net.likelion.bebc25.prodflow.quotation.dto.QuotationPdfDto.PreviewResponse preview() {
         return new net.likelion.bebc25.prodflow.quotation.dto.QuotationPdfDto.PreviewResponse(
                 123L, "QT-20261104-123", "테스트 거래처", "client@example.com",
-                "https://example.com/signed.pdf", java.time.Instant.now().plusSeconds(600));
+                "https://example.com/signed.pdf", java.time.Instant.now().plusSeconds(600), "a".repeat(64) + "." + "b".repeat(64));
     }
     private QuotationDto.CreateRequest request() {
         return new QuotationDto.CreateRequest(1L, LocalDate.of(2026, 12, 10), null, false,

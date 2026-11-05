@@ -1,0 +1,26 @@
+info:
+  name: 견적 발송
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/quotations/:id/send"
+  params:
+    - name: id
+      value: "{{quotationId}}"
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "confirmationToken": "{{quotationConfirmationToken}}"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
