@@ -10,7 +10,7 @@ public class ProductionPlanDto {
     public record Response(
             Long id,
             Long workOrderId, // 작업지시서 고유 번호
-            LocalDate planDate, // 생산 시작 예정일
+            LocalDate planDate, // 그날의 생산 예정일
             int quantity // 그 날짜의 계획 수량
     ) {
         public static Response from(ProductionPlan plan) {

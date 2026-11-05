@@ -89,7 +89,7 @@ public class WorkOrderController {
 
     @Operation(
             summary = "작업지시 상세 조회",
-            description = "로그인한 사용자가 작업지시 한 장을 조회한다. 목록 항목에 시작 예정일, 완료일, 메모, 수주 납기를 포함한다."
+            description = "로그인한 사용자가 작업지시 한 장을 조회한다. 목록 항목에 시작 예정일, 완료일, 메모, 수주 납기, 날짜별 계획 수량을 포함한다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -118,6 +118,7 @@ public class WorkOrderController {
     )
     @ApiResponse(responseCode = "400", description = "변경할 항목이 없거나 배정할 수 없는 라인 또는 담당자 정보가 유효하지 않음")
     @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "403", description = "라인 변경은 최고 관리자·생산 현장 관리자, 담당자 변경은 최고 관리자·수주 관리자만 가능")
     @ApiResponse(responseCode = "404", description = "작업지시서, 생산 라인 또는 담당자를 찾을 수 없음")
     @PatchMapping("/{workOrderId}")
     public ResponseEntity<WorkOrderDto.DetailResponse> update(
@@ -132,7 +133,7 @@ public class WorkOrderController {
 
     @Operation(
             summary = "작업지시 상태 변경",
-            description = "로그인한 사용자가 작업 상태를 바꾼다. 허용된 전이만 가능하고, 변경 내용은 status_history에 남긴다."
+            description = "배정된 생산 현장 관리자 또는 최고 관리자가 작업 상태를 바꾼다. 허용된 전이만 가능하고, 변경 내용은 status_history에 남긴다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -141,6 +142,7 @@ public class WorkOrderController {
     )
     @ApiResponse(responseCode = "400", description = "같은 상태, 허용되지 않은 전이, 작업 상태 코드 없음, 시작 예정일 전, 대기 수주")
     @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "403", description = "배정된 생산 현장 관리자 또는 최고 관리자가 아님")
     @ApiResponse(responseCode = "404", description = "작업지시를 찾을 수 없음")
     @PatchMapping("/{workOrderId}/status")
     public ResponseEntity<WorkOrderDto.DetailResponse> changeStatus(
