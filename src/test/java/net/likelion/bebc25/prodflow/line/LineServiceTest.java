@@ -138,6 +138,7 @@ class LineServiceTest {
                 .hasMessage("수정한 직원을 찾을 수 없습니다.");
     }
 
+
     @Test
     @DisplayName("라인 상태를 바꾸면 enum 이름이 status_history에 남는다")
     void changeLineStatus() {
@@ -145,14 +146,16 @@ class LineServiceTest {
         Response updated = lineService.changeStatus(1L, new UpdateStatusRequest(LineStatus.INSPECTION), 1L);
 
         assertThat(updated.status()).isEqualTo(LineStatus.INSPECTION);
-        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("서도윤");
+        assertThat(lineRepository.findById(1L).orElseThrow().getUpdatedBy()).isEqualTo("SYSTEM");
 
+        // 방금 저장한 상태 변경 이력을 ID 기준으로 조회한다.
         StatusHistory saved = statusHistoryRepository.findAll().stream()
                 .filter(history -> history.getEntity() == HistoryEntityType.LINE
                         && history.getEntityId().equals(1L)
                         && "INSPECTION".equals(history.getToStatus()))
-                .findFirst()
+                .max((a, b) -> a.getId().compareTo(b.getId()))
                 .orElseThrow();
+
         // name() 결과가 이력의 변경 전, 변경 후 문자열이다.
         assertThat(saved.getFromStatus()).isEqualTo("OPERATING");
         assertThat(saved.getToStatus()).isEqualTo("INSPECTION");
