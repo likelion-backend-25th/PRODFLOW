@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.work_order.dto;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public class WorkOrderDto {
 
@@ -33,7 +34,8 @@ public class WorkOrderDto {
     public record Response(
             Long id, // 저장된 작업지시서 고유 번호
             String workNo, // 작업 지시 번호
-            String note
+            String note,
+            List<ProductionPlanDto.Response> plans // 이 장에 저장된 하루 계획
     ) {
     }
 
