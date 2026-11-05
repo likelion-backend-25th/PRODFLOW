@@ -85,6 +85,23 @@ public class ProductController {
     }
 
     @Operation(
+            summary = "품목 관련 수주·생산 이력 조회",
+            description = "해당 품목이 포함된 최근 수주 이력을 조회한다. 최근 연결 수주 카드와 관련 생산 및 수주 이력 표에서 사용한다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/{id}/orders")
+    public ResponseEntity<List<ProductDto.OrderHistoryResponse>> getOrderHistories(
+            @Parameter(description = "생산품목 ID", example = "1")
+            @PathVariable Long id,
+            @Parameter(description = "조회 건수", example = "3")
+            @RequestParam(defaultValue = "3") int size
+    ) {
+        return ResponseEntity.ok(productService.getOrderHistories(id, size));
+    }
+
+    @Operation(
             summary = "생산품목 검색",
             description = "키워드와 상태로 생산품목을 검색한다."
     )

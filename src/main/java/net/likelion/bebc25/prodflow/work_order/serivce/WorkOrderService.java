@@ -19,6 +19,7 @@ import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
+import net.likelion.bebc25.prodflow.work_order.dto.ProductionPlanDto;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
@@ -111,24 +112,25 @@ public class WorkOrderService {
             holidays.add(holiday.getHolidayDate());
         }
 
-        // 이번 등록의 첫 지시번호다. 장을 저장할 때마다 1 올린다.
+        // 이번 수주 등록의 첫 지시번호다. 장을 저장할 때마다 1 올린다.
         long nextNo = workOrderRepository.count() + 1;
         // 아직 라인에 넣지 못한 수량이다.
         int remaining = request.quantity();
         // 저장된 작업지시서 응답이다. 장이 여러 개일 수 있다.
         List<WorkOrderDto.Response> responses = new ArrayList<>();
 
-        // 요청한 라인을 먼저 채운다.
+        // 사용 가능한 라인을 리스트로 한곳에 담는다
         List<Line> lines = new ArrayList<>();
         lines.add(line);
-        for (Line candidate : lineRepository.findAll()) {
+        // 남은 수량을 넘길 수 있는지 보는 다른 라인
+        for (Line otherLine : lineRepository.findAll()) {
             // 이미 넣은 요청 라인은 다시 넣지 않는다.
-            if (candidate.getId().equals(line.getId())) {
+            if (otherLine.getId().equals(line.getId())) {
                 continue;
             }
             // 남은 수량을 넘길 라인은 가동 가능·가동 중만 둔다.
-            if (candidate.getStatus() == LineStatus.AVAILABLE || candidate.getStatus() == LineStatus.OPERATING) {
-                lines.add(candidate);
+            if (otherLine.getStatus() == LineStatus.AVAILABLE || otherLine.getStatus() == LineStatus.OPERATING) {
+                lines.add(otherLine);
             }
         }
 
@@ -137,10 +139,8 @@ public class WorkOrderService {
             if (remaining == 0) {
                 break;
             }
-            // 이 라인 한 장의 날짜 목록이다. 라인이 바뀌면 비운 뒤 다시 쌓는다.
-            List<LocalDate> planDates = new ArrayList<>();
-            // planDates와 같은 위치의 그날 수량이다.
-            List<Integer> planQuantities = new ArrayList<>();
+            // 이 라인에 넣을 하루 계획이다. 라인이 바뀌면 비운 뒤 다시 쌓는다.
+            List<DayPlan> dayPlans = new ArrayList<>();
             // 이 라인에 넣어 볼 남은 수량이다.
             int remainingToAssign = remaining;
             // 이 라인의 첫 검사일이다.
@@ -155,18 +155,16 @@ public class WorkOrderService {
                     date = date.plusDays(1);
                     continue;
                 }
-                // 이 라인, 이 날짜에 이미 저장된 계획 수량을 합한다.
+                // 해당 라인, 해당 날짜에 이미 저장된 계획 수량을 합한다.
                 long alreadyPlanned = productionPlanRepository.sumQuantityByLineAndDate(target.getId(), date);
                 // 하루 생산량에서 이미 잡힌 수량을 빼 남은 자리를 구한다.
-                int room = target.getProductionCapacity() - (int) alreadyPlanned;
+                int remainingCapacity = target.getProductionCapacity() - (int) alreadyPlanned;
                 // 남은 자리가 있을 때만 수량을 넣는다.
-                if (room > 0) {
+                if (remainingCapacity > 0) {
                     // 남은 자리와 아직 못 넣은 수량 중 작은 쪽을 그날 배정량으로 한다.
-                    int assigned = Math.min(room, remainingToAssign);
-                    // 배정한 날짜를 쌓는다.
-                    planDates.add(date);
-                    // 같은 위치에 그날 수량을 쌓는다.
-                    planQuantities.add(assigned);
+                    int assigned = Math.min(remainingCapacity, remainingToAssign);
+                    // 날짜와 수량을 하루 계획 한 건으로 쌓는다.
+                    dayPlans.add(new DayPlan(date, assigned));
                     // 이 라인에 아직 못 넣은 수량에서 오늘 넣은 양을 뺀다.
                     remainingToAssign -= assigned;
                 }
@@ -176,9 +174,9 @@ public class WorkOrderService {
 
             // 이 라인에 실제로 들어간 수량 합이다.
             int assignedOnThisLine = 0;
-            for (Integer quantity : planQuantities) {
-                // 날짜별 수량을 더해 이 장에 들어갈 총수량을 만든다.
-                assignedOnThisLine += quantity;
+            for (DayPlan dayPlan : dayPlans) {
+                // 하루 계획 수량을 더해 이 장에 들어갈 총수량을 만든다.
+                assignedOnThisLine += dayPlan.quantity();
             }
             // 들어간 수량이 없으면 작업지시서를 만들지 않고 다음 라인으로 간다.
             if (assignedOnThisLine == 0) {
@@ -186,7 +184,7 @@ public class WorkOrderService {
             }
 
             // 이번 장의 지시번호다. count()를 다시 부르지 않는다.
-            String workNo = "WI-" + Year.now().getValue() + "-" + String.format("%03d", nextNo);
+            String workNo = "WO-" + Year.now().getValue() + "-" + String.format("%03d", nextNo);
             // 제품명, 이번 라인, 작업 시작 예정일, 작업 종료 예정일이다.
             String note = orderProduct.getProductName()
                     + " "
@@ -214,12 +212,15 @@ public class WorkOrderService {
             workOrder.changeStatus(prepare);
             // 저장해야 생산 계획에 작업지시서 id가 들어간다.
             WorkOrder saved = workOrderRepository.save(workOrder);
-            for (int i = 0; i < planDates.size(); i++) {
-                // i번째 날짜와 i번째 수량이 하루 계획이다.
-                productionPlanRepository.save(new ProductionPlan(saved, planDates.get(i), planQuantities.get(i)));
+            List<ProductionPlanDto.Response> plans = new ArrayList<>();
+            for (DayPlan dayPlan : dayPlans) {
+                // 저장 전 초안을 생산 계획으로 저장한다.
+                ProductionPlan savedPlan = productionPlanRepository.save(
+                        new ProductionPlan(saved, dayPlan.planDate(), dayPlan.quantity()));
+                plans.add(ProductionPlanDto.Response.from(savedPlan));
             }
-            // 저장된 장 하나를 응답 목록에 넣는다.
-            responses.add(new WorkOrderDto.Response(saved.getId(), saved.getWorkNo(), saved.getNote()));
+            // 저장된 장 하나와 그 하루 계획을 응답 목록에 넣는다.
+            responses.add(new WorkOrderDto.Response(saved.getId(), saved.getWorkNo(), saved.getNote(), plans));
             // 다음 장의 지시번호를 1 올린다.
             nextNo++;
             // 전체 남은 수량에서 이 장에 넣은 수량을 뺀다.
@@ -466,5 +467,9 @@ public class WorkOrderService {
                 .findByCodeGroup_GroupCodeAndCodeAndStatus("ORDER_STATUS", orderStatus, CodeStatus.ACTIVE)
                 .orElseThrow(() -> new IllegalArgumentException("수주 상태 코드를 찾을 수 없습니다."));
         workOrder.getOrderProduct().getCustomerOrder().changeProgress(orderCode);
+    }
+
+    // 저장 전 하루 계획. 날짜와 수량을 한 건으로 둔다.
+    private record DayPlan(LocalDate planDate, int quantity) {
     }
 }
