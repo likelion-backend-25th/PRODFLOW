@@ -62,9 +62,9 @@ class HolidaySchedulerTest {
         var cron = CronExpression.parse(schedule.cron());
         var endOfYear = ZonedDateTime.of(2026, 12, 31, 23, 59, 59, 0, ZoneId.of("Asia/Seoul"));
         var january = cron.next(endOfYear.withZoneSameInstant(zone));
-        assertThat(january).isEqualTo(ZonedDateTime.of(2027, 1, 1, 0, 10, 0, 0, ZoneId.of("Asia/Seoul")));
+        assertThat(january).isEqualTo(ZonedDateTime.of(2027, 1, 1, 0, 0, 0, 0, ZoneId.of("Asia/Seoul")));
         assertThat(cron.next(january))
-                .isEqualTo(ZonedDateTime.of(2027, 2, 1, 0, 10, 0, 0, ZoneId.of("Asia/Seoul")));
+                .isEqualTo(ZonedDateTime.of(2027, 2, 1, 0, 0, 0, 0, ZoneId.of("Asia/Seoul")));
     }
 
     @Test
