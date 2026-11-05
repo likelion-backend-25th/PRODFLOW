@@ -1,5 +1,7 @@
 package net.likelion.bebc25.prodflow.auth.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -25,6 +27,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Tag(name = "인증(Auth)", description = "로그인, JWT 재발급, 로그아웃 및 비밀번호 변경 API")
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -52,6 +55,12 @@ public class AuthController {
     private String allowedOrigins;
 
     // 로그인
+    @Operation(
+            summary = "로그인",
+            description = "이메일과 비밀번호를 확인한 뒤 Access Token을 응답 본문으로 반환합니다. "
+                    + "Refresh Token은 HttpOnly 쿠키(refreshToken)로 발급하며, "
+                    + "최초 비밀번호 변경 필요 여부도 함께 반환합니다."
+    )
     @PostMapping("/login")
     public ResponseEntity<AuthDto.LoginResponse> login(
             @Valid @RequestBody AuthDto.LoginRequest request,
@@ -74,6 +83,11 @@ public class AuthController {
     }
 
     // 토큰 재발급
+    @Operation(
+            summary = "Access Token 재발급",
+            description = "요청 쿠키의 refreshToken을 검증하고 새로운 Access Token을 반환합니다. "
+                    + "Refresh Token도 새 쿠키로 교체됩니다. 요청 본문은 필요하지 않습니다."
+    )
     @PostMapping("/refresh")
     public ResponseEntity<AuthDto.RefreshResponse> refresh(
             HttpServletRequest request
@@ -97,6 +111,11 @@ public class AuthController {
     }
 
     // 로그아웃
+    @Operation(
+            summary = "로그아웃",
+            description = "요청 쿠키의 Refresh Token을 서버에서 무효화하고 쿠키를 삭제합니다. "
+                    + "성공 시 204 No Content를 반환하며 요청 본문은 필요하지 않습니다."
+    )
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request) {
         // 요청 출처 검증
@@ -115,6 +134,12 @@ public class AuthController {
     }
 
     // 비밀번호 변경
+    @Operation(
+            summary = "최초 비밀번호 변경",
+            description = "로그인한 직원이 임시 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다. "
+                    + "Authorization 헤더의 Access Token이 필요하며, 변경 성공 시 Refresh Token 쿠키를 삭제하고 "
+                    + "204 No Content를 반환합니다. 변경 후 다시 로그인해야 합니다."
+    )
     @PostMapping("/change-password")
     public ResponseEntity<Void> changePassword(
             @AuthenticationPrincipal CustomUserDetails principal,
