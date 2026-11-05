@@ -78,6 +78,9 @@ holiday:
   initialization:
     # 운영 서버에서 true로 설정하면 시작 시 올해·다음 해 데이터를 수집
     enabled: ${HOLIDAY_INITIALIZATION_ENABLED:true}
+  scheduling:
+    # 매월 1일 한국 시간 00:00에 올해·다음 해 신규 공휴일 수집
+    enabled: ${HOLIDAY_SCHEDULING_ENABLED:true}
 
 
 # 배송조회 외부 API (스마트택배 연동)

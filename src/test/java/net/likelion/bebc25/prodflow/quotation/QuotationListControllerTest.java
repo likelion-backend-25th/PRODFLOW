@@ -30,7 +30,7 @@ class QuotationListControllerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new QuotationController(service,
-                        mock(QuotationSchedulePreviewService.class), mock(QuotationRescheduleService.class), mock(QuotationPdfStorageService.class), null))
+                        mock(QuotationSchedulePreviewService.class), mock(QuotationRescheduleService.class), mock(QuotationPdfStorageService.class), null, null))
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         when(service.getQuotationList(nullable(String.class), nullable(QuotationStatus.class),

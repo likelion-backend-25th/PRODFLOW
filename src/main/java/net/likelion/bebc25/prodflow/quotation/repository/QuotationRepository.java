@@ -2,6 +2,8 @@ package net.likelion.bebc25.prodflow.quotation.repository;
 
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.time.LocalDate;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +23,10 @@ public interface QuotationRepository extends JpaRepository<Quotation, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select q from Quotation q where q.id = :id")
     Optional<Quotation> findByIdForUpdate(@Param("id") Long id);
+
+    // 유효기간이 지난 발송 견적 조회 및 쓰기 잠금
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Quotation> findByStatusAndValidUntilBeforeOrderByIdAsc(QuotationStatus status, LocalDate today);
 
     // 거래처·작성자 포함 견적 목록 조회
     @Override

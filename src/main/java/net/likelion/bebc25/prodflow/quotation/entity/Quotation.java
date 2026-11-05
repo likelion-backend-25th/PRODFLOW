@@ -187,16 +187,25 @@ public class Quotation extends BaseTimeEntity {
 
     // 거절 상태 변경
     public void reject() {
+        if (status != QuotationStatus.SENT) {
+            throw new IllegalArgumentException("발송완료 견적만 거절할 수 있습니다.");
+        }
         this.status = QuotationStatus.REJECTED;
     }
 
-    // 취소 상태 변경
+    // 발송·승인 견적 취소
     public void cancel() {
+        if (status != QuotationStatus.SENT && status != QuotationStatus.APPROVED) {
+            throw new IllegalArgumentException("발송완료 또는 승인 견적만 취소할 수 있습니다.");
+        }
         this.status = QuotationStatus.CANCELLED;
     }
 
     // 만료 상태 변경
-    public void expired() {
+    public void expired(LocalDate today) {
+        if (status != QuotationStatus.SENT || !validUntil.isBefore(today)) {
+            throw new IllegalArgumentException("유효기간이 지난 발송완료 견적만 만료할 수 있습니다.");
+        }
         this.status = QuotationStatus.EXPIRED;
     }
 

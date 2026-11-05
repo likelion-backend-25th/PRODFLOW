@@ -1,0 +1,20 @@
+info:
+  name: 견적 취소
+  type: http
+  seq: 11
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/quotations/:quotationId/cancel"
+  params:
+    - name: quotationId
+      value: "17"
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
