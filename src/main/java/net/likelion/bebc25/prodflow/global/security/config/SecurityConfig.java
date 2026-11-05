@@ -183,6 +183,25 @@ public class SecurityConfig {
                                 "/api/v1/quotations"
                         ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
 
+                        // 생산품목 등록·도면 업로드는 최고 관리자 또는 수주 관리자만 허용
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/products",
+                                "/api/v1/products/*/drawings"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
+                        // 생산품목 수정은 최고 관리자 또는 수주 관리자만 허용
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/v1/products/*"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
+                        // 생산품목 상태 변경은 최고 관리자 또는 수주 관리자만 허용
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/products/*/status"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
                         // 위 규칙에 해당하지 않는 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 );
