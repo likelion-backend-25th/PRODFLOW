@@ -41,6 +41,9 @@ public class LineService {
     // 생산라인 알림 발송
     private final LineNotificationService lineNotificationService;
 
+    // 생산라인 알림 발송
+    private final LineNotificationService lineNotificationService;
+
     // 생산라인 목록. 카드 한 장과 상단 집계를 한 응답으로 만든다.
     public LineDto.ListResponse findAll() {
         // 쿼리는 라인 기준 아우터 조인이고, 라인 id 다음 작업 id 순이다.
