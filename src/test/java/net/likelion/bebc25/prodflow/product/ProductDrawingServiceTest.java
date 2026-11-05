@@ -7,7 +7,7 @@ import net.likelion.bebc25.prodflow.product.entity.ProductDrawing;
 import net.likelion.bebc25.prodflow.product.repository.ProductDrawingRepository;
 import net.likelion.bebc25.prodflow.product.repository.ProductRepository;
 import net.likelion.bebc25.prodflow.product.service.ProductDrawingService;
-import net.likelion.bebc25.prodflow.product.storage.StorageClient;
+import net.likelion.bebc25.prodflow.common.storage.StorageClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

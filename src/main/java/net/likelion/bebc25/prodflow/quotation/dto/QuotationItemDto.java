@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+
 import net.likelion.bebc25.prodflow.quotation.entity.QuotationItem;
 
 public class QuotationItemDto {
@@ -29,6 +30,7 @@ public class QuotationItemDto {
             Long unitPrice,
             Long lineAmount
     ) {
+        // 견적 품목 응답 변환
         public static Response from(QuotationItem item) {
             return new Response(
                     item.getId(),

@@ -1,15 +1,15 @@
 package net.likelion.bebc25.prodflow.quotation.dto;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import net.likelion.bebc25.prodflow.quotation.schedule.QuotationSchedulePreviewResult;
-import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleResult;
-
+import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
+
+import net.likelion.bebc25.prodflow.quotation.schedule.QuotationSchedulePreviewResult;
+import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleResult;
 
 public class QuotationScheduleDto {
 
@@ -39,7 +39,7 @@ public class QuotationScheduleDto {
             LocalDate plannedStartDate, // 시작 예정일
             LocalDate plannedEndDate // 완료 예정일
     ) {
-        // 최초 작성·기존 견적 재산정의 계산 결과를 같은 응답 형식으로 변환
+        // 납기 미리보기 응답 변환
         public static Response from(QuotationSchedulePreviewResult result, LocalDate requestedDueDate) {
             QuotationScheduleResult selected = result.selectedSchedule();
             return new Response(

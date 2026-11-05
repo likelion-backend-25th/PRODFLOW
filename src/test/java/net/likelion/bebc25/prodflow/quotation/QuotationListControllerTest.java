@@ -6,7 +6,7 @@ import net.likelion.bebc25.prodflow.quotation.controller.QuotationController;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationSortType;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationService;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationSchedulePreviewService;
 import net.likelion.bebc25.prodflow.quotation.service.QuotationRescheduleService;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +30,7 @@ class QuotationListControllerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new QuotationController(service,
-                        mock(QuotationSchedulePreviewService.class), mock(QuotationRescheduleService.class), mock(QuotationPdfService.class)))
+                        mock(QuotationSchedulePreviewService.class), mock(QuotationRescheduleService.class), mock(QuotationPdfStorageService.class)))
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         when(service.getQuotationList(nullable(String.class), nullable(QuotationStatus.class),

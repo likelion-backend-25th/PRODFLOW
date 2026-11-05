@@ -1,19 +1,21 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
+
 import lombok.RequiredArgsConstructor;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationScheduleDto;
-import net.likelion.bebc25.prodflow.quotation.schedule.QuotationSchedulePreviewResult;
-import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleService;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.List;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationScheduleDto;
+import net.likelion.bebc25.prodflow.quotation.schedule.QuotationSchedulePreviewResult;
+import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleService;
 
 @Service
 @Validated
@@ -24,7 +26,7 @@ public class QuotationSchedulePreviewService {
     private final QuotationItemService quotationItemService;
     private final QuotationScheduleService scheduleService;
 
-    // 품목을 검증하고 합산 수량으로 납기 미리보기 조회
+    // 신규 견적 납기 미리보기 계산
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
     public QuotationScheduleDto.Response previewSchedule(@NotNull @Valid QuotationScheduleDto.Request request) {
         List<Long> productIds = request.items().stream()

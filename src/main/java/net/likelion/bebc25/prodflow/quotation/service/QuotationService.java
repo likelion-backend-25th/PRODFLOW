@@ -1,8 +1,31 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.Valid;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.format.DateTimeFormatter;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
+
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
 import net.likelion.bebc25.prodflow.common.dto.PageResponse;
@@ -21,27 +44,6 @@ import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleService;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.validation.annotation.Validated;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @Validated
@@ -56,7 +58,7 @@ public class QuotationService {
     private final QuotationItemService quotationItemService;
     private final QuotationScheduleService scheduleService;
 
-    // 견적 초안 저장. PDF 생성은 이 트랜잭션 커밋 이후 수행한다.
+    // 견적 초안 저장
     @Transactional
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
     public QuotationDto.DetailResponse create(@NotNull @Valid QuotationDto.CreateRequest request, Long userId) {
@@ -123,10 +125,12 @@ public class QuotationService {
         return toDetailResponse(savedQuotation, savedItems);
     }
 
-    // 수정 커밋 후 컨트롤러에서 PDF를 생성. PDF 실패로 수정 내용을 되돌리지 않는다.
+    // 견적 초안 수정
     @Transactional
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
-    public QuotationDto.DetailResponse updateDraft(Long quotationId, @NotNull @Valid QuotationDto.CreateRequest request, Long userId) {
+    public QuotationDto.DetailResponse updateDraft(
+            Long quotationId, @NotNull @Valid QuotationDto.CreateRequest request, Long userId
+    ) {
         // 수정자 계정을 조회하고 사용 상태,최초 비밀번호 변경 완료 여부를 확인
         User editor = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("수정자 계정을 찾을 수 없습니다."));
@@ -182,11 +186,11 @@ public class QuotationService {
         // 변경 사항을 DB에 반영하고 감사 시각을 갱신한다. 실제 커밋은 서비스 메서드 반환 시 수행된다.
         quotationRepository.flush();
 
-        // 커밋 후 컨트롤러가 PDF를 만들 수 있도록 수정된 견적과 품목의 상세 정보를 반환
+        // 커밋 후 PDF를 만들 수 있도록 수정된 견적과 품목의 상세 정보를 반환
         return toDetailResponse(quotation, items);
     }
 
-    // 견적 최초 저장용 총액 계산
+    // 견적 총액 계산
     private long calculateTotalAmount(List<QuotationItemDto.CreateRequest> items, boolean vatIncluded) {
         try {
             long totalAmount = 0;
@@ -200,7 +204,7 @@ public class QuotationService {
         }
     }
 
-    // 견적 금액과 계약금·잔금을 계산한 뒤 상세 응답 DTO 생성
+    // 금액 계산 및 견적 상세 응답 변환
     private QuotationDto.DetailResponse toDetailResponse(Quotation quotation, List<QuotationItem> items) {
         try {
             long totalAmount = quotation.getTotalAmount(); // 저장된 부가세 포함 총액
@@ -240,7 +244,7 @@ public class QuotationService {
         }
     }
 
-    // 기존 거래처를 조회하거나 신규 거래처 등록
+    // 기존 거래처 조회 또는 신규 등록
     private Client findOrCreateClient(QuotationDto.CreateRequest request, User user) {
         // 기존 거래처 ID와 신규 거래처 정보가 모두 없으면 예외 발생
         if (request.clientId() == null && request.newClient() == null) {
@@ -271,13 +275,13 @@ public class QuotationService {
         return clientRepository.save(client);
     }
 
-    // 견적서 번호 생성
+    // 저장 전 임시 견적번호 생성
     private String createQuotationNo(LocalDate today) {
         String date = today.format(DateTimeFormatter.BASIC_ISO_DATE);
         return "QT-" + date + "-" + UUID.randomUUID();
     }
 
-    // 검색어·상태 필터·날짜 정렬로 견적서 목록 조회
+    // 견적 목록 조회
     public PageResponse<QuotationDto.Response> getQuotationList(
             String keyword, QuotationStatus status, @NotNull QuotationSortType sortType, Pageable pageable) {
         // 요청의 sort 대신 허용된 날짜 기준·방향 적용
@@ -306,7 +310,6 @@ public class QuotationService {
     }
 
     // 견적별 연결 수주 조회
-    // 여러 견적서에 연결된 수주를 조회하여 견적 ID 기준 Map으로 반환
     private Map<Long, CustomerOrder> findOrdersByQuotationIds(List<Long> quotationIds) {
         if (quotationIds.isEmpty()) {
             return Map.of();
@@ -320,7 +323,7 @@ public class QuotationService {
                 ));
     }
 
-    // 견적서 상세 조회
+    // 견적 상세 조회
     public QuotationDto.DetailResponse getQuotationById(Long id) {
         Quotation quotation = quotationRepository.findDetailById(id)
                 .orElseThrow(() -> new NoSuchElementException("존재하지 않는 견적서입니다. ID: " + id));

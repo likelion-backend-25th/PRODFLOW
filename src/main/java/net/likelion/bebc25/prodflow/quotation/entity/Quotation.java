@@ -2,8 +2,8 @@ package net.likelion.bebc25.prodflow.quotation.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -11,16 +11,17 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.user.entity.User;
-
-import java.time.LocalDate;
 
 @Entity
 @Getter
@@ -81,7 +82,11 @@ public class Quotation extends BaseTimeEntity {
     @Column(name = "total_amount", nullable = false)
     private Long totalAmount;
 
-    // 견적 품목은 QuotationItem으로 따로 조회한다.
+    // 업로드 완료 후에만 저장한다. NULL이면 미리보기를 허용하지 않는다.
+    @Column(name = "pdf_object_key")
+    private String pdfObjectKey;
+
+    // 견적 정보 초기화
     public Quotation(
             String quotationNo,
             Client client,
@@ -116,7 +121,7 @@ public class Quotation extends BaseTimeEntity {
         this.totalAmount = totalAmount;
     }
 
-    // 초안만 수정하며 견적 ID,번호,최초 작성자는 유지
+    // 견적 초안 변경
     public void changeDraft(Client client, String clientName, LocalDate requestedDueDate,
                             LocalDate estimatedDueDate, LocalDate plannedStartDate, LocalDate plannedEndDate,
                             LocalDate validUntil, boolean vatIncluded, Long totalAmount) {
@@ -138,8 +143,23 @@ public class Quotation extends BaseTimeEntity {
         this.validUntil = validUntil;
         this.vatIncluded = vatIncluded;
         this.totalAmount = totalAmount;
+        this.pdfObjectKey = null;
     }
 
+    // PDF 저장 경로 초기화
+    public void clearPdfObjectKey() {
+        this.pdfObjectKey = null;
+    }
+
+    // PDF 저장 경로 변경
+    public void changePdfObjectKey(String pdfObjectKey) {
+        if (pdfObjectKey == null || pdfObjectKey.isBlank()) {
+            throw new IllegalArgumentException("PDF 객체 키는 비어 있을 수 없습니다.");
+        }
+        this.pdfObjectKey = pdfObjectKey;
+    }
+
+    // 견적번호 변경
     public void changeQuotationNo(String quotationNo) {
         if (quotationNo == null || quotationNo.isBlank()) {
             throw new IllegalArgumentException("견적번호는 비어 있을 수 없습니다.");
@@ -147,6 +167,7 @@ public class Quotation extends BaseTimeEntity {
         this.quotationNo = quotationNo;
     }
 
+    // 거래처 주소 조합
     private static String formatAddress(Address address) {
         if (address == null) {
             throw new IllegalArgumentException("거래처 주소가 필요합니다.");
@@ -154,26 +175,32 @@ public class Quotation extends BaseTimeEntity {
         return String.join(" ", address.getZipcode(), address.getRoadAddress(), address.getDetailAddress());
     }
 
+    // 발송 완료 상태 변경
     public void sent() {
         this.status = QuotationStatus.SENT;
     }
 
+    // 승인 상태 변경
     public void approve() {
         this.status = QuotationStatus.APPROVED;
     }
 
+    // 거절 상태 변경
     public void reject() {
         this.status = QuotationStatus.REJECTED;
     }
 
+    // 취소 상태 변경
     public void cancel() {
         this.status = QuotationStatus.CANCELLED;
     }
 
+    // 만료 상태 변경
     public void expired() {
         this.status = QuotationStatus.EXPIRED;
     }
 
+    // 견적 납기 일정 변경
     public void changeSchedule(
             LocalDate requestedDueDate,
             LocalDate estimatedDueDate,

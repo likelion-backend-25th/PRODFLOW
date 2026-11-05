@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.global.exception;
 
+import net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -17,6 +18,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+    @Test
+    void pdfExceptionsUseGlobalHandlerAndPreserveRetryContract() throws Exception {
+        for (HttpStatus httpStatus : new HttpStatus[]{
+                HttpStatus.BAD_REQUEST, HttpStatus.CONFLICT, HttpStatus.BAD_GATEWAY}) {
+            var exception = new QuotationPdfPreparationException(
+                    123L, httpStatus, "PDF_TEST_ERROR", "PDF 준비 실패",
+                    new RuntimeException("외부 서비스 내부 상세"));
+            var mvc = MockMvcBuilders.standaloneSetup(new ExceptionController(exception))
+                    .setControllerAdvice(handler).build();
+            mvc.perform(get("/test/exception"))
+                    .andExpect(status().is(httpStatus.value()))
+                    .andExpect(header().string("Cache-Control", "no-store"))
+                    .andExpect(header().string("X-Quotation-Id", "123"))
+                    .andExpect(header().string("Location", "/api/v1/quotations/123"))
+                    .andExpect(jsonPath("$.code").value("PDF_TEST_ERROR"))
+                    .andExpect(jsonPath("$.message").value("PDF 준비 실패"))
+                    .andExpect(jsonPath("$.quotationId").value(123))
+                    .andExpect(jsonPath("$.retryUrl").value("/api/v1/quotations/123/pdf/regenerate"))
+                    .andExpect(jsonPath("$.previewUrl").doesNotExist());
+        }
+    }
 
     @Test
     void externalApiFailureReturns502WithoutExposingInternalDetails() {

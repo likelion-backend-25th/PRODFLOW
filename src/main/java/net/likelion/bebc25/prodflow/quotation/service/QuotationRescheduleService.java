@@ -1,8 +1,19 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.NoSuchElementException;
+
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
+
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationRescheduleDto;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationScheduleDto;
@@ -14,15 +25,6 @@ import net.likelion.bebc25.prodflow.quotation.repository.QuotationRepository;
 import net.likelion.bebc25.prodflow.quotation.schedule.QuotationSchedulePreviewResult;
 import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleResult;
 import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleService;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.validation.annotation.Validated;
-
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.NoSuchElementException;
 
 @Service
 @Validated
@@ -35,7 +37,7 @@ public class QuotationRescheduleService {
     private final QuotationScheduleService scheduleService;
     private final QuotationService quotationService;
 
-    // 저장된 품목 수량을 기준으로 기존 견적의 납기 미리보기 조회
+    // 기존 견적 납기 미리보기 계산
     public QuotationScheduleDto.Response previewSchedule(
             Long quotationId, @NotNull @Valid QuotationRescheduleDto.PreviewRequest request
     ) {
@@ -48,7 +50,7 @@ public class QuotationRescheduleService {
         return QuotationScheduleDto.Response.from(result, request.requestedDueDate());
     }
 
-    // 최신 생산 조건으로 재검증한 뒤 견적의 날짜 네 개만 변경
+    // 기존 견적 납기 재산정·저장
     @Transactional
     public QuotationDto.DetailResponse updateSchedule(
             Long quotationId, @NotNull @Valid QuotationRescheduleDto.UpdateRequest request
@@ -64,7 +66,7 @@ public class QuotationRescheduleService {
         return quotationService.getQuotationById(quotationId);
     }
 
-    // 발송완료 상태와 실제 유효기간을 모두 확인하여 재산정 대상 조회
+    // 납기 변경 가능 견적 조회
     private Quotation findEligibleQuotation(Long quotationId, LocalDate today) {
         Quotation quotation = quotationRepository.findDetailById(quotationId)
                 .orElseThrow(() -> new NoSuchElementException("존재하지 않는 견적서입니다. ID: " + quotationId));
@@ -77,7 +79,7 @@ public class QuotationRescheduleService {
         return quotation;
     }
 
-    // 현재 제품 정보 대신 견적에 저장된 품목 수량 사용
+    // 견적 품목 총수량 계산
     private long totalQuantity(Long quotationId) {
         List<QuotationItem> items = quotationItemRepository.findByQuotationIdOrderByIdAsc(quotationId);
         if (items.isEmpty()) {
