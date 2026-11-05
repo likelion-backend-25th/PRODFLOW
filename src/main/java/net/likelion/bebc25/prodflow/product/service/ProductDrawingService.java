@@ -8,6 +8,7 @@ import net.likelion.bebc25.prodflow.product.entity.ProductDrawing;
 import net.likelion.bebc25.prodflow.product.repository.ProductDrawingRepository;
 import net.likelion.bebc25.prodflow.product.repository.ProductRepository;
 import net.likelion.bebc25.prodflow.product.storage.StorageClient;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,6 +31,7 @@ public class ProductDrawingService {
     private final StorageClient storageClient;
 
 
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public Response upload(Long productId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("업로드할 파일이 없습니다.");
