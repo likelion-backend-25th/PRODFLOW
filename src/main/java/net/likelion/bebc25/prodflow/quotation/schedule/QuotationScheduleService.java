@@ -1,16 +1,5 @@
 package net.likelion.bebc25.prodflow.quotation.schedule;
 
-import lombok.RequiredArgsConstructor;
-import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
-import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
-import net.likelion.bebc25.prodflow.line.entity.Line;
-import net.likelion.bebc25.prodflow.line.enums.LineStatus;
-import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
-import net.likelion.bebc25.prodflow.quotation.repository.QuotationScheduleRepository;
-import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,6 +9,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
+import net.likelion.bebc25.prodflow.line.entity.Line;
+import net.likelion.bebc25.prodflow.line.enums.LineStatus;
+import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.quotation.repository.QuotationScheduleRepository;
+import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
+
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -27,7 +29,7 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
     private final LineRepository lineRepository;
     private final QuotationScheduleRepository scheduleRepository;
 
-    // 선택한 납기에 맞춰 생산 일정 계산
+    // 선택 납기의 생산 일정 계산
     public QuotationScheduleResult calculate(long quantity, LocalDate requestedDueDate, LocalDate today) {
         if (requestedDueDate == null) {
             throw new IllegalArgumentException("희망 납기일을 입력해주세요.");
@@ -41,7 +43,7 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
         return result.selectedSchedule();
     }
 
-    // 생산능력, 휴일, 기존 수주를 반영한 계산용 캘린더 생성
+    // 생산 계산용 캘린더 생성
     private ProductionCalendar createCalendar(LocalDate today) {
         long dailyCapacity = calculateDailyCapacity();
         Set<LocalDate> holidays = new HashSet<>(scheduleRepository.findHolidays());
@@ -56,7 +58,7 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
         return calendar;
     }
 
-    // 가동 가능·가동 중 라인의 일일 생산능력 합산
+    // 라인 일일 생산능력 합산
     private long calculateDailyCapacity() {
         long dailyCapacity = 0;
         for (Line line : lineRepository.findAll()) {
@@ -70,7 +72,7 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
         return dailyCapacity;
     }
 
-    // 가장 빠른 납기와 선택한 납기의 생산 가능 여부 조회
+    // 최단·선택 납기 일정 계산
     public QuotationSchedulePreviewResult previewSchedule(long quantity, LocalDate requestedDueDate, LocalDate today) {
         ProductionCalendar calendar = createCalendar(today);
         if (requestedDueDate != null) {
@@ -98,7 +100,8 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
             return new QuotationSchedulePreviewResult(earliestSchedule, null);
         }
 
-        Map<LocalDate, Long> selectedPlan = calendar.planProduction(quantity, firstDate, requestedDueDate, earliestPlan);
+        Map<LocalDate, Long> selectedPlan = calendar.planProduction(
+                quantity, firstDate, requestedDueDate, earliestPlan);
 
         LocalDate selectedStartDate = Collections.min(selectedPlan.keySet());
         LocalDate selectedEndDate = Collections.max(selectedPlan.keySet());
@@ -108,7 +111,7 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
         return new QuotationSchedulePreviewResult(earliestSchedule, selectedSchedule);
     }
 
-    // 기존 수주의 남은 생산 수량을 등록순으로 계산용 캘린더에 배정
+    // 기존 수주 생산량 예약
     private void reserveExistingOrders(ProductionCalendar calendar, LocalDate today) {
         // 수주 등록순 조회
         List<CustomerOrder> orders = scheduleRepository.findActiveOrders();
@@ -142,7 +145,7 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
         }
     }
 
-    // 수주별 품목 수량 합산
+    // 수주별 총수량 계산
     private Map<Long, Long> calculateOrderQuantities(List<Long> orderIds) {
         Map<Long, Long> totalQuantityByOrder = new HashMap<>();
         for (OrderProduct item : scheduleRepository.findOrderProducts(orderIds)) {
@@ -153,7 +156,7 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
         return totalQuantityByOrder;
     }
 
-    // 시작된 작업의 수주별 고정 수량 합산 및 오늘 이후 생산량 예약
+    // 확정 생산 일정 예약
     private Map<Long, Long> reserveFixedPlans(ProductionCalendar calendar, List<Long> orderIds, LocalDate today) {
         Map<Long, Long> fixedQuantityByOrder = new HashMap<>();
         // 시작된 작업의 생산계획 고정

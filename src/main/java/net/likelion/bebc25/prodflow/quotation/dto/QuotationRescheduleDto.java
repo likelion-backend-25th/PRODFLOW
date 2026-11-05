@@ -1,7 +1,6 @@
 package net.likelion.bebc25.prodflow.quotation.dto;
 
 import jakarta.validation.constraints.NotNull;
-
 import java.time.LocalDate;
 
 public class QuotationRescheduleDto {

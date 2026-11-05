@@ -3,6 +3,9 @@ package net.likelion.bebc25.prodflow.global.exception;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import net.likelion.bebc25.prodflow.auth.exception.AuthException;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationPdfDto;
+import net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -16,6 +19,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
+import java.net.URI;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
@@ -23,6 +27,15 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(QuotationPdfPreparationException.class)
+    public ResponseEntity<QuotationPdfDto.FailureResponse> handlePdfFailure(QuotationPdfPreparationException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .header("X-Quotation-Id", ex.getQuotationId().toString())
+                .location(URI.create("/api/v1/quotations/" + ex.getQuotationId()))
+                .body(QuotationPdfDto.FailureResponse.from(ex));
+    }
 
     // 요청 파라미터 타입 변환 실패 시 호출됨 (400 Bad Request 응답)
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
