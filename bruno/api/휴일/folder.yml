@@ -1,7 +1,7 @@
 info:
   name: 휴일
   type: folder
-  seq: 7
+  seq: 5
 
 request:
   auth: inherit

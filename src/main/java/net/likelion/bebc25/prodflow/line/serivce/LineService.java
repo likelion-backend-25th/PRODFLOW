@@ -10,6 +10,7 @@ import net.likelion.bebc25.prodflow.line.entity.LineCapacityLog;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.line.repsitory.LineCapacityLogRepository;
 import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line_notification.service.LineNotificationService;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
@@ -32,6 +33,9 @@ public class LineService {
     private final UserRepository userRepository;
     private final LineCapacityLogRepository lineCapacityLogRepository; // 라인 변경시 이력을 저장
     private final StatusHistoryRepository statusHistoryRepository; // 상태 변경시 이력을 저장
+
+    // 생산라인 알림 발송
+    private final LineNotificationService lineNotificationService;
 
     // 생산라인 목록. 카드 한 장과 상단 집계를 한 응답으로 만든다.
     public LineDto.ListResponse findAll() {
@@ -251,6 +255,13 @@ public class LineService {
                 beforeStatus.name(), // 변경전 상태
                 request.status().name(), // 변경후 상태
                 user)); // 변경한 직원
+
+        // 생산라인 상태 변경 알림 (생산라인 알림 도메인)
+        lineNotificationService.notifyLineStatusChanged(
+                line.getId(),
+                request.status()
+        );
         return LineDto.Response.from(line);
     }
+
 }
