@@ -14,9 +14,9 @@ import net.likelion.bebc25.prodflow.line_notification.service.LineNotificationSe
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
-import net.likelion.bebc25.prodflow.work_order.serivce.WorkOrderService;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
+import net.likelion.bebc25.prodflow.work_order.serivce.WorkOrderService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -37,9 +37,6 @@ public class LineService {
     private final LineCapacityLogRepository lineCapacityLogRepository; // 라인 변경시 이력을 저장
     private final StatusHistoryRepository statusHistoryRepository; // 상태 변경시 이력을 저장
     private final WorkOrderService workOrderService;
-
-    // 생산라인 알림 발송
-    private final LineNotificationService lineNotificationService;
 
     // 생산라인 알림 발송
     private final LineNotificationService lineNotificationService;
