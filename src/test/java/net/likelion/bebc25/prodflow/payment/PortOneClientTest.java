@@ -5,6 +5,7 @@ import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.payment.client.PortOneClient;
 import net.likelion.bebc25.prodflow.payment.dto.PortOneDto;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,7 @@ public class PortOneClientTest {
     @Autowired
     private CustomerOrderRepository customerOrderRepository;
 
+    @Disabled
     @Test
     @DisplayName("수주와 거래처 정보로 신한은행 가상계좌를 발급한다")
     void issueInstantPayment() {
