@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 
 public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
@@ -53,6 +55,32 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     // 이 작업을 뺀 같은 라인에 해당 상태의 작업이 있는지
     boolean existsByLine_IdAndCommonCode_CodeAndIdNot(Long lineId, String code, Long workOrderId);
+
+    // 고장 라인에 남은 생산·일시정지 작업. 미래 계획이 없어도 라인을 비운다.
+    List<WorkOrder> findByLine_IdAndCommonCode_CodeIn(Long lineId, Collection<String> codes);
+
+    // 같은 품목, 같은 라인의 준비 작업. 재배치로 넘긴 수량을 새 장 대신 여기에 더한다.
+    Optional<WorkOrder> findFirstByOrderProduct_IdAndLine_IdAndCommonCode_CodeAndIdNot(
+            Long orderProductId,
+            Long lineId,
+            String code,
+            Long workOrderId
+    );
+
+    // 재배치로 만든 작업 번호가 이미 있으면 다음 번호를 쓰기 위해 확인한다.
+    boolean existsByWorkNo(String workNo);
+
+    // 이 담당자에게 해당 상태의 작업지시가 있는지. 생산 중이면 준비 작업을 더 주지 않는다.
+    boolean existsByUser_IdAndCommonCode_Code(Long userId, String code);
+
+    // 담당자를 고를 때 준비 상태 수량의 합이 적은 사람을 본다.
+    @Query("""
+            select coalesce(sum(workOrder.quantity), 0)
+            from WorkOrder workOrder
+            where workOrder.user.id = :userId
+              and workOrder.commonCode.code = 'PREPARE'
+            """)
+    long sumPrepareQuantityByUserId(@Param("userId") Long userId);
 
     // 이 작업을 뺀 같은 수주에 포장 이전 작업이 있는지
     boolean existsByOrderProduct_CustomerOrder_IdAndCommonCode_CodeNotInAndIdNot(

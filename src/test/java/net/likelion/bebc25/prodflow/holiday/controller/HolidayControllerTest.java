@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.holiday;
+package net.likelion.bebc25.prodflow.holiday.controller;
 
 import net.likelion.bebc25.prodflow.holiday.service.HolidaySyncService;
 import net.likelion.bebc25.prodflow.holiday.entity.Holiday;
@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -26,17 +27,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = {
-        "holiday.initialization.enabled=false",
-        "holiday.scheduling.enabled=false",
-        "spring.datasource.url=jdbc:h2:mem:holiday-controller;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=USER,LINE",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa", "spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.sql.init.mode=never",
-        "spring.jpa.properties.hibernate.show_sql=false",
-        "jwt.secret=cXVvdGF0aW9uLXRlc3Qtc2VjcmV0LW11c3QtYmUtMzItYnl0ZXM=",
-        "jwt.access-token-expiration=60000", "jwt.refresh-token-expiration=120000"
-})
+@SpringBootTest
+@Transactional
 @AutoConfigureMockMvc
 class HolidayControllerTest {
     @Autowired MockMvc mvc;

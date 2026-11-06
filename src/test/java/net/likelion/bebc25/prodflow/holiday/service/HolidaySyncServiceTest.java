@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.holiday;
+package net.likelion.bebc25.prodflow.holiday.service;
 
 import net.likelion.bebc25.prodflow.holiday.client.HolidayApiClient;
 import net.likelion.bebc25.prodflow.global.exception.ExternalApiException;
@@ -7,6 +7,7 @@ import net.likelion.bebc25.prodflow.holiday.entity.Holiday;
 import net.likelion.bebc25.prodflow.holiday.repository.HolidayRepository;
 import net.likelion.bebc25.prodflow.holiday.service.HolidaySyncService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,24 +20,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest(properties = {
-        "holiday.initialization.enabled=false",
-        "holiday.scheduling.enabled=false",
-        "spring.datasource.url=jdbc:h2:mem:holiday-sync;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=USER,LINE",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa", "spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.sql.init.mode=never",
-        "spring.jpa.properties.hibernate.show_sql=false",
-        "jwt.secret=cXVvdGF0aW9uLXRlc3Qtc2VjcmV0LW11c3QtYmUtMzItYnl0ZXM=",
-        "jwt.access-token-expiration=60000", "jwt.refresh-token-expiration=120000"
-})
+// REQUIRES_NEW의 실제 커밋 결과를 검증하므로 테스트 전체 트랜잭션은 사용하지 않는다.
+@SpringBootTest
 class HolidaySyncServiceTest {
     @Autowired HolidaySyncService service;
     @Autowired HolidayRepository repository;
     @MockitoBean HolidayApiClient client;
 
+    // 별도 트랜잭션으로 저장된 공휴일 정리
     @BeforeEach
-    void setUp() {
+    @AfterEach
+    void clearHolidays() {
         repository.deleteAllInBatch();
     }
 

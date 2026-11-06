@@ -15,12 +15,13 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Arrays;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
@@ -156,14 +157,23 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.EXTERNAL_API_ERROR.getHttpStatus()).body(response);
     }
 
-    // RestClient를 통한 외부 API 호출 또는 응답 처리 실패 시 호출됨 (502 Bad Gateway 응답)
-    @ExceptionHandler(RestClientResponseException.class)
-    public ResponseEntity<ApiErrorResponse> handleRestClientResponseException(RestClientResponseException ex) {
+    // RestClient를 통한 외부 API 호출 실패 시 호출됨 (502 Bad Gateway 응답)
+    @ExceptionHandler(RestClientException.class)
+    public ResponseEntity<ApiErrorResponse> handleRestClientException(RestClientException ex) {
         log.error("RestClient 외부 API 연동 실패: {}", ex.getMessage(), ex);
         ApiErrorResponse response = ex.getMessage().isEmpty()
                 ? ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR)
                 : ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR, ex.getMessage());
         return ResponseEntity.status(ErrorCode.EXTERNAL_API_ERROR.getHttpStatus()).body(response);
+    }
+
+    // RestClient를 통한 외부 API 호출 시 실패한 응답을 받을 경우 호출됨 (해당 응답에 대한 errorcode 호출)
+    @ExceptionHandler(RestClientResponseException.class)
+    public ResponseEntity<ApiErrorResponse> handleRestClientResponseException(RestClientResponseException ex) {
+        log.error("RestClient 외부 API 실패 응답: {}", ex.getMessage(), ex);
+        ApiErrorResponse response
+                = ApiErrorResponse.of("REST_CLIENT_RESPONSE_ERROR", ex.getMessage(), ex.getStatusCode().value());
+        return ResponseEntity.status(ex.getStatusCode()).body(response);
     }
 
     @ExceptionHandler(ResponseStatusException.class)
@@ -179,5 +189,4 @@ public class GlobalExceptionHandler {
         ApiErrorResponse response = ApiErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, "요청 본문 형식을 확인해주세요.");
         return ResponseEntity.status(ErrorCode.INVALID_INPUT_VALUE.getHttpStatus()).body(response);
     }
-
 }

@@ -106,4 +106,21 @@ public class WorkOrder extends BaseTimeEntity {
     public void changeUser(User user) {
         this.user = user;
     }
+
+    // 작업지시 수량 변경
+    public void changeQuantity(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("작업지시 수량은 1 이상이어야 합니다.");
+        }
+        this.quantity = quantity;
+    }
+
+    // 작업지시 생산 예정 기간 변경
+    public void changePlannedDates(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("생산 예정 기간이 올바르지 않습니다.");
+        }
+        this.plannedStartDate = startDate;
+        this.plannedEndDate = endDate;
+    }
 }
