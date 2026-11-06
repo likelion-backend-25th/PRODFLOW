@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.payment.properties;
+package net.likelion.bebc25.prodflow.payment.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;

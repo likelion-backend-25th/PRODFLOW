@@ -1,51 +1,52 @@
-package net.likelion.bebc25.prodflow.payment.client.dto;
+package net.likelion.bebc25.prodflow.payment.dto;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Map;
-import java.util.Objects;
 
 public class PortOneDto {
+    // 수기 결제 시 포트원 API에 전달할 정보, PaymentService에서 정보를 취합해서 전달해야 함
     public record IssueRequest(
+            // 결제 id (임의 생성)
             String paymentId,
+
+            // 주문명 (예: 갤럭시 케이스 외 1)
             String orderName,
-            long amount,
-            String customerName,
-            String customerEmail,
-            String customerPhone,
+
+            // 수주 금액
+            Long amount,
+
+            // 수주 회사 명
+            String companyName,
+
+            // 수주 회사 메일
+            String email,
+
+            // 수주 회사 연락처
+            String phone,
+
+            // 수주 회사 도로명 주소
+            String roadAddress,
+
+            // 수주 회사 상세 주소
+            String detailAddress,
+
+            // 가상계좌 발급 은행
             String bank,
-            OffsetDateTime expiresAt,
+
+            // 가상계좌 만료일 (시간대 오프셋 포함, 예: 2026-11-09T16:16:26+09:00)
+            OffsetDateTime dueDate,
+
+            // 멱등키 (임의 생성)
             String idempotencyKey
     ) {
-        public IssueRequest {
-            requireText(paymentId, "PortOne 결제 ID");
-            if (!paymentId.matches("[A-Za-z0-9_-]{1,40}")) {
-                throw new IllegalArgumentException("PortOne 결제 ID는 40자 이하의 영문/숫자/_/-만 허용합니다.");
-            }
-            requireText(orderName, "주문명");
-            if (amount <= 0) {
-                throw new IllegalArgumentException("결제 금액은 0원보다 커야 합니다.");
-            }
-            requireText(customerName, "구매자 이름");
-            requireText(customerEmail, "구매자 이메일");
-            requireText(customerPhone, "구매자 전화번호");
-            requireText(bank, "PortOne 은행 코드");
-            Objects.requireNonNull(expiresAt, "만료 시각은 필수입니다.");
-            if (!expiresAt.isAfter(OffsetDateTime.now())) {
-                throw new IllegalArgumentException("가상계좌 만료 시각은 미래여야 합니다.");
-            }
-            requireText(idempotencyKey, "멱등 키");
-            if (!idempotencyKey.matches("[A-Za-z0-9_-]{16,256}")) {
-                throw new IllegalArgumentException("멱등 키는 영문/숫자/_/-로 구성된 16~256자여야 합니다.");
-            }
-        }
+    }
 
-        private static void requireText(String value, String name) {
-            if (value == null || value.isBlank()) {
-                throw new IllegalArgumentException(name + "은(는) 필수입니다.");
-            }
-        }
+    public record IssueResponse(
+            String pgTxId,
+            String paidAt
+    ) {
     }
 
     public record IssueResult(
@@ -124,7 +125,9 @@ public class PortOneDto {
 
         private static Long optionalLong(Map<?, ?> body, String field) {
             Object value = body.get(field);
-            if (!(value instanceof Number number)) return null;
+            if (!(value instanceof Number number)) {
+                return null;
+            }
             try {
                 return new java.math.BigDecimal(number.toString()).longValueExact();
             } catch (ArithmeticException | NumberFormatException e) {
@@ -134,7 +137,9 @@ public class PortOneDto {
 
         private static OffsetDateTime optionalDate(Map<?, ?> body, String field) {
             String value = optionalText(body, field);
-            if (value == null) return null;
+            if (value == null) {
+                return null;
+            }
             try {
                 return OffsetDateTime.parse(value);
             } catch (java.time.format.DateTimeParseException e) {
@@ -142,6 +147,4 @@ public class PortOneDto {
             }
         }
     }
-
-
 }
