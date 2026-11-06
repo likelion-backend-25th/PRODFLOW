@@ -158,6 +158,8 @@ public class UserDto {
             Long userId,
             @Schema(description = "직원 이름", example = "김철수")
             String name,
+            @Schema(description = "연락처", example = "010-1111-2222")
+            String phone,
             @Schema(description = "직원 이메일", example = "employee@prodflow.local")
             String email,
             @Schema(description = "직원 권한", example = "ORDER_MANAGER")
@@ -168,7 +170,7 @@ public class UserDto {
             boolean mustChangePassword
     ) {
         public static MeResponse from(User user) {
-            return new MeResponse(user.getId(), user.getName(), user.getEmail(), user.getRole(),
+            return new MeResponse(user.getId(), user.getName(), user.getPhone(), user.getEmail(), user.getRole(),
                     user.getStatus(), user.isMustChangePassword());
         }
     }
