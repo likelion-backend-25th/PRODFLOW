@@ -46,7 +46,7 @@ public class SecurityConfig {
      * application.yml 또는 환경변수에 auth.allowed-origins가
      * 정의되어 있으면 해당 설정값이 기본값보다 우선 적용된다.
      */
-    @Value("${auth.allowed-origins:http://localhost:3000,http://localhost:5173,https://www.prodflow.site}")
+    @Value("${auth.allowed-origins}")
     private String allowedOrigins;
 
     /**
