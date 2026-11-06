@@ -6,6 +6,7 @@ import net.likelion.bebc25.prodflow.client.dto.ClientDto;
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
 import net.likelion.bebc25.prodflow.common.domain.Address;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
@@ -132,7 +133,10 @@ public class ClientService {
         return clients.map(client -> {
             Long totalOrder = customerOrderRepository.countByClientId(client.getId());
             Long totalAmount = customerOrderRepository.sumTotalAmountByClientId(client.getId());
-            LocalDateTime recentOrderedAt = LocalDateTime.now();
+            CustomerOrder recentOrder = customerOrderRepository
+                    .findFirstByClient_IdOrderByCreatedAtDesc(client.getId())
+                    .orElse(null);
+            LocalDateTime recentOrderedAt = recentOrder != null ? recentOrder.getCreatedAt() : null;
 
             return ClientDto.Response.from(
                     client,
