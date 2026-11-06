@@ -377,14 +377,10 @@ class WorkOrderServiceTest {
     void rejectUpdateWhenLineIsOperating() {
         LocalDate day = firstOpenWeekday();
         Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
-        Long operatingLineId = lineRepository.findAll().stream()
-                .filter(line -> line.getStatus() == LineStatus.OPERATING)
-                .map(line -> line.getId())
-                .filter(lineId -> !lineId.equals(1L))
-                .findFirst()
-                .orElseThrow();
+        Line operatingLine = lineRepository.save(new Line("이동-가동", 1000));
+        operatingLine.changeStatus(LineStatus.OPERATING);
 
-        assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(operatingLineId, null), 1L))
+        assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(operatingLine.getId(), null), 1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("가동 가능한 라인만 배정할 수 있습니다.");
         assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getLine().getId()).isEqualTo(1L);
@@ -395,23 +391,20 @@ class WorkOrderServiceTest {
     void updateLineToAvailableLine() {
         LocalDate day = firstOpenWeekday();
         Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
-        Long availableLineId = lineRepository.findAll().stream()
-                .filter(line -> line.getStatus() == LineStatus.AVAILABLE)
-                .map(line -> line.getId())
-                .findFirst()
-                .orElseThrow();
+        // 시드 라인은 점검·고장으로 바뀌어 있을 수 있다. 이 테스트 안에서 가동 가능 라인을 만든다.
+        Line availableLine = lineRepository.save(new Line("이동-가능", 1000));
 
-        DetailResponse updated = workOrderService.update(workOrderId, updateRequest(availableLineId, null), 1L);
+        DetailResponse updated = workOrderService.update(workOrderId, updateRequest(availableLine.getId(), null), 1L);
 
-        assertThat(updated.lineId()).isEqualTo(availableLineId);
+        assertThat(updated.lineId()).isEqualTo(availableLine.getId());
         assertThat(updated.assignedId()).isEqualTo(4L);
-        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getLine().getId()).isEqualTo(availableLineId);
+        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getLine().getId()).isEqualTo(availableLine.getId());
         // 계획 행의 날짜와 수량은 그대로다. 합계는 작업지시의 현재 라인을 본다.
         List<ProductionPlan> plans = plansOf(workOrderId);
         assertThat(plans).extracting(ProductionPlan::getPlanDate).containsExactly(day);
         assertThat(plans).extracting(ProductionPlan::getQuantity).containsExactly(100);
         assertThat(productionPlanRepository.sumQuantityByLineAndDate(1L, day)).isZero();
-        assertThat(productionPlanRepository.sumQuantityByLineAndDate(availableLineId, day)).isEqualTo(100);
+        assertThat(productionPlanRepository.sumQuantityByLineAndDate(availableLine.getId(), day)).isEqualTo(100);
     }
 
     @Test
@@ -449,6 +442,30 @@ class WorkOrderServiceTest {
                 });
         // 상태 변경은 라인·담당자 변경 이력에 들어가지 않는다.
         assertThat(workOrderHistoryRepository.count()).isEqualTo(assignmentHistoryCount);
+    }
+
+    @Test
+    @DisplayName("생산을 중지했다가 준비로 돌아와도 줄어든 생산능력보다 큰 계획은 다시 시작할 수 없다")
+    void rejectProduceWhenPlanExceedsReducedCapacity() {
+        Line line = lineRepository.save(new Line("생산시작-용량", 1000));
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
+        // 시작 예정일이 오늘보다 뒤면 생산능력 검증보다 날짜 검증이 먼저 난다.
+        ReflectionTestUtils.setField(workOrder, "plannedStartDate", LocalDate.now());
+
+        workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L);
+        workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("HALT", null), 1L);
+        workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("PREPARE", null), 1L);
+        // 중지 상태의 계획은 생산능력 변경에서 비워지지 않는다. 용량만 줄인 뒤를 재현한다.
+        line.editProduction(40);
+
+        assertThatThrownBy(() -> workOrderService.changeStatus(
+                workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("라인의 생산능력을 초과하여 생산을 시작할 수 없습니다.");
+        assertThat(workOrder.getCommonCode().getCode()).isEqualTo("PREPARE");
+        assertThat(line.getProductionCapacity()).isEqualTo(40);
     }
 
     @Test
