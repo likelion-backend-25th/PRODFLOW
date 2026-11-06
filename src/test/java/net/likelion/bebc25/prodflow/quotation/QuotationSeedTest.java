@@ -45,6 +45,43 @@ class QuotationSeedTest {
     @Autowired QuotationService service;
 
     @Test
+    void orderPendingFiltersBeforePaginationAndKeepsSearchAndSort() {
+        em.createQuery("update Quotation q set q.status = :status")
+                .setParameter("status", QuotationStatus.APPROVED).executeUpdate();
+        em.createQuery("update Quotation q set q.status = :status where q.id = 16")
+                .setParameter("status", QuotationStatus.SENT).executeUpdate();
+        em.clear();
+
+        for (QuotationSortType sortType : QuotationSortType.values()) {
+            var expected = quotations.findAll(Sort.by("id")).stream()
+                    .filter(q -> q.getStatus() == QuotationStatus.APPROVED)
+                    .filter(q -> orders.findByQuotationIdIn(List.of(q.getId())).isEmpty())
+                    .map(q -> q.getId()).toList();
+            var full = service.getQuotationList(null, null, sortType, PageRequest.of(0, 100), true);
+            assertThat(full.getContent()).extracting(q -> q.id()).containsExactlyInAnyOrderElementsOf(expected);
+            assertThat(full.getContent()).allSatisfy(q -> {
+                assertThat(q.status()).isEqualTo(QuotationStatus.APPROVED);
+                assertThat(q.customerOrderId()).isNull();
+            });
+            assertThat(expected.size()).isGreaterThan(1);
+            var page = service.getQuotationList(null, null, sortType, PageRequest.of(1, 1), true);
+            assertThat(page.getTotalElements()).isEqualTo(expected.size());
+            assertThat(page.getTotalPages()).isEqualTo(expected.size());
+            assertThat(page.getContent()).isEqualTo(full.getContent().subList(1, 2));
+            var empty = service.getQuotationList(null, null, sortType, PageRequest.of(99, 2), true);
+            assertThat(empty.getContent()).isEmpty();
+            assertThat(empty.getTotalElements()).isEqualTo(expected.size());
+            var search = service.getQuotationList(" 한빛 ", null, sortType, PageRequest.of(0, 100), true);
+            assertThat(search.getContent()).isEqualTo(full.getContent().stream()
+                    .filter(q -> q.clientCompany().contains("한빛")).toList());
+        }
+        assertThat(service.getQuotationList(null, QuotationStatus.SENT,
+                QuotationSortType.CREATED_AT, PageRequest.of(0, 12), true).getContent()).isEmpty();
+        assertThat(service.getQuotationList(null, null,
+                QuotationSortType.CREATED_AT, PageRequest.of(0, 12), false).getTotalElements()).isEqualTo(16);
+    }
+
+    @Test
     void combinesStatusWithEveryDateSortKeywordAndPagination() {
         em.createQuery("update Quotation q set q.status = :status")
                 .setParameter("status", QuotationStatus.APPROVED).executeUpdate();
