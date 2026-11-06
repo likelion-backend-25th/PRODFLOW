@@ -89,4 +89,16 @@ public class UserController {
         );
     }
 
+    // 직원 소프트 삭제
+    @Operation(
+            summary = "직원 삭제",
+            description = "SUPER_ADMIN 전용. 직원 계정을 물리적으로 삭제하지 않고 DELETED 상태로 변경합니다."
+    )
+    @DeleteMapping("/{id}")
+    public ResponseEntity<UserDto.Response> deleteUser(
+            @Parameter(description = "삭제할 직원 ID", example = "1")
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(userService.softDeleteUser(id));
+    }
 }
