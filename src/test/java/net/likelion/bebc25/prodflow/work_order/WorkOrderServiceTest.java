@@ -26,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,10 +44,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 // 애플리케이션 설정은 유지한다. 이 테스트만 테이블을 지우지 않고 data.sql도 다시 실행하지 않는다.
+//@SpringBootTest(properties = {
+//        "spring.jpa.hibernate.ddl-auto=validate",
+//        "spring.sql.init.mode=never"
+//})
+
+// CI 에러 임시 해결 (@Sql 해당 부분 제거할 때 @Sql import 도 같이 삭제)
 @SpringBootTest(properties = {
-        "spring.jpa.hibernate.ddl-auto=validate",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.sql.init.mode=never"
 })
+@Sql("/data.sql")
+
 @Transactional // 테스트가 끝나면 롤백해서 시드 작업지시를 유지한다
 class WorkOrderServiceTest {
 
@@ -580,6 +589,7 @@ class WorkOrderServiceTest {
                 .min(Comparator.naturalOrder())
                 .orElseThrow();
     }
+
 
     private boolean isClosed(LocalDate day) {
         return day.getDayOfWeek() == DayOfWeek.SATURDAY
