@@ -44,11 +44,19 @@ public class ProductionPlan extends BaseTimeEntity {
 
     @Column(nullable = false)
     private LocalDate planDate;
-    
+
     public ProductionPlan(WorkOrder workOrder, LocalDate planDate, int quantity) {
         this.workOrder = workOrder;
         this.orderProduct = workOrder.getOrderProduct();
         this.planDate = planDate;
+        this.quantity = quantity;
+    }
+
+    // 생산계획 수량 변경
+    public void changeQuantity(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("생산계획 수량은 1 이상이어야 합니다.");
+        }
         this.quantity = quantity;
     }
 }
