@@ -8,6 +8,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,6 +20,13 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(
+        name = "shipment",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_shipment_carrier_tracking",
+                columnNames = {"carrier_code", "tracking_number"}
+        )
+)
 public class Shipment {
 
     @Id
@@ -56,6 +65,16 @@ public class Shipment {
 
     @Column
     private LocalDateTime deliveredAt;
+
+    public static Shipment start(Long orderId, Carrier carrier, String trackingNumber, LocalDateTime startedAt) {
+        Shipment shipment = new Shipment();
+        shipment.orderId = orderId;
+        shipment.carrier = carrier;
+        shipment.trackingNumber = trackingNumber;
+        shipment.startedAt = startedAt;
+        shipment.complete = false;
+        return shipment;
+    }
 
     public void applyTracking(
             Integer level,
