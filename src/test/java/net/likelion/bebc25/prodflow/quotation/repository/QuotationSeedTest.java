@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.quotation;
+package net.likelion.bebc25.prodflow.quotation.repository;
 
 import net.likelion.bebc25.prodflow.quotation.repository.QuotationRepository;
 import net.likelion.bebc25.prodflow.quotation.repository.QuotationScheduleRepository;
@@ -25,16 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:quotation-seed;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=USER,LINE",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa", "spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.sql.init.mode=always",
-        "spring.jpa.properties.hibernate.show_sql=false",
-        "quotation.expiration.enabled=false",
-        "jwt.secret=cXVvdGF0aW9uLXRlc3Qtc2VjcmV0LW11c3QtYmUtMzItYnl0ZXM=",
-        "jwt.access-token-expiration=60000", "jwt.refresh-token-expiration=120000"
-})
+@SpringBootTest
 @Transactional
 class QuotationSeedTest {
     @Autowired QuotationRepository quotations;

@@ -23,17 +23,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {
-        "holiday.initialization.enabled=false",
-        "spring.datasource.url=jdbc:h2:mem:quotation-preview-controller;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=USER,LINE",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa", "spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.sql.init.mode=never",
-        "spring.jpa.properties.hibernate.show_sql=false",
-        "quotation.expiration.enabled=false",
-        "jwt.secret=cXVvdGF0aW9uLXRlc3Qtc2VjcmV0LW11c3QtYmUtMzItYnl0ZXM=",
-        "jwt.access-token-expiration=60000", "jwt.refresh-token-expiration=120000"
-})
+@SpringBootTest
 @AutoConfigureMockMvc
 class QuotationSchedulePreviewControllerTest {
     private static final String URL = "/api/v1/quotations/schedule";
