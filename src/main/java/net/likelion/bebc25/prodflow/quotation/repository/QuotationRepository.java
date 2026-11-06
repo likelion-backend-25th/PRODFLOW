@@ -38,18 +38,25 @@ public interface QuotationRepository extends JpaRepository<Quotation, Long> {
     @Query(value = """
             select q from Quotation q
             where (:status is null or q.status = :status)
+              and (:orderPending = false or
+                   (q.status = net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus.APPROVED
+                    and not exists (select o.id from CustomerOrder o where o.quotation = q)))
               and (:keyword is null or lower(q.quotationNo) like lower(concat('%', :keyword, '%'))
                or lower(q.client.company) like lower(concat('%', :keyword, '%'))
                or lower(q.user.name) like lower(concat('%', :keyword, '%')))
             """, countQuery = """
             select count(q) from Quotation q
             where (:status is null or q.status = :status)
+              and (:orderPending = false or
+                   (q.status = net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus.APPROVED
+                    and not exists (select o.id from CustomerOrder o where o.quotation = q)))
               and (:keyword is null or lower(q.quotationNo) like lower(concat('%', :keyword, '%'))
                or lower(q.client.company) like lower(concat('%', :keyword, '%'))
                or lower(q.user.name) like lower(concat('%', :keyword, '%')))
             """)
     Page<Quotation> search(
-            @Param("keyword") String keyword, @Param("status") QuotationStatus status, Pageable pageable);
+            @Param("keyword") String keyword, @Param("status") QuotationStatus status,
+            @Param("orderPending") boolean orderPending, Pageable pageable);
 
     // 거래처·작성자 포함 견적 상세 조회
     @Query("""

@@ -194,6 +194,51 @@ public class QuotationController {
         return ResponseEntity.noContent().build();
     }
 
+    // PDF 생성 없이 신규 견적 초안 저장
+    @Operation(summary = "견적 초안 저장",
+            description = "입력값과 납기를 검증하고 견적과 품목을 DRAFT로 저장한다. PDF 생성이나 이메일 발송은 수행하지 않는다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "초안 저장 완료 및 견적 상세 반환"),
+            @ApiResponse(responseCode = "400", description = "입력값 또는 업무 규칙 오류", content = @Content),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "403", description = "권한 또는 계정 조건 미충족", content = @Content),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 거래처 또는 품목", content = @Content)
+    })
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    @PostMapping
+    public ResponseEntity<QuotationDto.DetailResponse> createDraft(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody QuotationDto.CreateRequest request
+    ) {
+        QuotationDto.DetailResponse response = quotationService.create(request, userDetails.getUserId());
+        return ResponseEntity.created(URI.create("/api/v1/quotations/" + response.id()))
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(response);
+    }
+
+    // PDF 생성 없이 기존 견적 초안 수정 저장
+    @Operation(summary = "견적 초안 수정 저장",
+            description = "전체 입력으로 DRAFT를 수정하고 금액과 납기를 다시 계산한다. "
+                    + "ID·견적번호·최초 작성자를 유지하며 기존 PDF를 무효화한다. PDF 생성이나 이메일 발송은 수행하지 않는다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "초안 수정 완료 및 견적 상세 반환"),
+            @ApiResponse(responseCode = "400", description = "입력값·초안 상태 또는 업무 규칙 오류", content = @Content),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "403", description = "권한 또는 계정 조건 미충족", content = @Content),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 견적·거래처 또는 품목", content = @Content)
+    })
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    @PutMapping("/{quotationId}")
+    public ResponseEntity<QuotationDto.DetailResponse> updateDraft(
+            @PathVariable Long quotationId,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody QuotationDto.CreateRequest request
+    ) {
+        QuotationDto.DetailResponse response = quotationService.updateDraft(
+                quotationId, request, userDetails.getUserId());
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store").body(response);
+    }
+
     // 견적 초안 저장 및 PDF 준비
     @Operation(summary = "견적 초안 저장 및 PDF 생성",
             description = "초안을 저장·커밋한 뒤 PDF를 S3에 저장하고 미리보기 URL을 JSON으로 반환한다. "
@@ -311,6 +356,9 @@ public class QuotationController {
             @Parameter(description = "견적 상태 (생략 시 전체)",
                     schema = @Schema(allowableValues = {"DRAFT", "SENT", "APPROVED", "REJECTED", "CANCELLED", "EXPIRED"}))
             @RequestParam(required = false) QuotationStatus status,
+            @Parameter(description = "수주 대기만 조회. true이면 승인(APPROVED) 상태이며 연결된 수주가 없는 견적만 조회. 상태 조건도 함께 적용",
+                    schema = @Schema(defaultValue = "false"))
+            @RequestParam(defaultValue = "false") boolean orderPending,
             @Parameter(description = "정렬 기준 (작성일, 희망 납기일, 예상 납기일, 유효기간)", schema = @Schema(defaultValue = "CREATED_AT",
                     allowableValues = {"CREATED_AT", "REQUESTED_DUE_DATE", "ESTIMATED_DUE_DATE", "VALID_UNTIL"}))
             @RequestParam(defaultValue = "CREATED_AT") QuotationSortType sortType,
@@ -321,7 +369,7 @@ public class QuotationController {
             @ParameterObject @PageableDefault(size = 12) Pageable pageable
     ) {
         PageResponse<QuotationDto.Response> response = quotationService.getQuotationList(
-                keyword, status, sortType, pageable);
+                keyword, status, sortType, pageable, orderPending);
 
         return ResponseEntity.ok(response);
     }
