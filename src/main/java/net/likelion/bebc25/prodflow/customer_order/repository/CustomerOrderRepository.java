@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
     // 견적 ID 목록에 연결된 수주 일괄 조회, 취소 수주 포함
@@ -33,4 +34,6 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
                   AND o.statusCode.code NOT IN ('COMPLETED', 'ON_HOLD', 'CANCELLED')
             """)
     Long countActiveOrdersByClientId(@Param("clientId") Long clientId);
+
+    Optional<CustomerOrder> findFirstByClient_IdOrderByCreatedAtDesc(Long clientId);
 }
