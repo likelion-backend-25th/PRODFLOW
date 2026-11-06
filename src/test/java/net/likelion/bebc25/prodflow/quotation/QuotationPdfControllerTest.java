@@ -34,6 +34,48 @@ class QuotationPdfControllerTest {
     private final QuotationController controller = new QuotationController(quotations, null, null, pdfs, null, null);
 
     @Test
+    void draftSaveEndpointsReturnDetailWithoutPreparingPdf() throws Exception {
+        var draft = QuotationPdfServiceTest.draft();
+        var principal = mock(CustomUserDetails.class);
+        when(principal.getUserId()).thenReturn(7L);
+        when(quotations.create(any(), eq(7L))).thenReturn(draft);
+        when(quotations.updateDraft(eq(draft.id()), any(), eq(7L))).thenReturn(draft);
+        var mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setCustomArgumentResolvers(
+                        new org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver())
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(principal, null));
+        String body = """
+                {"clientId":1,"requestedDueDate":"2027-06-30","vatIncluded":false,
+                 "items":[{"productId":1,"quantity":100,"unitPrice":1000}]}
+                """;
+        try {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                            .post("/api/v1/quotations").contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isCreated())
+                    .andExpect(header().string(HttpHeaders.LOCATION, "/api/v1/quotations/" + draft.id()))
+                    .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                            .jsonPath("$.id").value(draft.id()))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                            .jsonPath("$.status").value("DRAFT"));
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                            .put("/api/v1/quotations/" + draft.id())
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                            .jsonPath("$.id").value(draft.id()));
+            verify(quotations).create(any(), eq(7L));
+            verify(quotations).updateDraft(eq(draft.id()), any(), eq(7L));
+            verifyNoInteractions(pdfs);
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
     void createReturnsPreviewJsonAndSavedDraftLocation() {
         var draft = QuotationPdfServiceTest.draft();
         var principal = mock(CustomUserDetails.class);

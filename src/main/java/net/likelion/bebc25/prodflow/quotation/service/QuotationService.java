@@ -284,11 +284,18 @@ public class QuotationService {
     // 견적 목록 조회
     public PageResponse<QuotationDto.Response> getQuotationList(
             String keyword, QuotationStatus status, @NotNull QuotationSortType sortType, Pageable pageable) {
+        return getQuotationList(keyword, status, sortType, pageable, false);
+    }
+
+    // 기존 검색·정렬·페이징에 수주 대기 조건을 함께 적용
+    public PageResponse<QuotationDto.Response> getQuotationList(
+            String keyword, QuotationStatus status, @NotNull QuotationSortType sortType, Pageable pageable,
+            boolean orderPending) {
         // 요청의 sort 대신 허용된 날짜 기준·방향 적용
         Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sortType.toSort());
 
         String normalizedKeyword = keyword == null || keyword.isBlank() ? null : keyword.trim();
-        Page<Quotation> quotations = quotationRepository.search(normalizedKeyword, status, sortedPageable);
+        Page<Quotation> quotations = quotationRepository.search(normalizedKeyword, status, orderPending, sortedPageable);
 
         // 현재 페이지에 포함된 견적서 ID 추출
         List<Long> quotationIds = quotations.getContent().stream()
