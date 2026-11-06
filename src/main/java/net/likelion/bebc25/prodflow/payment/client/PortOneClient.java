@@ -10,4 +10,8 @@ import org.springframework.web.client.RestClient;
 public class PortOneClient {
     private final RestClient restClient;
     private final PortOneProperties properties;
+
+    private String authorization() {
+        return "PortOne " + properties.apiSecret();
+    }
 }
