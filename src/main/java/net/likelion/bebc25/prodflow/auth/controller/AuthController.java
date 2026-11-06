@@ -51,7 +51,7 @@ public class AuthController {
     private String sameSite;
 
     // 인증 관련 요청을 허용할 프론트엔드 주소
-    @Value("${auth.allowed-origins:http://localhost:3000,http://localhost:5173}")
+    @Value("${auth.allowed-origins}")
     private String allowedOrigins;
 
     // 로그인

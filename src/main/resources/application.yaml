@@ -111,3 +111,7 @@ portone:
   channel-key: ${PORTONE_CHANNEL_KEY:}
   webhook-url: ${PORTONE_WEBHOOK_URL:}
 
+  # 허용 프론트 도메인
+auth:
+  allowed-origins: ${AUTH_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,https://www.prodflow.site}
+
