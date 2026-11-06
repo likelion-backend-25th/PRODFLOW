@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.holiday;
+package net.likelion.bebc25.prodflow.holiday.client;
 
 import com.sun.net.httpserver.HttpServer;
 import net.likelion.bebc25.prodflow.global.exception.ExternalApiException;

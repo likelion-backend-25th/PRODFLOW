@@ -628,7 +628,7 @@ erDiagram
 | address             | VARCHAR(255) | NOT NULL                                              | 거래처 주소                                                                                                                                                              |
 | user_id             | BIGINT       | FK, NOT NULL                                          | 이 수주를 등록한 직원. 수주 관리자                                                                                                                                                |
 | requested_due_date  | DATE         | NOT NULL                                              | 희망 납기일. 견적의 희망 납기를 가져오고 등록 후 변경하지 않음                                                                                                                                |
-| estimated_due_date  | DATE         | NOT NULL                                              | 예상 납기일. 등록 시 견적 값을 가져오고, 생산 예정일이 바뀌면 다시 계산                                                                                                                          |
+| estimated_due_date  | DATE         | NOT NULL                                              | 최종 등록 납기일. 견적 예상 납기가 가능하면 유지하고, 변경 시 화면에서 선택한 날짜를 서버에서 재검증해 저장. 승인 견적은 변경하지 않음 |
 | planned_start_date  | DATE         | NOT NULL                                              | 생산 시작 예정일                                                                                                                                                           |
 | planned_end_date    | DATE         | NOT NULL                                              | 생산 완료 예정일                                                                                                                                                           |
 | end_date            | DATE         | NULL                                                  | 실제 생산 완료일                                                                                                                                                           |
@@ -649,6 +649,8 @@ erDiagram
 | updated_by          | VARCHAR(255) | -                                                     | 수정한 사용자                                                                                                                                                             |
 
 - 견적 하나에는 수주가 없거나 한 건만 연결된다. `quotation_id`의 UNIQUE 제약으로 취소 수주를 포함한 중복 연결을 방지한다.
+- 등록 API는 견적 품목 ID와 수량을 받아 품목별 100개 이상·견적 수량 이하를 검증하고 단가·VAT·거래처 스냅샷은 승인 견적에서 가져온다. 동의 체크값은 API와 DB에 저장하지 않는다.
+- 회사 주소 배송이면 거래처 주소를 조회하고, 직접 배송이면 우편번호·도로명·상세 주소를 받아 `shipping_address` 문자열로 저장한다. 결제 건·가상계좌 생성은 현재 수주 등록 API 범위에서 제외한다.
 - 수주 확정 상태는 `confirmation_status`에 저장한다. 진행 상태가 바뀌면 같이 고친다. 대기는 `PENDING`(예정), 취소는 `CANCELLED`(취소), 그 외는 `CONFIRMED`(확정)
   이다.
 - 입금 상태는 `payment` 테이블을 JOIN하여 조회한다.
