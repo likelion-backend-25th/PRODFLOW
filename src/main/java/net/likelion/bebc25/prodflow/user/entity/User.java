@@ -122,8 +122,8 @@ public class User {
         this.status = UserStatus.INACTIVE;
     }
 
-    // Soft Delete
-    public void delete() {
+    // 직원 삭제
+    public void softDelete() {
         this.status = UserStatus.DELETED;
         this.deletedAt = LocalDateTime.now();
     }

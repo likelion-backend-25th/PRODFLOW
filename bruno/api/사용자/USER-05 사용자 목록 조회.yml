@@ -5,10 +5,30 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/v1/users"
+  url: "{{baseUrl}}/api/v1/users?keyword=&status=INACTIVE&page=0&size=10"
+  params:
+    - name: keyword
+      value: ""
+      type: query
+      description: 이름/이메일/전번
+    - name: status
+      value: INACTIVE
+      type: query
+      description: 계정상태 필터
+    - name: page
+      value: "0"
+      type: query
+      description: 첫페이지
+    - name: size
+      value: "10"
+      type: query
+      description: 한페이지에10명
+  body:
+    type: json
+    data: ""
   auth:
     type: bearer
-    token: eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwcm9kZmxvdyIsImp0aSI6Ijg5Y2RmZDUzLTVlMDYtNDIzMy1hYTQzLTU0ZDMzOTYzYTk5YSIsInN1YiI6IjEiLCJlbWFpbCI6ImFkbWluQHByb2RmbG93LmxvY2FsIiwicm9sZSI6IlNVUEVSX0FETUlOIiwidHlwZSI6IkFDQ0VTUyIsImlhdCI6MTc5MzYwNTAxNCwiZXhwIjoxNzkzNjA2ODE0fQ.Pfw7jv9lVg4ArN6hti4uv96_P5gPUfkD0QxIv8EuW_0
+    token: eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwcm9kZmxvdyIsImp0aSI6IjdkNjU2ZTZkLWQ3MTgtNDQxZi1iMjNiLWE4OGRmMjQ2NTdkZiIsInN1YiI6IjEiLCJlbWFpbCI6ImFkbWluQHByb2RmbG93LmxvY2FsIiwicm9sZSI6IlNVUEVSX0FETUlOIiwidHlwZSI6IkFDQ0VTUyIsImlhdCI6MTc5Mzg4NDQxOCwiZXhwIjoxNzkzODg2MjE4fQ.4li_SpRqcPpWwApaZQZPONhWrA1mZnmNX4uuk_AGjaE
 
 settings:
   encodeUrl: true
