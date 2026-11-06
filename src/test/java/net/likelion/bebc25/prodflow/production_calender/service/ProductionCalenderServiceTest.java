@@ -45,8 +45,6 @@ class ProductionCalenderServiceTest {
     @Test
     @DisplayName("생산 캘린더에는 지정된 작업지시 상태만 포함된다")
     void getCalenderSchedulesWithValidStatus() {
-        // given
-
         // when
         List<ProductionCalenderDto.Response> result =
                 productionCalenderService.getCalenderSchedules();
@@ -54,14 +52,15 @@ class ProductionCalenderServiceTest {
         // then
         assertThat(result)
                 .extracting(ProductionCalenderDto.Response::status)
-                .containsOnly("PREPARE", "PRODUCE", "PACK", "SUSPEND");
+                .allSatisfy(status ->
+                        assertThat(status)
+                                .isIn("PREPARE", "PRODUCE", "PACK", "SUSPEND")
+                );
     }
 
     @Test
     @DisplayName("생산 캘린더의 종료 예정일은 시작 예정일보다 빠를 수 없다")
     void getCalenderSchedulesWithValidDateRange() {
-        // given
-
         // when
         List<ProductionCalenderDto.Response> result =
                 productionCalenderService.getCalenderSchedules();
@@ -77,8 +76,6 @@ class ProductionCalenderServiceTest {
     @Test
     @DisplayName("생산 캘린더는 생산라인과 시작 예정일 순서로 정렬된다")
     void getCalenderSchedulesWithSortedOrder() {
-        // given
-
         // when
         List<ProductionCalenderDto.Response> result =
                 productionCalenderService.getCalenderSchedules();
@@ -100,8 +97,6 @@ class ProductionCalenderServiceTest {
     @Test
     @DisplayName("생산 캘린더에는 동일한 작업지시가 중복으로 조회되지 않는다")
     void getCalenderSchedulesWithoutDuplicateWorkOrders() {
-        // given
-
         // when
         List<ProductionCalenderDto.Response> result =
                 productionCalenderService.getCalenderSchedules();
