@@ -507,3 +507,8 @@ VALUES (1, 'ORDER', 1, 'WAITING', 'PRODUCTION_READY', 2, '이서준', '계약금
        (2, 'ORDER', 11, 'WAITING', 'CANCELLED', 3, '박하은', '수주 취소 처리', '2026-09-20 14:00:00'),
        (3, 'WORK_ORDER', 6, 'PREPARE', 'PRODUCE', 4, '김태호', '작업지시 생산 시작', '2026-05-13 09:00:00'),
        (4, 'LINE', 4, 'OPERATING', 'BROKEN', 4, '김태호', '설비 고장 발생', '2026-10-24 08:40:00');
+
+
+-- 공휴일 (생산 일정 테스트용)
+INSERT INTO holiday (holiday_date, name)
+VALUES ('2026-12-25', '성탄절');
