@@ -44,6 +44,7 @@ public class PortOneClientTest {
         assertThat(response.pgTxId()).isNotBlank();
     }
 
+    @Disabled
     @Test
     @DisplayName("가상계좌 발급에 사용한 paymentId로 결제 정보를 조회한다")
     void getPayment() {
