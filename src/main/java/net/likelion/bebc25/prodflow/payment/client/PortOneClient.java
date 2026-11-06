@@ -71,4 +71,24 @@ public class PortOneClient {
             );
         }
     }
+
+    public PortOneDto.PaymentSnapshot getPayment(String paymentId) {
+        properties.requireConfigured();
+
+        try {
+            return restClient.get()
+                    .uri(uri -> uri.path("/payments/{id}")
+                            .queryParam("storeId", properties.storeId())
+                            .build(paymentId)
+                    )
+                    .header(HttpHeaders.AUTHORIZATION, authorization())
+                    .retrieve()
+                    .body(PortOneDto.PaymentSnapshot.class);
+
+        } catch (RestClientResponseException e) {
+            throw e;
+        } catch (RestClientException e) {
+            throw new RestClientException("PortOne 결제 상태를 가져오지 못했습니다. 잠시 후 다시 조회해 주세요.");
+        }
+    }
 }

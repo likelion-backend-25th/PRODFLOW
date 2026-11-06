@@ -1,14 +1,12 @@
 package net.likelion.bebc25.prodflow.common.entity;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import lombok.Getter;
 import lombok.Setter;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -17,7 +15,6 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @MappedSuperclass // 다른 Entity의 부모 클래스로 사용
-@EntityListeners(AuditingEntityListener.class) // 아래의 이벤트 감지
 public abstract class BaseTimeEntity { // 추상 클래스 new 생성 안됨
 
     @Column(updatable = false, nullable = false)
