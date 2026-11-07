@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.line;
+package net.likelion.bebc25.prodflow.line.service;
 
 import jakarta.persistence.EntityManager;
 import net.likelion.bebc25.prodflow.line.dto.LineDto.CreateRequest;
@@ -42,6 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 class LineBreakRescheduleTest {
 
+    // 2026-11-06은 금요일이다. 생산 시작은 예정일이 오늘보다 뒤면 거절되고, 토·일은 등록되지 않는다.
+    private static final LocalDate PRODUCE_DAY = LocalDate.of(2026, 11, 6);
     private static final LocalDate FULL = LocalDate.of(2026, 12, 15);
     private static final LocalDate NEXT = LocalDate.of(2026, 12, 16);
     private static final Long ORDER_PRODUCT_ID = 15L;
@@ -217,15 +219,13 @@ class LineBreakRescheduleTest {
         Long sourceId;
         Long receiverId;
         Long workOrderId;
-        LocalDate today;
 
         @BeforeEach
         void setUp() {
             sourceId = lineService.create(new CreateRequest("사전-생산", 1000), ACTOR_ID).id();
             receiverId = lineService.create(new CreateRequest("사전-생산수신", 1000), ACTOR_ID).id();
             closeOtherLines(sourceId, receiverId);
-            today = LocalDate.now();
-            workOrderId = createWork(sourceId, 100, today, today);
+            workOrderId = createWork(sourceId, 100, PRODUCE_DAY, PRODUCE_DAY);
             workOrderService.changeStatus(
                     workOrderId, new WorkOrderDto.UpdateStatusRequest("PRODUCE", null), ACTOR_ID);
             em.flush();
@@ -245,8 +245,8 @@ class LineBreakRescheduleTest {
             assertThat(moved.getQuantity()).isEqualTo(100);
             assertThat(lineRepository.findById(sourceId).orElseThrow().getStatus()).isEqualTo(LineStatus.BROKEN);
             assertThat(lineRepository.findById(receiverId).orElseThrow().getStatus()).isEqualTo(LineStatus.OPERATING);
-            assertThat(productionPlanRepository.sumQuantityByLineAndDate(sourceId, today)).isZero();
-            assertThat(productionPlanRepository.sumQuantityByLineAndDate(receiverId, today)).isEqualTo(100);
+            assertThat(productionPlanRepository.sumQuantityByLineAndDate(sourceId, PRODUCE_DAY)).isZero();
+            assertThat(productionPlanRepository.sumQuantityByLineAndDate(receiverId, PRODUCE_DAY)).isEqualTo(100);
         }
     }
 

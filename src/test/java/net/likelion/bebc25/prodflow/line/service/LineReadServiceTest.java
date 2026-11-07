@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.line;
+package net.likelion.bebc25.prodflow.line.service;
 
 import net.likelion.bebc25.prodflow.line.dto.LineDto.CreateRequest;
 import net.likelion.bebc25.prodflow.line.dto.LineDto.DetailResponse;
@@ -42,6 +42,8 @@ class LineReadServiceTest {
     private static final Long ORDER_PRODUCT_ID = 15L;
     private static final Long ASSIGNEE_ID = 4L;
     private static final Long ACTOR_ID = 1L;
+    // 2026-11-06은 금요일이다. 생산 시작은 예정일이 오늘보다 뒤면 거절되고, 토·일은 등록되지 않는다.
+    private static final LocalDate PRODUCE_DAY = LocalDate.of(2026, 11, 6);
     private static final LocalDate SOON = LocalDate.of(2026, 12, 15);
     private static final LocalDate LATER = LocalDate.of(2026, 12, 16);
     private static final LocalDate HALTED_DAY = LocalDate.of(2026, 12, 17);
@@ -78,8 +80,7 @@ class LineReadServiceTest {
         idleLineId = lineService.create(new CreateRequest("조회-대기", 1000), ACTOR_ID).id();
 
         // 2. 생산, 준비 두 건, 목록에서 빠질 생산 중지를 등록한다.
-        LocalDate today = LocalDate.now();
-        Long produceId = createWork(producingLineId, today, today);
+        Long produceId = createWork(producingLineId, PRODUCE_DAY, PRODUCE_DAY);
         Long soonId = createWork(producingLineId, SOON, SOON);
         Long laterId = createWork(producingLineId, LATER, LATER);
         Long haltedId = createWork(producingLineId, HALTED_DAY, HALTED_DAY);
