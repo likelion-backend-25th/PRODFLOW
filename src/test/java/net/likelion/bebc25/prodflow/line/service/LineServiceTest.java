@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.line;
+package net.likelion.bebc25.prodflow.line.service;
 
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
 import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
@@ -21,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -277,6 +278,107 @@ class LineServiceTest {
         assertThat(productionPlanRepository.sumQuantityByLineAndDate(createdLine.id(), day)).isZero();
         // create로 한 장만 늘고, 재배치가 장을 더 만들지 않는다.
         assertThat(workOrderRepository.count()).isEqualTo(workOrderCount + 1);
+    }
+
+    @Test
+    @DisplayName("이름이 비어 있거나 생산량이 1보다 작으면 라인을 등록하지 않는다")
+    void rejectCreateWhenNameOrCapacityIsInvalid() {
+        assertThatThrownBy(() -> lineService.create(new CreateRequest("  ", 500), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("라인 이름은 공백 허용 안함");
+        assertThatThrownBy(() -> lineService.create(new CreateRequest("검증-생산량", 0), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("하루 생산량은 1 이상");
+        assertThat(lineRepository.existsByLineName("검증-생산량")).isFalse();
+    }
+
+    @Test
+    @DisplayName("같은 이름의 라인은 등록하지 않는다")
+    void rejectDuplicateLineName() {
+        assertThatThrownBy(() -> lineService.create(new CreateRequest("A라인", 500), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("이미 존재하는 이름");
+        assertThat(lineRepository.count()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("없는 직원 id로 등록하면 라인을 만들지 않는다")
+    void rejectCreateWhenUserIsMissing() {
+        assertThatThrownBy(() -> lineService.create(new CreateRequest("검증-직원", 500), 999L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("등록한 직원을 찾을 수 없습니다.");
+        assertThat(lineRepository.existsByLineName("검증-직원")).isFalse();
+    }
+
+    @Test
+    @DisplayName("최고 관리자가 아니면 라인 이름을 바꾸지 않는다")
+    void rejectNameChangeWhenUserIsNotSuperAdmin() {
+        // 직원 2는 수주 관리자다. 생산량은 바꿀 수 있어도 이름은 최고 관리자만 바꾼다.
+        assertThatThrownBy(() -> lineService.update(1L, new UpdateRequest("A라인-금지", 1000, null), 2L))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("라인 이름은 최고 관리자만 수정할 수 있습니다.");
+        assertThat(lineRepository.findById(1L).orElseThrow().getLineName()).isEqualTo("A라인");
+    }
+
+    @Test
+    @DisplayName("없는 라인의 상세 조회는 거절한다")
+    void rejectMissingLineDetail() {
+        assertThatThrownBy(() -> lineService.findByLineId(999L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("라인을 찾을 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("생산량이 늘면 기존 계획의 날짜와 수량을 유지한다")
+    void keepPlanWhenCapacityIncreases() {
+        Response createdLine = lineService.create(new CreateRequest("증설-유지", 1000), 1L);
+        LocalDate day = LocalDate.of(2026, 12, 15);
+        Long workOrderId = workOrderService.create(
+                new net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.CreateRequest(
+                        15L, createdLine.id(), 4L, 100, day, day), 1L).getFirst().id();
+
+        lineService.update(createdLine.id(), new UpdateRequest("증설-유지", 1200, "설비 증설"), 1L);
+
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
+        assertThat(workOrder.getLine().getId()).isEqualTo(createdLine.id());
+        assertThat(workOrder.getPlannedStartDate()).isEqualTo(day);
+        assertThat(workOrder.getPlannedEndDate()).isEqualTo(day);
+        assertThat(productionPlanRepository.findByWorkOrder_Id(workOrderId))
+                .extracting(ProductionPlan::getPlanDate, ProductionPlan::getQuantity)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(day, 100));
+        assertThat(lineRepository.findById(createdLine.id()).orElseThrow().getProductionCapacity()).isEqualTo(1200);
+    }
+
+    @Test
+    @DisplayName("오늘 이후 생산 계획이 있으면 점검으로 바꾸지 않는다")
+    void rejectInspectionWhenProducing() {
+        // 등록은 주말을 건너뛰므로 생산 계획을 오늘로 직접 넣는다. 점검은 오늘 이후 생산만 막는다.
+        Response createdLine = lineService.create(new CreateRequest("점검-생산", 1000), 1L);
+        WorkOrder sample = workOrderRepository.findById(6L).orElseThrow();
+        LocalDate today = LocalDate.now();
+        WorkOrder producing = new WorkOrder(
+                "WO-TEST-PRODUCE",
+                sample.getOrderProduct(),
+                lineRepository.findById(createdLine.id()).orElseThrow(),
+                sample.getUser(),
+                100,
+                today,
+                today,
+                "점검 차단");
+        producing.changeStatus(sample.getCommonCode());
+        producing.setCreatedBy("서도윤");
+        producing.setUpdatedBy("서도윤");
+        WorkOrder saved = workOrderRepository.save(producing);
+        ProductionPlan plan = new ProductionPlan(saved, today, 100);
+        plan.setCreatedBy("서도윤");
+        plan.setUpdatedBy("서도윤");
+        productionPlanRepository.save(plan);
+
+        assertThatThrownBy(() -> lineService.changeStatus(
+                createdLine.id(), new UpdateStatusRequest(LineStatus.INSPECTION), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("생산 중인 작업이 있어 라인을 점검으로 바꿀 수 없습니다.");
+        assertThat(lineRepository.findById(createdLine.id()).orElseThrow().getStatus()).isEqualTo(LineStatus.AVAILABLE);
     }
 
     // 품목의 작업지시 수량 합. 계획 합과 같이 재배치 전후에 수량이 사라지지 않았는지 본다.

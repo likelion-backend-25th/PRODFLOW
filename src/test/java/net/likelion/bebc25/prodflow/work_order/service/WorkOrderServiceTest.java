@@ -1,6 +1,8 @@
-package net.likelion.bebc25.prodflow.work_order;
+package net.likelion.bebc25.prodflow.work_order.service;
 
+import jakarta.persistence.EntityManager;
 import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
+import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
 import net.likelion.bebc25.prodflow.holiday.repository.HolidayRepository;
 import net.likelion.bebc25.prodflow.line.entity.Line;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.jdbc.Sql;
@@ -76,6 +79,9 @@ class WorkOrderServiceTest {
 
     @Autowired
     LineRepository lineRepository;
+
+    @Autowired
+    EntityManager em;
 
     @Autowired
     HolidayRepository holidayRepository;
@@ -539,6 +545,98 @@ class WorkOrderServiceTest {
         assertThatThrownBy(() -> workOrderService.create(request, 1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("수주 품목을 찾을 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("점검 라인을 첫 라인으로 고르면 배정하지 않는다")
+    void rejectInspectionLine() {
+        LocalDate day = LocalDate.of(2026, 12, 15);
+
+        assertThatThrownBy(() -> workOrderService.create(request(15L, 5L, 4L, 100, day, day), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("점검·고장 라인에는 배정할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("목록은 라인, 상태, 수주번호로 거른다")
+    void findByLineStatusAndOrderNo() {
+        Line line = new Line("검색-라인", 1000);
+        line.setCreatedBy("서도윤");
+        line.setUpdatedBy("서도윤");
+        lineRepository.save(line);
+        LocalDate day = LocalDate.of(2026, 12, 15);
+        Long workOrderId = workOrderService.create(
+                request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        String workNo = workOrderRepository.findById(workOrderId).orElseThrow().getWorkNo();
+
+        Page<PageResponse> matched = workOrderService.findAll(
+                line.getId(), "PREPARE", null, null, "PF-2026-013", PageRequest.of(0, 5));
+        Page<PageResponse> otherStatus = workOrderService.findAll(
+                line.getId(), "PRODUCE", null, null, "PF-2026-013", PageRequest.of(0, 5));
+
+        assertThat(matched.getContent()).extracting(PageResponse::workNo).containsExactly(workNo);
+        assertThat(otherStatus.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("준비 상태에서 포장으로 건너뛰거나 같은 상태로 바꾸지 않는다")
+    void rejectDisallowedStatusTransition() {
+        LocalDate day = LocalDate.of(2026, 12, 15);
+        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+
+        assertThatThrownBy(() -> workOrderService.changeStatus(
+                workOrderId, new UpdateStatusRequest("PACK", null), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("현재 작업 상태에서는 요청한 상태로 변경할 수 없습니다.");
+        assertThatThrownBy(() -> workOrderService.changeStatus(
+                workOrderId, new UpdateStatusRequest("PREPARE", null), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("이미 같은 상태입니다.");
+        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getCommonCode().getCode())
+                .isEqualTo("PREPARE");
+    }
+
+    @Test
+    @DisplayName("생산 시작 예정일 전에는 생산을 시작하지 않는다")
+    void rejectProduceBeforePlannedStart() {
+        LocalDate day = LocalDate.of(2027, 12, 15);
+        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+
+        assertThatThrownBy(() -> workOrderService.changeStatus(
+                workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("생산 시작 예정일 전에는 시작할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("배정되지 않은 생산 현장 관리자는 작업 상태를 바꾸지 않는다")
+    void rejectStatusChangeWhenUserIsNotAssignee() {
+        LocalDate day = LocalDate.of(2026, 12, 15);
+        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+
+        // 직원 5는 생산 현장 관리자이지만 이 작업의 담당자가 아니다.
+        assertThatThrownBy(() -> workOrderService.changeStatus(
+                workOrderId, new UpdateStatusRequest("HALT", null), 5L))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("배정된 생산 현장 관리자와 최고 관리자만 작업 상태를 바꿀 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("취소된 수주의 생산 중지 작업은 준비로 돌아가지 않는다")
+    void rejectResumeWhenOrderIsCancelled() {
+        LocalDate day = LocalDate.of(2026, 12, 15);
+        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+        workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("HALT", "수주 취소"), 1L);
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
+        workOrder.getOrderProduct().getCustomerOrder().changeProgress(em.find(CommonCode.class, 15L));
+        em.flush();
+
+        assertThatThrownBy(() -> workOrderService.changeStatus(
+                workOrderId, new UpdateStatusRequest("PREPARE", null), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("취소된 수주의 작업은 다시 준비할 수 없습니다.");
+        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getCommonCode().getCode())
+                .isEqualTo("HALT");
     }
 
     private CreateRequest request(Long orderProductId, Long lineId, Long assignedId, int quantity,

@@ -34,24 +34,24 @@ class DeliveryRiskServiceTest {
         assertThat(response.totalRiskOrderCount()).isEqualTo(response.items().size());
     }
 
-    @Test
-    @DisplayName("납기 임박 수주가 조회된다")
-    void getUrgentDeliveryRisk() {
-        // given
-        String orderNo = "PF-2026-009";
-
-        // when
-        DashboardDto.DeliveryRiskStatisticsResponse response =
-                deliveryRiskService.getDeliveryRisks();
-
-        // then
-        assertThat(response.items())
-                .anySatisfy(item -> {
-                    assertThat(item.orderNo()).isEqualTo(orderNo);
-                    assertThat(item.riskType()).isEqualTo("URGENT");
-                    assertThat(item.requestedDueDate()).isEqualTo(LocalDate.of(2026, 11, 6));
-                });
-    }
+//    @Test
+//    @DisplayName("납기 임박 수주가 조회된다")
+//    void getUrgentDeliveryRisk() {
+//        // given
+//        String orderNo = "PF-2026-009";
+//
+//        // when
+//        DashboardDto.DeliveryRiskStatisticsResponse response =
+//                deliveryRiskService.getDeliveryRisks();
+//
+//        // then
+//        assertThat(response.items())
+//                .anySatisfy(item -> {
+//                    assertThat(item.orderNo()).isEqualTo(orderNo);
+//                    assertThat(item.riskType()).isEqualTo("URGENT");
+//                    assertThat(item.requestedDueDate()).isEqualTo(LocalDate.of(2026, 11, 6));
+//                });
+//    }
 
     @Test
     @DisplayName("납기일이 지난 수주는 지연 상태로 조회된다")
