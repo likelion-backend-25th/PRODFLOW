@@ -10,33 +10,46 @@ import java.time.LocalDate;
 public interface DeliveryPerformanceRepository
         extends JpaRepository<CustomerOrder, Long> {
 
-    // 집계 대상 수주 건수
+    // 납기일이 조회 기간 안이고 오늘보다 이전인 취소가 아닌 수주
     @Query("""
             SELECT COUNT(o)
             FROM CustomerOrder o
             JOIN o.statusCode sc
+            JOIN sc.codeGroup cg
             WHERE o.requestedDueDate >= :from
               AND o.requestedDueDate <= :to
+              AND o.requestedDueDate < :today
+              AND cg.groupCode = 'ORDER_STATUS'
               AND sc.code <> 'CANCELLED'
             """)
     long countTargetOrders(
             @Param("from") LocalDate from,
-            @Param("to") LocalDate to
+            @Param("to") LocalDate to,
+            @Param("today") LocalDate today
     );
 
-    // 납기 내 생산 완료 수주 건수
+    // 배송 완료일이 요청 납기일 이전인 수주
     @Query("""
             SELECT COUNT(o)
             FROM CustomerOrder o
             JOIN o.statusCode sc
+            JOIN sc.codeGroup cg
             WHERE o.requestedDueDate >= :from
               AND o.requestedDueDate <= :to
+              AND o.requestedDueDate < :today
+              AND cg.groupCode = 'ORDER_STATUS'
               AND sc.code <> 'CANCELLED'
-              AND o.endDate IS NOT NULL
-              AND o.endDate <= o.requestedDueDate
+              AND EXISTS (
+                  SELECT s.id
+                  FROM Shipment s
+                  WHERE s.orderId = o.id
+                    AND s.deliveredAt IS NOT NULL
+                    AND cast(s.deliveredAt as localdate) <= o.requestedDueDate
+              )
             """)
     long countOnTimeOrders(
             @Param("from") LocalDate from,
-            @Param("to") LocalDate to
+            @Param("to") LocalDate to,
+            @Param("today") LocalDate today
     );
 }

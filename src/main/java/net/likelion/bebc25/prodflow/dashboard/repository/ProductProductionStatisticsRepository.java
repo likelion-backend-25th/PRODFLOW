@@ -21,12 +21,15 @@ public interface ProductProductionStatisticsRepository
             )
             FROM WorkOrder wo
             JOIN wo.orderProduct op
+            JOIN op.customerOrder co
+            JOIN co.statusCode sc
             JOIN wo.commonCode cc
             JOIN cc.codeGroup cg
             WHERE wo.completedAt >= :startDate
             AND wo.completedAt < :endDate
             AND cg.groupCode = 'WORK_ORDER_STATUS'
             AND cc.code = 'PACK_DONE'
+            AND sc.code <> 'CANCELLED'
             GROUP BY op.product.id, op.productName
             ORDER BY op.product.id
             """)
@@ -39,12 +42,16 @@ public interface ProductProductionStatisticsRepository
     @Query("""
             SELECT COALESCE(SUM(wo.quantity), 0)
             FROM WorkOrder wo
+            JOIN wo.orderProduct op
+            JOIN op.customerOrder co
+            JOIN co.statusCode sc
             JOIN wo.commonCode cc
             JOIN cc.codeGroup cg
             WHERE wo.completedAt >= :startDate
             AND wo.completedAt < :endDate
             AND cg.groupCode = 'WORK_ORDER_STATUS'
             AND cc.code = 'PACK_DONE'
+            AND sc.code <> 'CANCELLED'
             """)
     long sumCompletedProductionQuantity(
             @Param("startDate") LocalDate startDate,

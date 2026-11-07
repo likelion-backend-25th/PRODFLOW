@@ -6,6 +6,7 @@ import net.likelion.bebc25.prodflow.dashboard.repository.DeliveryPerformanceRepo
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 
 @Service
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 public class DeliveryPerformanceService {
 
     private final DeliveryPerformanceRepository deliveryPerformanceRepository;
+    private final Clock clock;
 
     // 납기 이행률 조회
     public DashboardDto.DeliveryPerformanceResponse getDeliveryPerformance(
@@ -22,8 +24,9 @@ public class DeliveryPerformanceService {
     ) {
         validateDateRange(from, to);
 
-        long totalOrderCount = deliveryPerformanceRepository.countTargetOrders(from, to);
-        long onTimeOrderCount = deliveryPerformanceRepository.countOnTimeOrders(from, to);
+        LocalDate today = LocalDate.now(clock);
+        long totalOrderCount = deliveryPerformanceRepository.countTargetOrders(from, to, today);
+        long onTimeOrderCount = deliveryPerformanceRepository.countOnTimeOrders(from, to, today);
 
         double onTimeDeliveryRate = totalOrderCount == 0
                 ? 0.0

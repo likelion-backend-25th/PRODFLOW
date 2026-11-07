@@ -15,8 +15,12 @@ public interface ProductionStatisticsRepository
     @Query("""
             SELECT COALESCE(SUM(p.quantity), 0)
             FROM ProductionPlan p
+            JOIN p.orderProduct op
+            JOIN op.customerOrder co
+            JOIN co.statusCode sc
             WHERE p.planDate >= :from
               AND p.planDate < :to
+              AND sc.code <> 'CANCELLED'
             """)
     long sumPlannedQuantity(
             @Param("from") LocalDate from,
@@ -27,8 +31,12 @@ public interface ProductionStatisticsRepository
     @Query("""
             SELECT p.planDate, SUM(p.quantity)
             FROM ProductionPlan p
+            JOIN p.orderProduct op
+            JOIN op.customerOrder co
+            JOIN co.statusCode sc
             WHERE p.planDate >= :from
               AND p.planDate < :to
+              AND sc.code <> 'CANCELLED'
             GROUP BY p.planDate
             ORDER BY p.planDate
             """)
@@ -42,9 +50,13 @@ public interface ProductionStatisticsRepository
             SELECT COALESCE(SUM(w.quantity), 0)
             FROM WorkOrder w
             JOIN w.commonCode c
+            JOIN w.orderProduct op
+            JOIN op.customerOrder co
+            JOIN co.statusCode sc
             WHERE w.completedAt >= :from
               AND w.completedAt < :to
               AND c.code = 'PACK_DONE'
+              AND sc.code <> 'CANCELLED'
             """)
     long sumCompletedQuantity(
             @Param("from") LocalDate from,
@@ -56,9 +68,13 @@ public interface ProductionStatisticsRepository
             SELECT FUNCTION('DATE', w.completedAt), SUM(w.quantity)
             FROM WorkOrder w
             JOIN w.commonCode c
+            JOIN w.orderProduct op
+            JOIN op.customerOrder co
+            JOIN co.statusCode sc
             WHERE w.completedAt >= :from
               AND w.completedAt < :to
               AND c.code = 'PACK_DONE'
+              AND sc.code <> 'CANCELLED'
             GROUP BY FUNCTION('DATE', w.completedAt)
             ORDER BY FUNCTION('DATE', w.completedAt)
             """)
