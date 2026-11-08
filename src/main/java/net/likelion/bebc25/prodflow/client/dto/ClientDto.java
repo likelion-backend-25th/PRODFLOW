@@ -1,6 +1,8 @@
 package net.likelion.bebc25.prodflow.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.ToString;
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.common.domain.Address;
@@ -11,11 +13,21 @@ import java.time.LocalDateTime;
 @ToString
 public class ClientDto {
     public record Request(
+            @NotBlank(message = "거래처명을 입력해주세요.")
             String company,
+
+            @NotBlank(message = "거래처 대표 직원 이름을 입력해주세요.")
             String employee,
+
+            @NotBlank(message = "거래처 이메일을 입력해주세요.")
             String email,
+
+            @NotBlank(message = "거래처 연락처를 입력해주세요.")
             String phone,
+
+            @NotNull
             Long userId,
+            
             @JsonProperty
             Address address
     ) {

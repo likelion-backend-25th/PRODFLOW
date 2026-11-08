@@ -1,6 +1,7 @@
 package net.likelion.bebc25.prodflow.global.security.config;
 
 import net.likelion.bebc25.prodflow.global.security.handler.CustomAccessDeniedHandler;
+import net.likelion.bebc25.prodflow.global.security.handler.CustomAuthenticationEntryPoint;
 import net.likelion.bebc25.prodflow.global.security.jwt.JwtAuthenticationFilter;
 import net.likelion.bebc25.prodflow.global.security.jwt.JwtProvider;
 import net.likelion.bebc25.prodflow.global.security.service.CustomUserDetailsService;
@@ -67,6 +68,7 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtProvider jwtProvider,
             CustomUserDetailsService userDetailsService,
+            CustomAuthenticationEntryPoint customAuthenticationEntryPoint,
             CustomAccessDeniedHandler customAccessDeniedHandler
     ) throws Exception {
 
@@ -86,11 +88,8 @@ public class SecurityConfig {
 
                 // 인증 및 인가 실패 시 예외 처리
                 .exceptionHandling(ex -> ex
-
-                        // 인증되지 않은 사용자의 요청에 401 응답
-                        .authenticationEntryPoint((req, res, e) ->
-                                writeError(res, 401,
-                                        "UNAUTHORIZED_ACCESS", "로그인이 필요합니다."))
+                        // 인증되지 않은 사용자에 대한 처리
+                        .authenticationEntryPoint(customAuthenticationEntryPoint)
 
                         // 인증은 되었으나 권한이 부족한 경우 처리
                         .accessDeniedHandler(customAccessDeniedHandler)

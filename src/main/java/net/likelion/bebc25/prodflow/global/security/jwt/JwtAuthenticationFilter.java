@@ -88,6 +88,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || (path.equals("/api/v1/users/me") && "GET".equalsIgnoreCase(request.getMethod()));
     }
 
+    // 해당 예외 반환 처리를 ApiErrorResponse 형식으로 반환해야함
     private void unauthorized(HttpServletResponse response) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());

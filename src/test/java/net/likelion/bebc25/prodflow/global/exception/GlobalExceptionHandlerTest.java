@@ -11,10 +11,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
@@ -48,7 +49,7 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
         assertThat(response.getBody().code()).isEqualTo("EXTERNAL_API_ERROR");
-        assertThat(response.getBody().message()).isEqualTo(ErrorCode.EXTERNAL_API_ERROR.getMessage());
+        assertThat(response.getBody().message()).isEqualTo("공휴일 API 내부 상세");
         assertThat(response.getBody().status()).isEqualTo(502);
         assertThat(response.getBody().timestamp()).isNotNull();
         assertThat(response.getBody().errors()).isEmpty();

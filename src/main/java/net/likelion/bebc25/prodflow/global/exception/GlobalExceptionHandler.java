@@ -61,6 +61,7 @@ public class GlobalExceptionHandler {
                 .body(ApiErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE));
     }
 
+    // ----------------- AuthException에 대한 정리 필요 (지금 GlobalExceptionHandler와 반환 형식이 다름)
     // 인증 관련 업무 예외 발생 시 지정된 상태 코드와 오류 메시지 반환
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<Map<String, String>> handleAuthException(AuthException ex) {
@@ -120,13 +121,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.FORBIDDEN_OPERATION.getHttpStatus()).body(response);
     }
 
-    // 권한이 부족할 때 (403 Forbidden 응답)
+    // 로직 안에서 객체 상태가 메소드를 실행하기 적절하지 않을 때 (400 BAD_REQUEST 응답)
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalStateException(IllegalStateException ex) {
         ApiErrorResponse response = ex.getMessage().isEmpty()
-                ? ApiErrorResponse.of(ErrorCode.FORBIDDEN_OPERATION)
-                : ApiErrorResponse.of(ErrorCode.FORBIDDEN_OPERATION, ex.getMessage());
-        return ResponseEntity.status(ErrorCode.FORBIDDEN_OPERATION.getHttpStatus()).body(response);
+                ? ApiErrorResponse.of(ErrorCode.WRONG_OBJECT_STATE)
+                : ApiErrorResponse.of(ErrorCode.WRONG_OBJECT_STATE, ex.getMessage());
+        return ResponseEntity.status(ErrorCode.WRONG_OBJECT_STATE.getHttpStatus()).body(response);
     }
 
     // 요청한 자원이 없을 때 (404 Not Found 응답)
@@ -142,7 +143,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGeneralException(Exception ex) {
         log.error(ex.getMessage());
-        ex.printStackTrace();
         ApiErrorResponse response = ex.getMessage().isEmpty()
                 ? ApiErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR)
                 : ApiErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR, ex.getMessage());
@@ -153,7 +153,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ExternalApiException.class)
     public ResponseEntity<ApiErrorResponse> handleExternalApiException(ExternalApiException ex) {
         log.error("외부 API 연동 실패: {}", ex.getMessage(), ex);
-        ApiErrorResponse response = ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR);
+        ApiErrorResponse response = ex.getMessage().isEmpty()
+                ? ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR)
+                : ApiErrorResponse.of(ErrorCode.EXTERNAL_API_ERROR, ex.getMessage());
         return ResponseEntity.status(ErrorCode.EXTERNAL_API_ERROR.getHttpStatus()).body(response);
     }
 
@@ -186,7 +188,9 @@ public class GlobalExceptionHandler {
     // 요청 본문을 읽거나 변환할 수 없을 때 호출됨 (400 Bad Request 응답)
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidBody(HttpMessageNotReadableException ex) {
-        ApiErrorResponse response = ApiErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, "요청 본문 형식을 확인해주세요.");
+        ApiErrorResponse response = ex.getMessage().isEmpty()
+                ? ApiErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE)
+                : ApiErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, ex.getMessage());
         return ResponseEntity.status(ErrorCode.INVALID_INPUT_VALUE.getHttpStatus()).body(response);
     }
 }
