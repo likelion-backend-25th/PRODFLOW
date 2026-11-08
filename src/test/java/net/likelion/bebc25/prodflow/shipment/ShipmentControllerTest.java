@@ -36,7 +36,7 @@ class ShipmentControllerTest {
                 "530099990001", 3, "Y", false, "2026-11-09", startedAt, null);
         when(shipmentService.getByOrderId(3L)).thenReturn(new ShipmentDto.OrderResponse(shipment));
 
-        mvc.perform(get("/api/v1/shipments").param("orderId", "3"))
+        mvc.perform(get("/api/v1/shipments/{orderId}", 3L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.shipment.shipmentId").value(10))
                 .andExpect(jsonPath("$.shipment.orderId").value(3))
@@ -55,7 +55,7 @@ class ShipmentControllerTest {
     void getOrderWithoutShipment() throws Exception {
         when(shipmentService.getByOrderId(10L)).thenReturn(new ShipmentDto.OrderResponse(null));
 
-        mvc.perform(get("/api/v1/shipments").param("orderId", "10"))
+        mvc.perform(get("/api/v1/shipments/{orderId}", 10L))
                 .andExpect(status().isOk())
                 .andExpect(content().json("{\"shipment\":null}"));
     }
@@ -65,25 +65,29 @@ class ShipmentControllerTest {
     void unknownOrderReturnsNotFound() throws Exception {
         when(shipmentService.getByOrderId(Long.MAX_VALUE)).thenThrow(new NoSuchElementException("수주를 찾을 수 없습니다."));
 
-        mvc.perform(get("/api/v1/shipments").param("orderId", Long.toString(Long.MAX_VALUE)))
+        mvc.perform(get("/api/v1/shipments/{orderId}", Long.MAX_VALUE))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("수주를 찾을 수 없습니다."));
     }
 
     @Test
-    @DisplayName("수주 ID가 누락되면 400으로 응답한다")
-    void rejectMissingOrderId() throws Exception {
-        when(shipmentService.getByOrderId(null)).thenThrow(new IllegalArgumentException("수주 ID를 입력해 주세요."));
+    @DisplayName("수주 ID 경로가 없으면 기본 탭의 배송 목록을 조회한다")
+    void getListWithoutOrderId() throws Exception {
+        when(shipmentService.findList("READY_TO_SHIP")).thenReturn(new ShipmentDto.ListResponse(
+                "READY_TO_SHIP", new ShipmentDto.TabCounts(0, 0, 0, 0), java.util.List.of()));
 
         mvc.perform(get("/api/v1/shipments"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("수주 ID를 입력해 주세요."));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tab").value("READY_TO_SHIP"))
+                .andExpect(jsonPath("$.items").isEmpty());
+        verify(shipmentService).findList("READY_TO_SHIP");
+        verify(shipmentService, never()).getByOrderId(any());
     }
 
     @Test
     @DisplayName("숫자가 아닌 수주 ID는 서비스 호출 전에 거부한다")
     void rejectInvalidOrderId() throws Exception {
-        mvc.perform(get("/api/v1/shipments").param("orderId", "invalid"))
+        mvc.perform(get("/api/v1/shipments/{orderId}", "invalid"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(shipmentService);
     }
