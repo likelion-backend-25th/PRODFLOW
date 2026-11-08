@@ -7,13 +7,13 @@ import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductReposi
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
 import net.likelion.bebc25.prodflow.dashboard.service.ProductionStatisticsService;
 import net.likelion.bebc25.prodflow.line.entity.Line;
-import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
-import net.likelion.bebc25.prodflow.work_order.repsitory.ProductionPlanRepository;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

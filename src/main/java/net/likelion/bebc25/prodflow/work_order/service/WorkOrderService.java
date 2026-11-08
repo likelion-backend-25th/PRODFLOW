@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.work_order.serivce;
+package net.likelion.bebc25.prodflow.work_order.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +14,7 @@ import net.likelion.bebc25.prodflow.holiday.entity.Holiday;
 import net.likelion.bebc25.prodflow.holiday.repository.HolidayRepository;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
-import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
@@ -25,9 +25,9 @@ import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderHistoryDto;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrderHistory;
-import net.likelion.bebc25.prodflow.work_order.repsitory.ProductionPlanRepository;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderHistoryRepository;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderHistoryRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -153,7 +153,8 @@ public class WorkOrderService {
             // 종료일까지, 이 라인에 더 넣을 수량이 있는 동안 하루씩 본다.
             while (!date.isAfter(request.plannedEndDate()) && remainingToAssign > 0) {
                 // 주말인지 확인
-                boolean isWeekend = date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY;
+                boolean isWeekend = date.getDayOfWeek() == DayOfWeek.SATURDAY
+                        || date.getDayOfWeek() == DayOfWeek.SUNDAY;
                 // 주말이거나 공휴일이면 다음 날로 넘긴다.
                 if (isWeekend || holidays.contains(date)) {
                     date = date.plusDays(1);
@@ -243,7 +244,14 @@ public class WorkOrderService {
     }
 
     // 작업지시서 페이징 조회
-    public Page<WorkOrderDto.PageResponse> findAll(Long lineId, String status, LocalDate from, LocalDate to, String keyword, Pageable pageable) {
+    public Page<WorkOrderDto.PageResponse> findAll(
+            Long lineId,
+            String status,
+            LocalDate from,
+            LocalDate to,
+            String keyword,
+            Pageable pageable
+    ) {
         // 각 요소가 null, 빈칸이 아닌경우 공백 제거하여 저장
         String code = status == null || status.isBlank() ? null : status.trim();
         String word = keyword == null || keyword.isBlank() ? null : keyword.trim();
@@ -251,13 +259,10 @@ public class WorkOrderService {
         // 검색 조건이 전부 공백 상태인 경우
         if (!hasCondition) {
             // 완료 예정일이 빠른 순이다. 같은 날이면 id가 큰 최근 등록이 앞이다.
-            return workOrderRepository.findAllByOrderByPlannedEndDateAscIdDesc(pageable)
-                    // 작업지시 엔티티를 페이징 응답으로 바꾼다.
-                    .map(WorkOrderDto.PageResponse::from);
+            return workOrderRepository.findPage(pageable);
         }
-        // 조건별 검색 기능
-        return workOrderRepository.search(lineId, status, from, to, keyword, pageable)
-                .map(WorkOrderDto.PageResponse::from);
+        // 조건별 검색이다. 응답 컬럼은 조회 쿼리에서 이미 채운다.
+        return workOrderRepository.searchPage(lineId, status, from, to, keyword, pageable);
     }
 
     // 작업지시서 상세 조회

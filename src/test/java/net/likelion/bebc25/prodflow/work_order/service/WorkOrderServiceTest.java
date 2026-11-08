@@ -7,7 +7,7 @@ import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
 import net.likelion.bebc25.prodflow.holiday.repository.HolidayRepository;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
-import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.work_order.dto.ProductionPlanDto;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.CreateRequest;
@@ -18,10 +18,10 @@ import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.UpdateStatusRequ
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.UpdatedRequest;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
-import net.likelion.bebc25.prodflow.work_order.repsitory.ProductionPlanRepository;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderHistoryRepository;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
-import net.likelion.bebc25.prodflow.work_order.serivce.WorkOrderService;
+import net.likelion.bebc25.prodflow.work_order.repository.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderHistoryRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
+import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +29,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,18 +45,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// 애플리케이션 설정은 유지한다. 이 테스트만 테이블을 지우지 않고 data.sql도 다시 실행하지 않는다.
-//@SpringBootTest(properties = {
-//        "spring.jpa.hibernate.ddl-auto=validate",
-//        "spring.sql.init.mode=never"
-//})
-
-// CI 에러 임시 해결 (@Sql 해당 부분 제거할 때 @Sql import 도 같이 삭제)
-@SpringBootTest(properties = {
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.sql.init.mode=never"
-})
-@Sql("/data.sql")
+@SpringBootTest
 
 @Transactional // 테스트가 끝나면 롤백해서 시드 작업지시를 유지한다
 class WorkOrderServiceTest {
@@ -413,7 +401,8 @@ class WorkOrderServiceTest {
 
         assertThat(updated.lineId()).isEqualTo(availableLine.getId());
         assertThat(updated.assignedId()).isEqualTo(4L);
-        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getLine().getId()).isEqualTo(availableLine.getId());
+        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getLine().getId())
+                .isEqualTo(availableLine.getId());
         // 계획 행의 날짜와 수량은 그대로다. 합계는 작업지시의 현재 라인을 본다.
         List<ProductionPlan> plans = plansOf(workOrderId);
         assertThat(plans).extracting(ProductionPlan::getPlanDate).containsExactly(day);
@@ -729,7 +718,9 @@ class WorkOrderServiceTest {
     // 등록 응답의 하루 계획이 날짜, 수량, 작업지시 번호와 맞는지 본다.
     private void assertResponsePlans(Response response, List<LocalDate> dates, List<Integer> quantities) {
         assertThat(response.plans()).extracting(ProductionPlanDto.Response::planDate).containsExactlyElementsOf(dates);
-        assertThat(response.plans()).extracting(ProductionPlanDto.Response::quantity).containsExactlyElementsOf(quantities);
+        assertThat(response.plans())
+                .extracting(ProductionPlanDto.Response::quantity)
+                .containsExactlyElementsOf(quantities);
         assertThat(response.plans()).extracting(ProductionPlanDto.Response::workOrderId).containsOnly(response.id());
     }
 

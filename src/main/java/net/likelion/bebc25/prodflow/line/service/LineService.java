@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.line.serivce;
+package net.likelion.bebc25.prodflow.line.service;
 
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
@@ -8,15 +8,15 @@ import net.likelion.bebc25.prodflow.line.dto.LineDto;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.entity.LineCapacityLog;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
-import net.likelion.bebc25.prodflow.line.repsitory.LineCapacityLogRepository;
-import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line.repository.LineCapacityLogRepository;
+import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.line_notification.service.LineNotificationService;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
-import net.likelion.bebc25.prodflow.work_order.serivce.ProductionPlanRescheduleService;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
+import net.likelion.bebc25.prodflow.work_order.service.ProductionPlanRescheduleService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;

@@ -1,8 +1,8 @@
-package net.likelion.bebc25.prodflow.line.serivce;
+package net.likelion.bebc25.prodflow.line.service;
 
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.line.dto.LineDto;
-import net.likelion.bebc25.prodflow.line.repsitory.LineCapacityLogRepository;
+import net.likelion.bebc25.prodflow.line.repository.LineCapacityLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

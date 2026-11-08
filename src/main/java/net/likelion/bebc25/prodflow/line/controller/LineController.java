@@ -4,14 +4,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.common.dto.StatusHistoryDto;
 import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.service.StatusHistoryService;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.line.dto.LineDto;
-import net.likelion.bebc25.prodflow.line.serivce.LineCapacityLogService;
-import net.likelion.bebc25.prodflow.line.serivce.LineService;
+import net.likelion.bebc25.prodflow.line.service.LineCapacityLogService;
+import net.likelion.bebc25.prodflow.line.service.LineService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,7 +27,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("api/v1/lines")
+@RequestMapping("/api/v1/lines")
 @RequiredArgsConstructor // final 받는 필드를 자동 생성
 public class LineController {
 
@@ -79,7 +80,7 @@ public class LineController {
     @ApiResponse(responseCode = "403", description = "최고 관리자, 수주 관리자가 아님")
     @PostMapping
     public ResponseEntity<LineDto.Response> create(
-            @RequestBody LineDto.CreateRequest request, // 이름, 생산 능력, 도입일
+            @Valid @RequestBody LineDto.CreateRequest request, // 이름, 생산 능력, 도입일
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         // 이름은 토큰에 없으므로 서비스가 id로 User를 조회한다.
@@ -103,7 +104,7 @@ public class LineController {
     @PatchMapping("/{lineId}")
     public ResponseEntity<LineDto.Response> update(
             @PathVariable Long lineId, // 수정할 라인 id
-            @RequestBody LineDto.UpdateRequest request, // 이름, 생산량, 변경 사유
+            @Valid @RequestBody LineDto.UpdateRequest request, // 이름, 생산량, 변경 사유
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         // 이름은 토큰에 없으므로 서비스가 id로 User를 조회한다.
@@ -125,7 +126,7 @@ public class LineController {
     @PatchMapping("/{lineId}/status")
     public ResponseEntity<LineDto.Response> changeStatus(
             @PathVariable Long lineId,
-            @RequestBody LineDto.UpdateStatusRequest request,
+            @Valid @RequestBody LineDto.UpdateStatusRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(lineService.changeStatus(lineId, request, userDetails.getUserId()));
