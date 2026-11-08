@@ -12,6 +12,7 @@ import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.line.repository.LineCapacityLogRepository;
 import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.line.service.LineService;
+import net.likelion.bebc25.prodflow.line_notification.repository.LineNotificationRepository;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 import net.likelion.bebc25.prodflow.work_order.repository.ProductionPlanRepository;
@@ -44,6 +45,9 @@ class LineServiceTest {
 
     @Autowired
     StatusHistoryRepository statusHistoryRepository;
+
+    @Autowired
+    LineNotificationRepository lineNotificationRepository;
 
     @Autowired
     WorkOrderService workOrderService;
@@ -183,11 +187,13 @@ class LineServiceTest {
     @DisplayName("같은 라인 상태로 바꾸면 이력을 남기지 않는다")
     void changeLineStatusToSameValue() {
         long historyCount = statusHistoryRepository.count();
+        long noticeCount = lineNotificationRepository.count();
 
         assertThatThrownBy(() -> lineService.changeStatus(1L, new UpdateStatusRequest(LineStatus.OPERATING), 1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("이미 같은 상태입니다.");
         assertThat(statusHistoryRepository.count()).isEqualTo(historyCount);
+        assertThat(lineNotificationRepository.count()).isEqualTo(noticeCount);
     }
 
     @Test

@@ -17,9 +17,10 @@ public class ShipmentTrackingService {
 
     private final ShipmentRepository shipmentRepository;
     private final ShipmentTrackingClient shipmentTrackingClient;
+    private final ShipmentService shipmentService;
 
     @Transactional
-    public ShipmentTrackingDto refreshByShipmentId(Long shipmentId) {
+    public ShipmentTrackingDto refreshByShipmentId(Long shipmentId, Long userId) {
         Shipment shipment = shipmentRepository.findById(shipmentId)
                 .orElseThrow(() -> new EntityNotFoundException(
                         "운송장을 찾을 수 없습니다: id=" + shipmentId
@@ -37,6 +38,9 @@ public class ShipmentTrackingService {
                 api.estimate()
         );
 
-        return ShipmentTrackingDto.from(shipment);
+        // 조회 결과가 배송완료면 수주도 COMPLETED로 맞춘다.
+        String orderStatus = shipmentService.completeOrderIfDelivered(shipment, userId);
+
+        return ShipmentTrackingDto.from(shipment, orderStatus);
     }
 }

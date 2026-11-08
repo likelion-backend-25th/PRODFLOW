@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record ShipmentTrackingDto(
         Long shipmentId,
         Long orderId,
+        String orderStatus,
         String carrierCode,
         String carrierName,
         String trackingNumber,
@@ -18,10 +19,11 @@ public record ShipmentTrackingDto(
         LocalDateTime startedAt,
         LocalDateTime deliveredAt
 ) {
-    public static ShipmentTrackingDto from(Shipment shipment) {
+    public static ShipmentTrackingDto from(Shipment shipment, String orderStatus) {
         return new ShipmentTrackingDto(
                 shipment.getId(),
                 shipment.getOrderId(),
+                orderStatus,
                 shipment.getCarrier().getCode(),
                 shipment.getCarrier().getName(),
                 shipment.getTrackingNumber(),
