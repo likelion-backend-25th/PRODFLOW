@@ -78,7 +78,14 @@ public class LineNotificationService {
         lineNotificationRepository.save(notification);
     }
 
-    // 생산 현장관리자 전체에게 알림 생성
+    // 라인 상태 알림은 활성 최고관리자, 수주 관리자, 생산 현장 관리자에게 보낸다. 업무 조회 담당자는 제외한다.
+    private static final List<UserRole> statusNoticeRoles = List.of(
+            UserRole.SUPER_ADMIN,
+            UserRole.ORDER_MANAGER,
+            UserRole.PRODUCTION_MANAGER
+    );
+
+    // 라인 상태 알림 수신 역할의 활성 사용자에게 알림 생성
     @Transactional
     public void notificationProductionManagers(
             Long lineId,
@@ -88,8 +95,8 @@ public class LineNotificationService {
         Line line = lineRepository.findById(lineId)
                 .orElseThrow(() -> new IllegalArgumentException("생산라인을 찾을 수 없습니다."));
 
-        List<User> managers = notificationUserRepository.findByRoleAndStatus(
-                UserRole.PRODUCTION_MANAGER,
+        List<User> managers = notificationUserRepository.findByRoleInAndStatus(
+                statusNoticeRoles,
                 UserStatus.ACTIVE
         );
 
