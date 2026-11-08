@@ -13,7 +13,10 @@ public class ProductionCalenderDto {
             String workNo,
             LocalDate plannedStartDate,
             LocalDate plannedEndDate,
-            String status
+            String status,
+            String orderNo,
+            String productName,
+            int quantity
     ) {
         public static Response from(WorkOrder workOrder) {
             return new Response(
@@ -23,7 +26,10 @@ public class ProductionCalenderDto {
                     workOrder.getWorkNo(),
                     workOrder.getPlannedStartDate(),
                     workOrder.getPlannedEndDate(),
-                    workOrder.getCommonCode().getCode()
+                    workOrder.getCommonCode().getCode(),
+                    workOrder.getOrderProduct().getCustomerOrder().getOrderNo(),
+                    workOrder.getOrderProduct().getProductName(),
+                    workOrder.getQuantity()
             );
         }
     }

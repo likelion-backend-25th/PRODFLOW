@@ -12,11 +12,12 @@ public interface ProductionCalenderRepository extends JpaRepository<WorkOrder, L
 
     // 확정된 수주의 진행 중인 작업지시 조회
     @Query("""
-            SELECT workOrder
+            SELECT DISTINCT workOrder
             FROM WorkOrder workOrder
-            JOIN workOrder.commonCode commonCode
-            JOIN workOrder.orderProduct orderProduct
-            JOIN orderProduct.customerOrder customerOrder
+            JOIN FETCH workOrder.line
+            JOIN FETCH workOrder.commonCode commonCode
+            JOIN FETCH workOrder.orderProduct orderProduct
+            JOIN FETCH orderProduct.customerOrder customerOrder
             WHERE customerOrder.confirmationStatus = :confirmationStatus
             AND commonCode.code IN :statuses
             ORDER BY workOrder.line.id, workOrder.plannedStartDate
