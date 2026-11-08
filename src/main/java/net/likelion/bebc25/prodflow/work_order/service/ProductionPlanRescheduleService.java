@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.work_order.serivce;
+package net.likelion.bebc25.prodflow.work_order.service;
 
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
@@ -11,7 +11,7 @@ import net.likelion.bebc25.prodflow.holiday.entity.Holiday;
 import net.likelion.bebc25.prodflow.holiday.repository.HolidayRepository;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
-import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
@@ -19,9 +19,9 @@ import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrderHistory;
-import net.likelion.bebc25.prodflow.work_order.repsitory.ProductionPlanRepository;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderHistoryRepository;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderHistoryRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -231,7 +231,8 @@ public class ProductionPlanRescheduleService {
                 continue;
             }
             long occupied = productionPlanRepository.sumQuantityByLineAndDate(destination.getId(), date);
-            int space = destination.getProductionCapacity() - (int) Math.min(occupied, destination.getProductionCapacity());
+            int space = destination.getProductionCapacity()
+                    - (int) Math.min(occupied, destination.getProductionCapacity());
             if (space <= 0) {
                 continue;
             }

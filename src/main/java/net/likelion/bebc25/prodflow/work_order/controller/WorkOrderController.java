@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.common.dto.StatusHistoryDto;
 import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
@@ -13,7 +14,7 @@ import net.likelion.bebc25.prodflow.common.service.StatusHistoryService;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderHistoryDto;
-import net.likelion.bebc25.prodflow.work_order.serivce.WorkOrderService;
+import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,7 +34,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("api/v1/work-orders")
+@RequestMapping("/api/v1/work-orders")
 @RequiredArgsConstructor
 public class WorkOrderController {
 
@@ -54,7 +55,7 @@ public class WorkOrderController {
     @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
     @PostMapping
     public ResponseEntity<List<WorkOrderDto.Response>> create(
-            @RequestBody WorkOrderDto.CreateRequest request,
+            @Valid @RequestBody WorkOrderDto.CreateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         List<WorkOrderDto.Response> responses = workOrderService.create(request, userDetails.getUserId());
@@ -128,7 +129,7 @@ public class WorkOrderController {
     @PatchMapping("/{workOrderId}")
     public ResponseEntity<WorkOrderDto.DetailResponse> update(
             @PathVariable Long workOrderId,
-            @RequestBody WorkOrderDto.UpdatedRequest request,
+            @Valid @RequestBody WorkOrderDto.UpdatedRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(
@@ -153,7 +154,7 @@ public class WorkOrderController {
     public ResponseEntity<WorkOrderDto.DetailResponse> changeStatus(
             @Parameter(description = "작업지시 ID", example = "1")
             @PathVariable Long workOrderId,
-            @RequestBody WorkOrderDto.UpdateStatusRequest request,
+            @Valid @RequestBody WorkOrderDto.UpdateStatusRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(

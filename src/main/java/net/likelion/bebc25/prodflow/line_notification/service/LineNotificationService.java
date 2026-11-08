@@ -3,7 +3,7 @@ package net.likelion.bebc25.prodflow.line_notification.service;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
-import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.line_notification.dto.LineNotificationDto;
 import net.likelion.bebc25.prodflow.line_notification.entity.LineNotification;
 import net.likelion.bebc25.prodflow.line_notification.enums.LineNotificationType;

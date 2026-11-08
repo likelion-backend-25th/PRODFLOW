@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.line.repsitory;
+package net.likelion.bebc25.prodflow.line.repository;
 
 import jakarta.persistence.LockModeType;
 import net.likelion.bebc25.prodflow.line.dto.LineDto;

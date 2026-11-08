@@ -1,5 +1,9 @@
 package net.likelion.bebc25.prodflow.work_order.dto;
 
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 
 import java.time.LocalDate;
@@ -8,27 +12,51 @@ import java.util.List;
 public class WorkOrderDto {
 
     public record CreateRequest(
+            @NotNull(message = "수주 품목을 입력해주세요.")
+            @Positive(message = "수주 품목을 입력해주세요.")
             Long orderProductId, // 생산 품목
+            @NotNull(message = "라인을 입력해주세요.")
+            @Positive(message = "라인을 입력해주세요.")
             Long lineId, // 작업 라인
+            @NotNull(message = "담당자를 입력해주세요.")
+            @Positive(message = "담당자를 입력해주세요.")
             Long assignedId, // 담당자
+            @Positive(message = "작업지시 수량은 1 이상이어야 합니다.")
             int quantity, // 이 라인에 배정하는 수량
+            @NotNull(message = "생산 시작 예정일을 입력해주세요.")
             LocalDate plannedStartDate,
+            @NotNull(message = "생산 완료 예정일을 입력해주세요.")
             LocalDate plannedEndDate
     ) {
+        // 날짜가 비어 있으면 @NotNull이 알린다. 둘 다 있을 때만 순서를 본다.
+        @AssertTrue(message = "생산 예정 기간이 올바르지 않습니다.")
+        public boolean isPlannedPeriodValid() {
+            if (plannedStartDate == null || plannedEndDate == null) {
+                return true;
+            }
+            return !plannedStartDate.isAfter(plannedEndDate);
+        }
     }
 
     // 작업 상태 변경. status는 WORK_ORDER_STATUS의 code다. note는 생산 중지 사유다.
     public record UpdateStatusRequest(
+            @NotBlank(message = "작업 상태를 입력해주세요.")
             String status,
             String note
     ) {
     }
 
-    // 담당 라인, 작업자 변경 요청 dto
+    // 담당 라인, 작업자 변경 요청 dto. 라인과 담당자는 하나만 바꿔도 된다.
     public record UpdatedRequest(
+            @Positive(message = "라인을 입력해주세요.")
             Long lineId,
+            @Positive(message = "담당자를 입력해주세요.")
             Long assignedId
     ) {
+        @AssertTrue(message = "변경된 라인 또는 담당자가 없습니다.")
+        public boolean hasLineOrAssignee() {
+            return lineId != null || assignedId != null;
+        }
     }
 
     // 등록 후 응답

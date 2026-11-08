@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.work_order.repsitory;
+package net.likelion.bebc25.prodflow.work_order.repository;
 
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrderHistory;
 import org.springframework.data.jpa.repository.JpaRepository;

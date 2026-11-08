@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.line.repsitory;
+package net.likelion.bebc25.prodflow.line.repository;
 
 import net.likelion.bebc25.prodflow.line.entity.LineCapacityLog;
 import org.springframework.data.jpa.repository.JpaRepository;
