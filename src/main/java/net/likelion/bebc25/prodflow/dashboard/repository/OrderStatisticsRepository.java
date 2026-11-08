@@ -17,7 +17,9 @@ public interface OrderStatisticsRepository extends JpaRepository<CustomerOrder, 
             SELECT COUNT(o)
             FROM CustomerOrder o
             JOIN o.statusCode sc
-            WHERE sc.code <> 'CANCELLED'
+            JOIN sc.codeGroup cg
+            WHERE cg.groupCode = 'ORDER_STATUS'
+              AND sc.code <> 'CANCELLED'
             """)
     long countAllOrders();
 
@@ -26,8 +28,10 @@ public interface OrderStatisticsRepository extends JpaRepository<CustomerOrder, 
             SELECT COUNT(o)
             FROM CustomerOrder o
             JOIN o.statusCode sc
+            JOIN sc.codeGroup cg
             WHERE o.createdAt >= :startDate
               AND o.createdAt < :endDate
+              AND cg.groupCode = 'ORDER_STATUS'
               AND sc.code <> 'CANCELLED'
             """)
     long countOrdersByPeriod(
@@ -43,6 +47,8 @@ public interface OrderStatisticsRepository extends JpaRepository<CustomerOrder, 
             )
             FROM CustomerOrder o
             JOIN o.statusCode sc
+            JOIN sc.codeGroup cg
+            WHERE cg.groupCode = 'ORDER_STATUS'
             GROUP BY sc.code, sc.name
             ORDER BY sc.code
             """)
@@ -56,12 +62,16 @@ public interface OrderStatisticsRepository extends JpaRepository<CustomerOrder, 
                      FROM Payment p
                      JOIN p.order paymentOrder
                      JOIN paymentOrder.statusCode paymentStatusCode
-                     WHERE paymentStatusCode.code <> 'CANCELLED'
+                     JOIN paymentStatusCode.codeGroup paymentGroup
+                     WHERE paymentGroup.groupCode = 'ORDER_STATUS'
+                       AND paymentStatusCode.code <> 'CANCELLED'
                        AND p.status = :paymentStatus
                  ), 0)
             FROM CustomerOrder o
             JOIN o.statusCode sc
-            WHERE sc.code <> 'CANCELLED'
+            JOIN sc.codeGroup cg
+            WHERE cg.groupCode = 'ORDER_STATUS'
+              AND sc.code <> 'CANCELLED'
             """)
     long sumUnpaidAmount(
             @Param("paymentStatus") PaymentStatus paymentStatus

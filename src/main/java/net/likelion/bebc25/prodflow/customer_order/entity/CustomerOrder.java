@@ -114,7 +114,7 @@ public class CustomerOrder extends BaseTimeEntity {
     @Column(name = "total_amount", nullable = false)
     private Long totalAmount;
 
-    // 수주 품목은 OrderProduct로 따로 조회한다.
+    // 수주 정보 초기화
     public CustomerOrder(
             String orderNo,
             Quotation quotation,
@@ -164,6 +164,12 @@ public class CustomerOrder extends BaseTimeEntity {
         this.endDate = null;
     }
 
+    // 수주번호 확정
+    public void changeOrderNo(String orderNo) {
+        this.orderNo = orderNo;
+    }
+
+    // 생산 일정 변경
     public void changeSchedule(
             LocalDate estimatedDueDate,
             LocalDate plannedStartDate,
@@ -174,6 +180,7 @@ public class CustomerOrder extends BaseTimeEntity {
         this.plannedEndDate = plannedEndDate;
     }
 
+    // 진행·확정 상태 변경
     public void changeProgress(CommonCode statusCode) {
         this.statusCode = statusCode;
         this.confirmationStatus = switch (statusCode.getCode()) {
@@ -183,22 +190,27 @@ public class CustomerOrder extends BaseTimeEntity {
         };
     }
 
+    // 미입금 상태 변경
     public void markUnpaid() {
         this.paymentStatus = OrderPaymentStatus.UNPAID;
     }
 
+    // 일부 입금 상태 변경
     public void markPartiallyPaid() {
         this.paymentStatus = OrderPaymentStatus.PARTIALLY_PAID;
     }
 
+    // 전액 입금 상태 변경
     public void markPaid() {
         this.paymentStatus = OrderPaymentStatus.PAID;
     }
 
+    // 생산 완료일 설정
     public void completeProduction(LocalDate endDate) {
         this.endDate = endDate;
     }
 
+    // 배송 정보 변경
     public void changeShipping(
             String shippingAddress,
             String receiverName,
@@ -211,6 +223,7 @@ public class CustomerOrder extends BaseTimeEntity {
         this.notifyChannel = notifyChannel;
     }
 
+    // 업무 메모 변경
     public void changeMemo(String memo) {
         this.memo = memo;
     }

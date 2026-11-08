@@ -1,0 +1,31 @@
+info:
+  name: 거래처 등록
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/clients"
+  body:
+    type: json
+    data: |-
+      { 
+        "company": "테스트 거래처(주)", 
+        "employee": "이승언", 
+        "email": "devse9894@gmail.com", 
+        "phone": "010-1234-5678", 
+        "userId": 1, 
+        "address": { 
+          "zipcode": "06236", 
+          "roadAddress": "서울특별시 강남구 테헤란로 123", 
+          "detailAddress": "5층" 
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

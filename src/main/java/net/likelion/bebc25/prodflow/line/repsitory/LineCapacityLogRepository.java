@@ -9,4 +9,7 @@ public interface LineCapacityLogRepository extends JpaRepository<LineCapacityLog
 
     // 상세의 생산량 변경 이력. 최근 변경이 앞이다.
     List<LineCapacityLog> findByLine_IdOrderByChangedAtDesc(Long lineId);
+
+    // 특정 생산라인의 최근 생산량 변경 이력 3개 조회
+    List<LineCapacityLog> findTop3ByLine_IdOrderByChangedAtDesc(Long lineId);
 }

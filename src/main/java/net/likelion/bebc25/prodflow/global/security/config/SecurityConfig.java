@@ -1,10 +1,10 @@
 package net.likelion.bebc25.prodflow.global.security.config;
 
 import net.likelion.bebc25.prodflow.global.security.handler.CustomAccessDeniedHandler;
+import net.likelion.bebc25.prodflow.global.security.handler.CustomAuthenticationEntryPoint;
 import net.likelion.bebc25.prodflow.global.security.jwt.JwtAuthenticationFilter;
 import net.likelion.bebc25.prodflow.global.security.jwt.JwtProvider;
 import net.likelion.bebc25.prodflow.global.security.service.CustomUserDetailsService;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -47,7 +47,7 @@ public class SecurityConfig {
      * application.yml 또는 환경변수에 auth.allowed-origins가
      * 정의되어 있으면 해당 설정값이 기본값보다 우선 적용된다.
      */
-    @Value("${auth.allowed-origins:http://localhost:3000,http://localhost:5173,https://www.prodflow.site}")
+    @Value("${auth.allowed-origins}")
     private String allowedOrigins;
 
     /**
@@ -68,6 +68,7 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtProvider jwtProvider,
             CustomUserDetailsService userDetailsService,
+            CustomAuthenticationEntryPoint customAuthenticationEntryPoint,
             CustomAccessDeniedHandler customAccessDeniedHandler
     ) throws Exception {
 
@@ -87,11 +88,8 @@ public class SecurityConfig {
 
                 // 인증 및 인가 실패 시 예외 처리
                 .exceptionHandling(ex -> ex
-
-                        // 인증되지 않은 사용자의 요청에 401 응답
-                        .authenticationEntryPoint((req, res, e) ->
-                                writeError(res, 401,
-                                        "UNAUTHORIZED_ACCESS", "로그인이 필요합니다."))
+                        // 인증되지 않은 사용자에 대한 처리
+                        .authenticationEntryPoint(customAuthenticationEntryPoint)
 
                         // 인증은 되었으나 권한이 부족한 경우 처리
                         .accessDeniedHandler(customAccessDeniedHandler)
@@ -153,17 +151,35 @@ public class SecurityConfig {
                                 "/api/v1/users/**"
                         ).hasRole("SUPER_ADMIN")
 
-                        // 생산 라인 등록은 최고 관리자 또는 발주 관리자만 허용
+                        // 생산 라인 등록은 최고 관리자 또는 수주 관리자만 허용
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/lines"
                         ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
 
-                        // 생산 라인 수정은 최고 관리자 또는 발주 관리자만 허용
+                        // 생산 라인 상태는 최고 관리자, 수주 관리자, 생산 현장 관리자가 허용
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/lines/*/status"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER", "PRODUCTION_MANAGER")
+
+                        // 생산 라인 수정은 최고 관리자 또는 수주 관리자만 허용. 이름 변경은 서비스에서 최고 관리자만 받는다.
                         .requestMatchers(
                                 HttpMethod.PATCH,
                                 "/api/v1/lines/*"
                         ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
+                        // 작업 상태 변경은 최고 관리자 또는 생산 현장 관리자만 허용. 배정된 담당자인지는 서비스에서 본다.
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/work-orders/*/status"
+                        ).hasAnyRole("SUPER_ADMIN", "PRODUCTION_MANAGER")
+
+                        // 라인 변경과 담당자 변경은 역할이 다르다. 어느 항목인지는 서비스에서 가른다.
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/work-orders/*"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER", "PRODUCTION_MANAGER")
 
                         // 거래처 등록은 최고 관리자 또는 발주 관리자만 허용
                         .requestMatchers(
@@ -181,6 +197,25 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/quotations"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
+                        // 생산품목 등록·도면 업로드는 최고 관리자 또는 수주 관리자만 허용
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/products",
+                                "/api/v1/products/*/drawings"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
+                        // 생산품목 수정은 최고 관리자 또는 수주 관리자만 허용
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/v1/products/*"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
+                        // 생산품목 상태 변경은 최고 관리자 또는 수주 관리자만 허용
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/products/*/status"
                         ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
 
                         // 위 규칙에 해당하지 않는 모든 요청은 인증 필요

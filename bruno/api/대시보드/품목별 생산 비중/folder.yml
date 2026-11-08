@@ -1,0 +1,7 @@
+info:
+  name: 품목별 생산 비중
+  type: folder
+  seq: 6
+
+request:
+  auth: inherit

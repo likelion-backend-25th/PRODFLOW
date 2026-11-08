@@ -1,0 +1,20 @@
+info:
+  name: 견적 PDF 미리보기 URL 조회
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/quotations/:id/pdf"
+  params:
+    - name: id
+      value: "17"
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

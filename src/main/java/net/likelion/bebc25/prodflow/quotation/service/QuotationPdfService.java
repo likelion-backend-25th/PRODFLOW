@@ -1,30 +1,32 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationItemDto;
-import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
-import org.openpdf.text.Document;
-import org.openpdf.text.DocumentException;
-import org.openpdf.text.Element;
-import org.openpdf.text.Font;
-import org.openpdf.text.PageSize;
-import org.openpdf.text.Paragraph;
-import org.openpdf.text.Phrase;
-import org.openpdf.text.pdf.BaseFont;
-import org.openpdf.text.pdf.PdfPCell;
-import org.openpdf.text.pdf.PdfPTable;
-import org.openpdf.text.pdf.PdfReader;
-import org.openpdf.text.pdf.PdfWriter;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Service;
-
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.text.NumberFormat;
 import java.util.Locale;
+
+import org.openpdf.text.Document;
+import org.openpdf.text.DocumentException;
+import org.openpdf.text.Element;
+import org.openpdf.text.Font;
+import org.openpdf.text.PageSize;
+import org.openpdf.text.Paragraph;
+import org.openpdf.text.pdf.BaseFont;
+import org.openpdf.text.pdf.PdfPCell;
+import org.openpdf.text.pdf.PdfPTable;
+import org.openpdf.text.pdf.PdfReader;
+import org.openpdf.text.pdf.PdfWriter;
+import org.openpdf.text.Phrase;
+
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationItemDto;
+import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 
 @Service
 @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
@@ -34,7 +36,7 @@ public class QuotationPdfService {
     private static final String SUPPLIER_ADDRESS = "서울특별시 예시로 123 (예시)";
     private static final String SUPPLIER_PHONE = "02-0000-0000 (예시)";
 
-    // 저장된 초안 데이터로 PDF 생성
+    // 견적 PDF 생성
     public byte[] generate(QuotationDto.DetailResponse quotation) {
         if (quotation.status() != QuotationStatus.DRAFT) {
             throw new IllegalArgumentException("초안 상태의 견적만 PDF를 생성할 수 있습니다.");
@@ -123,6 +125,7 @@ public class QuotationPdfService {
         }
     }
 
+    // PDF 한글 폰트 로드
     private BaseFont loadFont(String filename) throws IOException {
         try (var input = new ClassPathResource("fonts/" + filename).getInputStream()) {
             return BaseFont.createFont(filename, BaseFont.IDENTITY_H, BaseFont.EMBEDDED,
@@ -130,6 +133,7 @@ public class QuotationPdfService {
         }
     }
 
+    // PDF 표 생성
     private PdfPTable table(float[] widths) {
         PdfPTable table = new PdfPTable(widths);
         table.setWidthPercentage(100);
@@ -138,6 +142,7 @@ public class QuotationPdfService {
         return table;
     }
 
+    // PDF 셀 생성
     private PdfPCell cell(String text, Font font, int alignment) {
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
         cell.setPadding(7);
@@ -148,6 +153,7 @@ public class QuotationPdfService {
         return cell;
     }
 
+    // PDF 납기 항목 추가
     private void addDueDate(PdfPTable table, String label, String date, Font font) {
         PdfPCell heading = cell(label, font, Element.ALIGN_CENTER);
         heading.setBackgroundColor(new Color(240, 240, 240));
@@ -157,11 +163,13 @@ public class QuotationPdfService {
         table.addCell(cell(date, new Font(font.getBaseFont(), 13, Font.NORMAL, Color.BLACK), Element.ALIGN_CENTER));
     }
 
+    // PDF 금액 요약 추가
     private void addSummary(PdfPTable table, String label, long value, Font font) {
         table.addCell(cell(label, font, Element.ALIGN_LEFT));
         table.addCell(cell(amount(value) + "원", font, Element.ALIGN_RIGHT));
     }
 
+    // 금액 천 단위 구분
     private String amount(long value) {
         return NumberFormat.getIntegerInstance(Locale.KOREA).format(value);
     }

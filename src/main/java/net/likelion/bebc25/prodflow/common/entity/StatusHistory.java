@@ -64,6 +64,13 @@ public class StatusHistory {
         this.userName = user.getName();
     }
 
+    public void writeNote(String note) {
+        if (note == null || note.isBlank()) {
+            return;
+        }
+        this.note = note.trim();
+    }
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

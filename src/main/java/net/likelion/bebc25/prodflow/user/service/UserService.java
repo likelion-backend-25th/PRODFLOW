@@ -1,19 +1,20 @@
 package net.likelion.bebc25.prodflow.user.service;
 
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import net.likelion.bebc25.prodflow.auth.dto.AuthDto;
 import net.likelion.bebc25.prodflow.auth.exception.AuthException;
 import net.likelion.bebc25.prodflow.auth.repository.RefreshTokenRepository;
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.user.dto.UserDto;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.Locale;
 
 @Service
 @Transactional(readOnly = true)
@@ -48,16 +49,6 @@ public class UserService {
 
         // 응답 Dto를 반환해 추가조회 없이 화면에 갱신가능
         return UserDto.Response.from(saveUser);
-    }
-
-
-    // 직원 목록 조회
-    public List<UserDto.Response> getAllUsers() {
-
-        return userRepository.findAll()
-                .stream()
-                .map(UserDto.Response::from) // 람다식 .map(user -> UserDto.Response.from(user))
-                .toList();
     }
 
     // 직원 상세 조회
@@ -97,16 +88,19 @@ public class UserService {
             );
         }
 
-        // 인증 관련 정보 변경 여부 확인
+        // 임시 비밀번호 확인 및 검증
+        String temporaryPassword = request.temporaryPassword();
+
+        if (temporaryPassword != null) {
+            validateTemporaryPassword(temporaryPassword);
+        }
+
+        // 인증 관련 정보 변경 여부 계산
         boolean securityInfoChanged =
-                //이메일
                 !user.getEmail().equals(request.email())
-                        // 계정 권한
                         || user.getRole() != request.role()
-                        // 계정 상태
                         || user.getStatus() != request.status()
-                        // 비밀번호 변경
-                        || request.temporaryPassword() != null;
+                        || temporaryPassword != null;
 
         // 직원 정보 수정
         user.update(
@@ -117,25 +111,17 @@ public class UserService {
                 request.status()
         );
 
-        // 임시 비밀번호 가져오기
-        String temporaryPassword = request.temporaryPassword();
-        // 임시 비밀번호가 발급된 경우에만 변경
+        // 임시 비밀번호를 발급한 경우에만 변경
         if (temporaryPassword != null) {
-            // 유효성 검사
-            validateTemporaryPassword(temporaryPassword);
-
-            String encodedPassword =
-                    passwordEncoder.encode(temporaryPassword);
-
-            user.updatePassword(encodedPassword);
+            user.updatePassword(
+                    passwordEncoder.encode(temporaryPassword)
+            );
         }
-        // 계정 상태, 권한, 이메일, 비밀번호 변경 시 Refresh Token 폐기
+
+        // 인증 관련 정보 변경 시 Refresh Token 폐기
         if (securityInfoChanged) {
             refreshTokenRepository.deleteByUserId(id);
         }
-
-        // save()가 필요없는 이유 : @Transactional 내부에서 조회한 User는 영속 상태이므로,
-        // JPA의 변경 감지(Dirty Checking)를 통해 트랜잭션 커밋 시 DB에 반영
 
         return UserDto.Response.from(user);
     }
@@ -148,19 +134,67 @@ public class UserService {
     }
 
     // 내 정보 조회
-    public AuthDto.MeResponse me(Long userId) {
+    public UserDto.MeResponse me(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> AuthException.unauthorized("사용자를 찾을 수 없습니다."));
         requireActive(user);
-        return AuthDto.MeResponse.from(user);
+        return UserDto.MeResponse.from(user);
     }
 
-    // ID로 직원 조회
-    // 공통으로 사용하므로 getUserById()에서 작성하지 않고 분리
-    private User findUserByIdOrThrow(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("직원을 찾을 수 없습니다. id: " + id)
-                );
+    // 직원 목록 페이징 조회
+    public PageResponse<UserDto.Response> getUsers(
+            String keyword,
+            UserStatus status,
+            Pageable pageable
+    ) {
+        // 삭제 계정 검색 차단
+        if (status == UserStatus.DELETED) {
+            throw new IllegalArgumentException(
+                    "ACTIVE 또는 INACTIVE만 조회할 수 있습니다."
+            );
+        }
+
+        // 검색어 공백 제거 및 소문자 변환
+        String normalizedKeyword =
+                (keyword == null || keyword.isBlank())
+                        ? null
+                        : keyword.trim().toLowerCase(Locale.ROOT);
+
+        if (normalizedKeyword != null
+                && normalizedKeyword.length() > 100) {
+            throw new IllegalArgumentException(
+                    "검색어는 100자 이내로 입력해주세요."
+            );
+        }
+
+        // DB에서 검색 + 필터 + 페이징
+        Page<User> users = userRepository.searchUsers(
+                normalizedKeyword,
+                status,
+                UserStatus.DELETED,
+                pageable
+        );
+
+        // 기존 공통 PageResponse 재사용
+        return PageResponse.from(
+                users.map(UserDto.Response::from)
+        );
+    }
+
+    // 통계 조회
+    public UserDto.StatsResponse getUserStats() {
+
+        long active =
+                userRepository.countByStatus(UserStatus.ACTIVE);
+
+        long inactive =
+                userRepository.countByStatus(UserStatus.INACTIVE);
+
+        return new UserDto.StatsResponse(
+                active + inactive,
+                active,
+                inactive
+        );
     }
 
     // 삭제된 직원 검증
@@ -188,5 +222,15 @@ public class UserService {
                     "임시 비밀번호 형식이 올바르지 않습니다."
             );
         }
+    }
+
+    // 직원 ID로 조회하고 존재하지 않으면 예외 발생
+    private User findUserByIdOrThrow(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "존재하지 않는 직원입니다."
+                        )
+                );
     }
 }

@@ -2,12 +2,12 @@ package net.likelion.bebc25.prodflow.product.service;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.common.storage.StorageClient;
 import net.likelion.bebc25.prodflow.product.dto.ProductDrawingDto.Response;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.entity.ProductDrawing;
 import net.likelion.bebc25.prodflow.product.repository.ProductDrawingRepository;
 import net.likelion.bebc25.prodflow.product.repository.ProductRepository;
-import net.likelion.bebc25.prodflow.product.storage.StorageClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;

@@ -19,6 +19,10 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
             WHERE s.orderId IN :orderIds
             """)
     List<Shipment> findByOrderIdIn(@Param("orderIds") Collection<Long> orderIds);
+    boolean existsByOrderId(Long orderId);
+
+    boolean existsByCarrier_CodeAndTrackingNumber(String carrierCode, String trackingNumber);
+
 
     //아직 배송 완료가 아닌 운송장 (주기 조회 대상)
     //complete = false 이거나 null

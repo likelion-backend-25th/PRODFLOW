@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -15,6 +16,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@Import(FixedDashboardClock.class)
 @Transactional
 class DeliveryRiskServiceTest {
 
@@ -129,7 +131,7 @@ class DeliveryRiskServiceTest {
     }
 
     @Test
-    @DisplayName("결제 완료 상태가 납기 위험 수주에 포함된다")
+    @DisplayName("납기 위험 수주의 결제 상태는 수주 결제 상태와 같다")
     void getDeliveryRiskPaidStatus() {
         // given
         String orderNo = "PF-2026-009";
@@ -142,13 +144,38 @@ class DeliveryRiskServiceTest {
         assertThat(response.items())
                 .anySatisfy(item -> {
                     if (item.orderNo().equals(orderNo)) {
-                        assertThat(item.paymentStatus())
-                                .isIn(
-                                        OrderPaymentStatus.UNPAID,
-                                        OrderPaymentStatus.PARTIALLY_PAID,
-                                        OrderPaymentStatus.PAID
-                                );
+                        assertThat(item.paymentStatus()).isEqualTo(OrderPaymentStatus.UNPAID);
+                        assertThat(item.paidAmount()).isZero();
                     }
                 });
+    }
+
+    @Test
+    @DisplayName("여러 품목의 이름과 수량을 한 수주로 합친다")
+    void joinsProductsOnOneOrder() {
+        DashboardDto.DeliveryRiskStatisticsResponse response =
+                deliveryRiskService.getDeliveryRisks();
+
+        assertThat(response.items())
+                .anySatisfy(item -> {
+                    if ("PF-2026-001".equals(item.orderNo())) {
+                        assertThat(item.productName()).isEqualTo(
+                                "디자인 A 투명 케이스, 디자인 B 맥세이프 케이스, 디자인 C 카드수납 케이스"
+                        );
+                        assertThat(item.quantity()).isEqualTo(6000);
+                    }
+                });
+    }
+
+    @Test
+    @DisplayName("미배송 수주는 작업지시 유무와 관계없이 포함하고 배송 완료와 취소는 뺀다")
+    void includesUndeliveredOrdersOnly() {
+        DashboardDto.DeliveryRiskStatisticsResponse response =
+                deliveryRiskService.getDeliveryRisks();
+
+        assertThat(response.items())
+                .extracting(DashboardDto.DeliveryRiskStatisticsItemResponse::orderNo)
+                .contains("PF-2026-006", "PF-2026-010")
+                .doesNotContain("PF-2026-007", "PF-2026-011");
     }
 }

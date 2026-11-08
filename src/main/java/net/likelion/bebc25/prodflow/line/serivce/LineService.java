@@ -10,11 +10,15 @@ import net.likelion.bebc25.prodflow.line.entity.LineCapacityLog;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.line.repsitory.LineCapacityLogRepository;
 import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line_notification.service.LineNotificationService;
 import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
+import net.likelion.bebc25.prodflow.work_order.serivce.ProductionPlanRescheduleService;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +36,10 @@ public class LineService {
     private final UserRepository userRepository;
     private final LineCapacityLogRepository lineCapacityLogRepository; // 라인 변경시 이력을 저장
     private final StatusHistoryRepository statusHistoryRepository; // 상태 변경시 이력을 저장
+    private final ProductionPlanRescheduleService productionPlanRescheduleService;
+
+    // 생산라인 알림 발송
+    private final LineNotificationService lineNotificationService;
 
     // 생산라인 목록. 카드 한 장과 상단 집계를 한 응답으로 만든다.
     public LineDto.ListResponse findAll() {
@@ -204,6 +212,18 @@ public class LineService {
         boolean isNameChanged = !line.getLineName().equals(lineName);
         // 생산량을 수정했는지 여부
         boolean isCapacityChanged = line.getProductionCapacity() != request.productionCapacity();
+        // 하루 생산량은 수주 관리자도 바꾸지만, 라인 이름은 최고 관리자만 바꾼다.
+        if (isNameChanged && user.getRole() != UserRole.SUPER_ADMIN) {
+            throw new AccessDeniedException("라인 이름은 최고 관리자만 수정할 수 있습니다.");
+        }
+        // 같은 라인의 남은 기간에 다시 넣는다. 다른 라인으로 옮기지 않는다.
+        if (isCapacityChanged && request.productionCapacity() < line.getProductionCapacity()) {
+            String reason = request.reason() == null || request.reason().isBlank()
+                    ? "생산능력 변경으로 재배치"
+                    : request.reason();
+            productionPlanRescheduleService.rescheduleReducedCapacity(
+                    line, request.productionCapacity(), user, reason);
+        }
 
         if (isNameChanged && isCapacityChanged) {
             line.changeName(lineName);
@@ -243,6 +263,17 @@ public class LineService {
         if (beforeStatus == request.status()) {
             throw new IllegalArgumentException("이미 같은 상태입니다.");
         }
+        // 점검은 오늘 이후 준비 계획만 다른 라인으로 옮긴 뒤에 상태를 바꾼다.
+        if (request.status() == LineStatus.INSPECTION) {
+            productionPlanRescheduleService.rescheduleAway(line, LocalDate.now(), user, "라인 점검으로 재배치");
+        }
+        // 고장은 옮길 수 있는 준비와 생산 중 작업을 다른 라인으로 옮긴 뒤에 상태를 바꾼다.
+        // 받을 곳이 없어도 고장으로 바꾸고, 못 옮긴 작업은 그 라인에 남긴다.
+        if (request.status() == LineStatus.BROKEN) {
+            productionPlanRescheduleService.rescheduleBroken(line, LocalDate.now(), user, "라인 고장으로 재배치");
+        }
+        // 점검·고장에서 가동 가능으로 복구해도 작업지시는 옮기지 않는다.
+        // 일정은 작업지시의 라인을 직접 바꿀 때만 당긴다.
         line.changeStatus(request.status()); // 요청에 맞도록 상태 변형
         line.setUpdatedBy(user.getName()); // 상태변경한 직원 이름
         statusHistoryRepository.save(new StatusHistory(
@@ -251,6 +282,13 @@ public class LineService {
                 beforeStatus.name(), // 변경전 상태
                 request.status().name(), // 변경후 상태
                 user)); // 변경한 직원
+
+        // 생산라인 상태 변경 알림 (생산라인 알림 도메인)
+        lineNotificationService.notifyLineStatusChanged(
+                line.getId(),
+                request.status()
+        );
         return LineDto.Response.from(line);
     }
+
 }

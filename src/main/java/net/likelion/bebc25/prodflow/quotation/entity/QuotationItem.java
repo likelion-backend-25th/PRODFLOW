@@ -10,14 +10,15 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import net.likelion.bebc25.prodflow.product.entity.Product;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import net.likelion.bebc25.prodflow.product.entity.Product;
 
 @Entity
 @Getter
@@ -55,6 +56,7 @@ public class QuotationItem {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    // 견적 품목 초기화
     public QuotationItem(
             Quotation quotation,
             Product product,
@@ -73,13 +75,14 @@ public class QuotationItem {
         this.createdAt = LocalDateTime.now();
     }
 
+    // 견적 품목 수량·단가 변경
     public void changePrice(int quantity, Long unitPrice) {
         this.quantity = quantity;
         this.unitPrice = unitPrice;
         this.lineAmount = calculateAmount(quantity, unitPrice, quotation.isVatIncluded());
     }
 
-    // 견적 총액 사전 계산·품목 금액 저장 공통 규칙
+    // VAT 반영 품목 금액 계산
     public static long calculateAmount(int quantity, Long unitPrice, boolean vatIncluded) {
         if (quantity < 100 || unitPrice == null || unitPrice < 0) {
             throw new IllegalArgumentException("견적 수량은 100개 이상, 단가는 0원 이상이어야 합니다.");

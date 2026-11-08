@@ -1,6 +1,17 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.product.repository.ProductRepository;
@@ -9,15 +20,6 @@ import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
 import net.likelion.bebc25.prodflow.quotation.entity.QuotationItem;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.quotation.repository.QuotationItemRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
@@ -26,7 +28,7 @@ public class QuotationItemService {
     private final QuotationItemRepository quotationItemRepository;
     private final ProductRepository productRepository;
 
-    // 중복·존재 여부·생산 가능 상태를 검증하고 품목을 ID별로 반환
+    // 견적 품목 유효성 검증
     public Map<Long, Product> validateProducts(List<Long> productIds) {
         Set<Long> uniqueIds = new HashSet<>(productIds);
 
@@ -50,7 +52,7 @@ public class QuotationItemService {
         return productsById;
     }
 
-    // 기존 품목을 제거한 뒤 재등록한다. 실패하면 외부 수정 트랜잭션 전체가 롤백된다.
+    // 초안 품목 교체
     @Transactional
     public List<QuotationItem> replaceDraftItems(Quotation quotation, List<QuotationItemDto.CreateRequest> requests) {
         if (quotation.getStatus() != QuotationStatus.DRAFT) {
@@ -63,7 +65,7 @@ public class QuotationItemService {
         return create(quotation, requests);
     }
 
-    // 검증한 생산품목으로 견적 품목을 생성하고 저장
+    // 견적 품목 생성·저장
     @Transactional
     public List<QuotationItem> create(Quotation quotation, List<QuotationItemDto.CreateRequest> requests) {
         List<Long> productIds = requests.stream()

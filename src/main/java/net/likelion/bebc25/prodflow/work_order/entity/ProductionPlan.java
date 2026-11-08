@@ -8,17 +8,15 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
-import org.springframework.data.annotation.CreatedDate;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -27,7 +25,7 @@ import java.time.LocalDateTime;
         name = "production_plan",
         uniqueConstraints = @UniqueConstraint(columnNames = {"work_order_id", "plan_date"})
 )
-public class ProductionPlan {
+public class ProductionPlan extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
@@ -47,21 +45,18 @@ public class ProductionPlan {
     @Column(nullable = false)
     private LocalDate planDate;
 
-    @CreatedDate // Entity 최초 저장될 때 생성일시를 자동으로 주입
-    @Column(updatable = false, nullable = false)
-    private LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-    }
-
     public ProductionPlan(WorkOrder workOrder, LocalDate planDate, int quantity) {
         this.workOrder = workOrder;
         this.orderProduct = workOrder.getOrderProduct();
         this.planDate = planDate;
+        this.quantity = quantity;
+    }
+
+    // 생산계획 수량 변경
+    public void changeQuantity(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("생산계획 수량은 1 이상이어야 합니다.");
+        }
         this.quantity = quantity;
     }
 }

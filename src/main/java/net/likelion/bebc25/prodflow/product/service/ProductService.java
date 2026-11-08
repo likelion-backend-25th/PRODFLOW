@@ -5,11 +5,17 @@ import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
 import net.likelion.bebc25.prodflow.commoncode.service.CommonCodeService;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
+import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductRepository;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto;
+import net.likelion.bebc25.prodflow.product.dto.ProductDto.OrderHistoryResponse;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto.Response;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.product.repository.ProductRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,8 +31,10 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CommonCodeRepository commonCodeRepository;
     private final CommonCodeService commonCodeService;
+    private final OrderProductRepository orderProductRepository;
 
     @Transactional
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public Response create(ProductDto.CreateRequest request) {
 
         //modelCode 중복이면 예외
@@ -111,6 +119,7 @@ public class ProductService {
         return responses;
     }
 
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public Response updateStatus(Long id, ProductDto.UpdateStatusRequest request) {
         Optional<Product> optionalProduct = productRepository.findById(id);
         if (optionalProduct.isEmpty()) {
@@ -124,6 +133,7 @@ public class ProductService {
 
     }
 
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public Response update(Long id, ProductDto.UpdateRequest request) {
         Optional<Product> optionalProduct = productRepository.findById(id);
         if (optionalProduct.isEmpty()) {
@@ -159,5 +169,36 @@ public class ProductService {
         String trimmed = modelCode.trim();
         boolean exists = productRepository.existsByModelCode(trimmed);
         return new ProductDto.ModelCodeExistsResponse(trimmed, !exists);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderHistoryResponse> getOrderHistories(Long productId, int size) {
+        if (!productRepository.existsById(productId)) {
+            throw new EntityNotFoundException("품목을 찾을 수 없습니다: id=" + productId);
+        }
+        int limit = size <= 0 ? 3 : size;
+        List<OrderProduct> orderProducts = orderProductRepository.findRecentByProductId(
+                productId,
+                PageRequest.of(0, limit)
+        );
+
+        List<OrderHistoryResponse> responses = new ArrayList<>();
+        for (OrderProduct orderProduct : orderProducts) {
+            CustomerOrder order = orderProduct.getCustomerOrder();
+            responses.add(new OrderHistoryResponse(
+                    order.getId(),
+                    order.getOrderNo(),
+                    order.getClient().getCompany(),
+                    orderProduct.getProductName(),
+                    orderProduct.getQuantity(),
+                    orderProduct.getUnitPrice(),
+                    orderProduct.lineAmount(),
+                    order.getTotalAmount(),
+                    order.getEstimatedDueDate(),
+                    order.getStatusCode().getCode(),
+                    order.getStatusCode().getName()
+            ));
+        }
+        return responses;
     }
 }

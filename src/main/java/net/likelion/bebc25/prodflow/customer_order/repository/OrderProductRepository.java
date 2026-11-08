@@ -2,7 +2,12 @@ package net.likelion.bebc25.prodflow.customer_order.repository;
 
 import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
 
 import java.util.Collection;
 import java.util.List;
@@ -12,4 +17,15 @@ public interface OrderProductRepository extends JpaRepository<OrderProduct, Long
 
     @EntityGraph(attributePaths = "product")
     List<OrderProduct> findByCustomerOrder_IdIn(Collection<Long> orderIds);
+    // 품목별 최근 수주 이력 조회
+    @Query("""
+            SELECT op
+            FROM OrderProduct op
+            JOIN FETCH op.customerOrder co
+            JOIN FETCH co.client
+            JOIN FETCH co.statusCode
+            WHERE op.product.id = :productId
+            ORDER BY co.createdAt DESC
+            """)
+    List<OrderProduct> findRecentByProductId(@Param("productId") Long productId, Pageable pageable);
 }

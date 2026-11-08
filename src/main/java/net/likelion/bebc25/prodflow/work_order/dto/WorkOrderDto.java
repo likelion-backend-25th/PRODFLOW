@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.work_order.dto;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public class WorkOrderDto {
 
@@ -16,9 +17,10 @@ public class WorkOrderDto {
     ) {
     }
 
-    // 작업 상태 변경. 값은 WORK_ORDER_STATUS의 code다.
+    // 작업 상태 변경. status는 WORK_ORDER_STATUS의 code다. note는 생산 중지 사유다.
     public record UpdateStatusRequest(
-            String status
+            String status,
+            String note
     ) {
     }
 
@@ -33,7 +35,8 @@ public class WorkOrderDto {
     public record Response(
             Long id, // 저장된 작업지시서 고유 번호
             String workNo, // 작업 지시 번호
-            String note
+            String note,
+            List<ProductionPlanDto.Response> plans // 이 장에 저장된 하루 계획
     ) {
     }
 
@@ -86,9 +89,10 @@ public class WorkOrderDto {
             LocalDate completedAt,
             String status,
             String note,
-            LocalDate estimatedDueDate // 수주 납기
+            LocalDate estimatedDueDate, // 수주 납기
+            List<ProductionPlanDto.Response> plans // 날짜별 계획 수량
     ) {
-        public static DetailResponse from(WorkOrder workOrder) {
+        public static DetailResponse from(WorkOrder workOrder, List<ProductionPlanDto.Response> plans) {
             return new DetailResponse(
                     workOrder.getId(),
                     workOrder.getWorkNo(),
@@ -106,7 +110,8 @@ public class WorkOrderDto {
                     workOrder.getCompletedAt(),
                     workOrder.getCommonCode().getCode(),
                     workOrder.getNote(),
-                    workOrder.getOrderProduct().getCustomerOrder().getEstimatedDueDate()
+                    workOrder.getOrderProduct().getCustomerOrder().getEstimatedDueDate(),
+                    plans
             );
         }
     }

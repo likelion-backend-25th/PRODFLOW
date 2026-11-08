@@ -5,6 +5,7 @@ import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
 import net.likelion.bebc25.prodflow.client.service.ClientService;
 import net.likelion.bebc25.prodflow.common.domain.Address;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
@@ -44,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -107,11 +109,16 @@ public class ClientServiceTest {
         given(customerOrderRepository.sumTotalAmountByClientId(3L)).willReturn(98000000L);
         given(customerOrderRepository.countByClientId(2L)).willReturn(0L);
         given(customerOrderRepository.sumTotalAmountByClientId(2L)).willReturn(0L);
+        LocalDateTime recentOrderedAt = LocalDateTime.of(2026, 10, 28, 14, 30);
+        CustomerOrder recentOrder = mock(CustomerOrder.class);
+        given(recentOrder.getCreatedAt()).willReturn(recentOrderedAt);
+        given(customerOrderRepository.findFirstByClient_IdOrderByCreatedAtDesc(3L))
+                .willReturn(Optional.of(recentOrder));
+        given(customerOrderRepository.findFirstByClient_IdOrderByCreatedAtDesc(2L))
+                .willReturn(Optional.empty());
 
         // when
-        LocalDateTime before = LocalDateTime.now();
         Page<ClientDto.Response> response = clientService.findClients(null, pageable);
-        LocalDateTime after = LocalDateTime.now();
 
         // then
         assertThat(response.getContent())
@@ -124,10 +131,10 @@ public class ClientServiceTest {
         assertThat(response.getContent())
                 .extracting(ClientDto.Response::totalOrder, ClientDto.Response::totalAmount)
                 .containsExactly(tuple(8L, 98000000L), tuple(0L, 0L));
-        // 최근 주문일은 현재 서비스에서 조회 시각을 반환한다.
-        assertThat(response.getContent()).allSatisfy(client -> {
-            assertThat(client.recentOrderedAt()).isBetween(before, after);
-        });
+        // 수주가 있으면 최근 수주의 생성일을, 없으면 null을 반환한다.
+        assertThat(response.getContent())
+                .extracting(ClientDto.Response::recentOrderedAt)
+                .containsExactly(recentOrderedAt, null);
         assertThat(response.getPageable()).isEqualTo(pageable);
         assertThat(response.getNumber()).isEqualTo(1);
         assertThat(response.getSize()).isEqualTo(2);
@@ -140,6 +147,8 @@ public class ClientServiceTest {
         verify(customerOrderRepository).sumTotalAmountByClientId(3L);
         verify(customerOrderRepository).countByClientId(2L);
         verify(customerOrderRepository).sumTotalAmountByClientId(2L);
+        verify(customerOrderRepository).findFirstByClient_IdOrderByCreatedAtDesc(3L);
+        verify(customerOrderRepository).findFirstByClient_IdOrderByCreatedAtDesc(2L);
         verifyNoMoreInteractions(customerOrderRepository);
         verifyNoMoreInteractions(clientRepository);
         verifyNoInteractions(userRepository);
@@ -161,11 +170,14 @@ public class ClientServiceTest {
                 .willReturn(new PageImpl<>(List.of(client), pageable, 3L));
         given(customerOrderRepository.countByClientId(2L)).willReturn(6L);
         given(customerOrderRepository.sumTotalAmountByClientId(2L)).willReturn(45000000L);
+        LocalDateTime recentOrderedAt = LocalDateTime.of(2026, 11, 2, 9, 15);
+        CustomerOrder recentOrder = mock(CustomerOrder.class);
+        given(recentOrder.getCreatedAt()).willReturn(recentOrderedAt);
+        given(customerOrderRepository.findFirstByClient_IdOrderByCreatedAtDesc(2L))
+                .willReturn(Optional.of(recentOrder));
 
         // when
-        LocalDateTime before = LocalDateTime.now();
         Page<ClientDto.Response> response = clientService.findClients(keyword, pageable);
-        LocalDateTime after = LocalDateTime.now();
 
         // then
         assertThat(response.getContent()).singleElement().satisfies(result -> {
@@ -176,7 +188,7 @@ public class ClientServiceTest {
             assertThat(result.email()).isEqualTo("contact@hanbit-case.example");
             assertThat(result.totalOrder()).isEqualTo(6L);
             assertThat(result.totalAmount()).isEqualTo(45000000L);
-            assertThat(result.recentOrderedAt()).isBetween(before, after);
+            assertThat(result.recentOrderedAt()).isEqualTo(recentOrderedAt);
         });
         assertThat(response.getPageable()).isEqualTo(pageable);
         assertThat(response.getNumber()).isEqualTo(1);
@@ -187,6 +199,7 @@ public class ClientServiceTest {
         verify(clientRepository).findByKeyword(keyword, pageable);
         verify(customerOrderRepository).countByClientId(2L);
         verify(customerOrderRepository).sumTotalAmountByClientId(2L);
+        verify(customerOrderRepository).findFirstByClient_IdOrderByCreatedAtDesc(2L);
         verifyNoMoreInteractions(customerOrderRepository);
         verifyNoMoreInteractions(clientRepository);
         verifyNoInteractions(userRepository);

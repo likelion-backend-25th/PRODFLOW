@@ -7,8 +7,12 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.common.dto.StatusHistoryDto;
+import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
+import net.likelion.bebc25.prodflow.common.service.StatusHistoryService;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
+import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderHistoryDto;
 import net.likelion.bebc25.prodflow.work_order.serivce.WorkOrderService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,6 +38,7 @@ import java.util.List;
 public class WorkOrderController {
 
     private final WorkOrderService workOrderService;
+    private final StatusHistoryService statusHistoryService;
 
     // 계약금 확인 전이므로 수주 흐름 대신 이 API로 등록을 시험한다.
     @Operation(
@@ -89,7 +94,7 @@ public class WorkOrderController {
 
     @Operation(
             summary = "작업지시 상세 조회",
-            description = "로그인한 사용자가 작업지시 한 장을 조회한다. 목록 항목에 시작 예정일, 완료일, 메모, 수주 납기를 포함한다."
+            description = "로그인한 사용자가 작업지시 한 장을 조회한다. 목록 항목에 시작 예정일, 완료일, 메모, 수주 납기, 날짜별 계획 수량을 포함한다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -106,7 +111,7 @@ public class WorkOrderController {
         return ResponseEntity.ok(workOrderService.getDetail(workOrderId));
     }
 
-    
+
     @Operation(
             summary = "작업지시서 수정",
             description = "작업지시서의 배정 생산 라인과 담당자를 변경한다. 라인 또는 담당자 중 변경할 항목만 전달할 수 있으며, 두 항목 모두 변경할 수도 있다."
@@ -118,6 +123,7 @@ public class WorkOrderController {
     )
     @ApiResponse(responseCode = "400", description = "변경할 항목이 없거나 배정할 수 없는 라인 또는 담당자 정보가 유효하지 않음")
     @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "403", description = "라인 변경은 최고 관리자·생산 현장 관리자, 담당자 변경은 최고 관리자·수주 관리자만 가능")
     @ApiResponse(responseCode = "404", description = "작업지시서, 생산 라인 또는 담당자를 찾을 수 없음")
     @PatchMapping("/{workOrderId}")
     public ResponseEntity<WorkOrderDto.DetailResponse> update(
@@ -132,7 +138,7 @@ public class WorkOrderController {
 
     @Operation(
             summary = "작업지시 상태 변경",
-            description = "로그인한 사용자가 작업 상태를 바꾼다. 허용된 전이만 가능하고, 변경 내용은 status_history에 남긴다."
+            description = "배정된 생산 현장 관리자 또는 최고 관리자가 작업 상태를 바꾼다. 허용된 전이만 가능하고, 변경 내용은 status_history에 남긴다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -141,6 +147,7 @@ public class WorkOrderController {
     )
     @ApiResponse(responseCode = "400", description = "같은 상태, 허용되지 않은 전이, 작업 상태 코드 없음, 시작 예정일 전, 대기 수주")
     @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "403", description = "배정된 생산 현장 관리자 또는 최고 관리자가 아님")
     @ApiResponse(responseCode = "404", description = "작업지시를 찾을 수 없음")
     @PatchMapping("/{workOrderId}/status")
     public ResponseEntity<WorkOrderDto.DetailResponse> changeStatus(
@@ -151,6 +158,42 @@ public class WorkOrderController {
     ) {
         return ResponseEntity.ok(
                 workOrderService.changeStatus(workOrderId, request, userDetails.getUserId())
+        );
+    }
+
+    // 작업지시서 상태 변경 이력 조회
+    @Operation(
+            summary = "작업지시서 상태 변경 이력 조회",
+            description = "로그인한 사용자가 특정 작업지시서의 상태 변경 이력을 변경 일시 기준 최신순으로 조회한다."
+    )
+    @ApiResponse(responseCode = "200", description = "조회 성공 (이력이 없는 경우 빈 배열 반환)")
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @GetMapping("/{workOrderId}/status-history")
+    public List<StatusHistoryDto.Response> getStatusHistories(
+            @PathVariable Long workOrderId
+    ) {
+        // 해당 작업지시서의 상태 변경 이력 조회
+        return statusHistoryService.getStatusHistories(
+                HistoryEntityType.WORK_ORDER,
+                workOrderId
+        );
+    }
+
+    // 작업지시서 라인 및 담당자 변경 이력 조회
+    @Operation(
+            summary = "작업지시서 변경 이력 조회",
+            description = "로그인한 사용자가 특정 작업지시서의 라인 및 담당자 변경 이력을 최근 5개까지 최신순으로 조회한다."
+    )
+    @ApiResponse(responseCode = "200", description = "조회 성공 (이력이 없는 경우 빈 배열 반환)")
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @GetMapping("/{workOrderId}/history")
+    public ResponseEntity<List<WorkOrderHistoryDto.Response>> getWorkOrderHistories(
+            @Parameter(description = "작업지시서 ID", example = "16")
+            @PathVariable Long workOrderId
+    ) {
+        // 해당 작업지시서의 최근 변경 이력 5개 조회
+        return ResponseEntity.ok(
+                workOrderService.getWorkOrderHistories(workOrderId)
         );
     }
 }

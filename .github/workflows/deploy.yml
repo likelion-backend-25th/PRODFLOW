@@ -58,8 +58,3 @@ jobs:
             docker compose up -d --no-deps --force-recreate prodflow-app
 
             docker compose ps
-
-
-
-
-

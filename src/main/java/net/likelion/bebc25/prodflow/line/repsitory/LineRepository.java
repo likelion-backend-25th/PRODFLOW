@@ -1,8 +1,10 @@
 package net.likelion.bebc25.prodflow.line.repsitory;
 
+import jakarta.persistence.LockModeType;
 import net.likelion.bebc25.prodflow.line.dto.LineDto;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
@@ -11,6 +13,11 @@ public interface LineRepository extends JpaRepository<Line, Long> {
 
     // line_name 중복 검사
     boolean existsByLineName(String lineName);
+
+    // 재배치 동안 라인 행을 id 순으로 잠근다. 같은 날 용량을 두 요청이 같이 쓰지 않게 한다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select line from Line line order by line.id asc")
+    List<Line> findAllForUpdate();
 
     // 라인에서 아우터 조인한다. PRODUCE 조건은 ON에 둔다.
     // WHERE에 두면 생산 중인 작업이 없는 라인이 빠진다.
