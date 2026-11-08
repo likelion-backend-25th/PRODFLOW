@@ -45,6 +45,7 @@ public class OrderProduct extends BaseTimeEntity {
     @Column(name = "unit_price", nullable = false)
     private Long unitPrice;
 
+    // 수주 품목 초기화
     public OrderProduct(
             CustomerOrder customerOrder,
             Product product,
@@ -59,6 +60,7 @@ public class OrderProduct extends BaseTimeEntity {
         this.unitPrice = unitPrice;
     }
 
+    // VAT 반영 품목 금액 계산
     public long lineAmount() {
         long supply = unitPrice * quantity;
         if (customerOrder.isVatIncluded()) {

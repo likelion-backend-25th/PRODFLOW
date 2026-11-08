@@ -103,8 +103,8 @@ class DashboardServiceTest {
     }
 
     @Test
-    @DisplayName("대시보드 월간 생산 통계는 조회 종료일 기준 월을 반환한다")
-    void monthlyProductionUsesEndDateMonth() {
+    @DisplayName("대시보드 월간 생산 통계는 조회 기간의 모든 달을 반환한다")
+    void monthlyProductionCoversRequestedRange() {
         // given
         DashboardDto.Request request = new DashboardDto.Request(
                 LocalDate.of(2026, 10, 1),
@@ -117,10 +117,40 @@ class DashboardServiceTest {
 
         // then
         assertThat(response.monthlyProductionStatistics())
-                .anySatisfy(item -> {
-                    assertThat(item.year()).isEqualTo(2026);
-                    assertThat(item.month()).isEqualTo(11);
-                });
+                .extracting(
+                        DashboardDto.MonthlyProductionResponse::year,
+                        DashboardDto.MonthlyProductionResponse::month
+                )
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(2026, 10),
+                        org.assertj.core.groups.Tuple.tuple(2026, 11)
+                );
+    }
+
+    @Test
+    @DisplayName("조회 시작일이 없으면 예외가 발생한다")
+    void getDashboardWithNullStartDate() {
+        DashboardDto.Request request = new DashboardDto.Request(
+                null,
+                LocalDate.of(2026, 10, 31)
+        );
+
+        assertThatThrownBy(() -> dashboardService.getDashboard(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("조회 시작일과 종료일은 필수입니다.");
+    }
+
+    @Test
+    @DisplayName("조회 종료일이 없으면 예외가 발생한다")
+    void getDashboardWithNullEndDate() {
+        DashboardDto.Request request = new DashboardDto.Request(
+                LocalDate.of(2026, 10, 1),
+                null
+        );
+
+        assertThatThrownBy(() -> dashboardService.getDashboard(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("조회 시작일과 종료일은 필수입니다.");
     }
 
     @Test
@@ -135,6 +165,6 @@ class DashboardServiceTest {
         // when & then
         assertThatThrownBy(() -> dashboardService.getDashboard(request))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("조회 시작을은 종료일보다 늦을 수 없습니다.");
+                .hasMessage("조회 시작일은 종료일보다 늦을 수 없습니다.");
     }
 }

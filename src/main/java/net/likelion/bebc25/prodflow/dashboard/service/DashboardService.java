@@ -49,11 +49,11 @@ public class DashboardService {
                         endDate
                 );
 
-        // 월간 생산 통계 조회
-        DashboardDto.MonthlyProductionResponse monthlyProduction =
+        // 요청 기간에 포함된 달의 생산 통계 조회
+        List<DashboardDto.MonthlyProductionResponse> monthlyProduction =
                 productionStatisticsService.getMonthlyProduction(
-                        targetMonth.getYear(),
-                        targetMonth.getMonthValue()
+                        startDate,
+                        endDate
                 );
 
         // 주간 생산 통계 조회
@@ -104,7 +104,7 @@ public class DashboardService {
                 orderStatistics,
                 orderStatusStatistics,
                 productionStatistics,
-                List.of(monthlyProduction),
+                monthlyProduction,
                 weeklyProduction,
                 deliveryPerformance,
                 productStatistics,
@@ -150,13 +150,13 @@ public class DashboardService {
         );
     }
 
-    // 조회 기간 유혀성 검사
+    // 조회 기간 유효성 검사
     private void validateDateRange(DashboardDto.Request request) {
         if (request == null || request.startDate() == null || request.endDate() == null) {
             throw new IllegalArgumentException("조회 시작일과 종료일은 필수입니다.");
         }
         if (request.startDate().isAfter(request.endDate())) {
-            throw new IllegalArgumentException("조회 시작을은 종료일보다 늦을 수 없습니다.");
+            throw new IllegalArgumentException("조회 시작일은 종료일보다 늦을 수 없습니다.");
         }
     }
 

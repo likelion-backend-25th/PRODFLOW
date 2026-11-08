@@ -68,6 +68,7 @@ public class WorkOrderService {
     private final ProductionPlanRepository productionPlanRepository;
     private final StatusHistoryRepository statusHistoryRepository;
     private final WorkOrderHistoryRepository workOrderHistoryRepository;
+    private final ProductionPlanRescheduleService productionPlanRescheduleService;
 
     // 한 라인이 부족하면 다른 라인에 장을 더 만든다. 장마다 지시번호가 1 증가한다.
     @Transactional
@@ -294,7 +295,6 @@ public class WorkOrderService {
                     "변경된 라인 또는 담당자가 없습니다."
             );
         }
-        List<ProductionPlanDto.Response> plans = plansOf(workOrder);
         // 갱신한 직원. 라인과 담당자는 바꿀 수 있는 역할이 다르다.
         User modifier = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("수정자를 찾을 수 없습니다."));
@@ -308,7 +308,8 @@ public class WorkOrderService {
                 && modifier.getRole() != UserRole.ORDER_MANAGER) {
             throw new AccessDeniedException("담당자 변경은 최고 관리자와 수주 관리자만 할 수 있습니다.");
         }
-        // 라인변경
+        // 라인변경. 복구 라인의 앞날이 비어 있을 때만 밀린 일정을 당긴다.
+        String historyReason = null;
         if (isChangedLine) {
             Line line = lineRepository.findById(request.lineId())
                     .orElseThrow(() -> new IllegalArgumentException("변경할 라인을 찾을 수 없습니다."));
@@ -316,9 +317,15 @@ public class WorkOrderService {
                 throw new IllegalArgumentException(
                         "가동 가능한 라인만 배정할 수 있습니다.");
             }
-            // 계획 행은 그대로 둔다. 합계가 작업지시 라인을 보므로 옮긴 뒤에 잔여가 다시 계산된다.
-            assertPlansFitLine(workOrder, line);
-            workOrder.changeLine(line);
+            if (productionPlanRescheduleService.shouldPullForward(workOrder, line)) {
+                // 복구 라인의 앞날이 비어 있을 때만 밀린 일정을 당긴다.
+                productionPlanRescheduleService.replanOnRecoveredLine(workOrder, line, modifier);
+                historyReason = "복구 라인으로 재이동";
+            } else {
+                // 앞날에 다른 작업이 있거나 일반 이동이면 기존 날짜가 들어가는지만 본다.
+                productionPlanRescheduleService.assertFits(workOrder, line);
+                workOrder.changeLine(line);
+            }
         }
         // 담당자 변경
         if (isChangedAssigned) {
@@ -332,6 +339,8 @@ public class WorkOrderService {
             workOrder.changeUser(assignedUser);
         }
 
+        // 계획 조회는 수정자 이름을 넣기 전에 한다. 조회가 flush되면 수정자 이름이 SYSTEM으로 바뀐다.
+        List<ProductionPlanDto.Response> plans = plansOf(workOrder);
         workOrder.setUpdatedBy(modifier.getName());
         // 바꾸지 않은 라인·담당자는 변경 전과 같은 값을 남긴다.
         workOrderHistoryRepository.save(new WorkOrderHistory(
@@ -341,7 +350,7 @@ public class WorkOrderService {
                 previousUser,
                 workOrder.getUser(),
                 modifier,
-                null
+                historyReason
         ));
         return WorkOrderDto.DetailResponse.from(workOrder, plans);
     }
@@ -444,6 +453,16 @@ public class WorkOrderService {
         if (otherProduceOnLine) {
             throw new IllegalArgumentException("이 라인에서 이미 생산 중인 작업이 있습니다.");
         }
+        // 중지 뒤 준비로 돌아와도 계획은 그대로다. 줄어든 생산능력보다 큰 날은 시작하지 못한다.
+        for (ProductionPlan plan : productionPlanRepository.findByWorkOrder_Id(workOrder.getId())) {
+            long occupied = productionPlanRepository.sumQuantityByLineAndDate(
+                    workOrder.getLine().getId(), plan.getPlanDate());
+            boolean planExceedsLine = plan.getQuantity() > workOrder.getLine().getProductionCapacity();
+            boolean dayExceedsLine = occupied > workOrder.getLine().getProductionCapacity();
+            if (planExceedsLine || dayExceedsLine) {
+                throw new IllegalArgumentException("라인의 생산능력을 초과하여 생산을 시작할 수 없습니다.");
+            }
+        }
         changeLineStatus(workOrder.getLine(), LineStatus.OPERATING, user);
         changeOrder(workOrder, "IN_PRODUCTION");
     }
@@ -456,6 +475,7 @@ public class WorkOrderService {
         changeOrder(workOrder, "PRODUCTION_READY");
     }
 
+    // 수주 진행 상태는 ORDER_STATUS 그룹의 코드다.
     private String orderStatus(WorkOrder workOrder) {
         return workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode();
     }
@@ -502,31 +522,7 @@ public class WorkOrderService {
         return line.getProductionCapacity() - (int) occupied;
     }
 
-    // 줄인 생산능력이 기존 계획을 담지 못하면 변경하지 않는다.
-    public void assertPlansWithinCapacity(Long lineId, int capacity) {
-        List<LocalDate> exceeded = productionPlanRepository.findDatesExceedingCapacity(lineId, capacity);
-        if (!exceeded.isEmpty()) {
-            throw new IllegalArgumentException("기존 생산계획이 새 생산능력을 초과합니다.");
-        }
-    }
-
-    // 새 라인의 각 계획일이 이 작업의 수량을 더 받을 수 있는지 본다.
-    private void assertPlansFitLine(WorkOrder workOrder, Line line) {
-        if ("CANCELLED".equals(orderStatus(workOrder))) {
-            return;
-        }
-        if (line.getId().equals(workOrder.getLine().getId())) {
-            return;
-        }
-        for (ProductionPlan plan : productionPlanRepository.findByWorkOrder_Id(workOrder.getId())) {
-            long occupied = productionPlanRepository.sumQuantityByLineAndDate(line.getId(), plan.getPlanDate());
-            if (occupied + plan.getQuantity() > line.getProductionCapacity()) {
-                throw new IllegalArgumentException("변경할 라인의 생산능력을 초과합니다.");
-            }
-        }
-    }
-
-    // 수주 진행 상태는 ORDER_STATUS 그룹의 코드다.
+    // 수주 진행 상태를 ORDER_STATUS 코드로 바꾼다.
     private void changeOrder(WorkOrder workOrder, String orderStatus) {
         CommonCode orderCode = commonCodeRepository
                 .findByCodeGroup_GroupCodeAndCodeAndStatus("ORDER_STATUS", orderStatus, CodeStatus.ACTIVE)

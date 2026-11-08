@@ -1,19 +1,20 @@
 package net.likelion.bebc25.prodflow.dashboard.service;
 
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
 import net.likelion.bebc25.prodflow.dashboard.repository.DeliveryRiskRepository;
 import net.likelion.bebc25.prodflow.dashboard.repository.PaymentStatisticsRepository;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
-import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,25 +27,26 @@ public class DeliveryRiskService {
 
     private final DeliveryRiskRepository deliveryRiskRepository;
     private final PaymentStatisticsRepository paymentStatisticsRepository;
+    private final Clock clock;
 
     public DashboardDto.DeliveryRiskStatisticsResponse getDeliveryRisks() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         LocalDate riskDate = today.plusDays(URGENT_DAYS);
 
-        List<WorkOrder> workOrders =
-                deliveryRiskRepository.findDeliveryRiskWorkOrders(riskDate);
+        List<CustomerOrder> orders =
+                deliveryRiskRepository.findDeliveryRiskOrders(riskDate);
 
-        // 한 수주에 작업지시서가 여러 개 있어도 수주별로 한 건만 조회
-        Map<Long, WorkOrder> orderWorkOrders = workOrders.stream()
-                .collect(Collectors.toMap(
-                        wo -> wo.getOrderProduct().getCustomerOrder().getId(),
-                        Function.identity(),
-                        (first, second) -> first
+        List<Long> orderIds = orders.stream()
+                .map(CustomerOrder::getId)
+                .toList();
+
+        Map<Long, List<OrderProduct>> productsByOrder = orderIds.isEmpty()
+                ? Map.of()
+                : deliveryRiskRepository.findOrderProducts(orderIds).stream()
+                .collect(Collectors.groupingBy(
+                        product -> product.getCustomerOrder().getId()
                 ));
 
-        List<Long> orderIds = List.copyOf(orderWorkOrders.keySet());
-
-        // 수주별 입금 완료 금액 조회
         Map<Long, Long> paidAmounts = orderIds.isEmpty()
                 ? Map.of()
                 : paymentStatisticsRepository.sumPaidAmountsByOrderIds(
@@ -56,25 +58,14 @@ public class DeliveryRiskService {
                         row -> ((Number) row[1]).longValue()
                 ));
 
-        List<DashboardDto.DeliveryRiskStatisticsItemResponse> items =
-                orderWorkOrders.values().stream()
-                        .map(workOrder -> {
-                            Long orderId = workOrder.getOrderProduct()
-                                    .getCustomerOrder()
-                                    .getId();
-
-                            long paidAmount = paidAmounts.getOrDefault(orderId, 0L);
-
-                            return toResponseItem(
-                                    workOrder,
-                                    today,
-                                    paidAmount
-                            );
-                        })
-                        .sorted((first, second) ->
-                                first.requestedDueDate()
-                                        .compareTo(second.requestedDueDate()))
-                        .toList();
+        List<DashboardDto.DeliveryRiskStatisticsItemResponse> items = orders.stream()
+                .map(order -> toResponseItem(
+                        order,
+                        productsByOrder.getOrDefault(order.getId(), List.of()),
+                        today,
+                        paidAmounts.getOrDefault(order.getId(), 0L)
+                ))
+                .toList();
 
         return new DashboardDto.DeliveryRiskStatisticsResponse(
                 items.size(),
@@ -83,19 +74,16 @@ public class DeliveryRiskService {
     }
 
     private DashboardDto.DeliveryRiskStatisticsItemResponse toResponseItem(
-            WorkOrder workOrder,
+            CustomerOrder customerOrder,
+            List<OrderProduct> products,
             LocalDate today,
             long paidAmount
     ) {
-        var orderProduct = workOrder.getOrderProduct();
-        var customerOrder = orderProduct.getCustomerOrder();
-
         LocalDate requestedDueDate = customerOrder.getRequestedDueDate();
         long daysUntilDue = ChronoUnit.DAYS.between(today, requestedDueDate);
 
         String riskType;
         String riskReason;
-
         if (daysUntilDue < 0) {
             riskType = "DELAYED";
             riskReason = "납기일이 지났습니다.";
@@ -104,15 +92,22 @@ public class DeliveryRiskService {
             riskReason = "납기일까지 " + daysUntilDue + "일 남았습니다.";
         }
 
+        String productName = products.stream()
+                .map(OrderProduct::getProductName)
+                .collect(Collectors.joining(", "));
+        int quantity = products.stream()
+                .mapToInt(OrderProduct::getQuantity)
+                .sum();
+
         return new DashboardDto.DeliveryRiskStatisticsItemResponse(
                 customerOrder.getId(),
                 customerOrder.getOrderNo(),
                 customerOrder.getClient().getCompany(),
-                orderProduct.getProductName(),
-                orderProduct.getQuantity(),
+                productName,
+                quantity,
                 customerOrder.getRequestedDueDate(),
                 customerOrder.getPlannedEndDate(),
-                workOrder.getCommonCode().getId(),
+                customerOrder.getStatusCode().getId(),
                 riskType,
                 riskReason,
                 customerOrder.getPaymentStatus(),

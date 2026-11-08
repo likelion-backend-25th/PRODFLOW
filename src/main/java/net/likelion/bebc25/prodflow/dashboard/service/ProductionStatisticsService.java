@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -107,6 +108,32 @@ public class ProductionStatisticsService {
                 plannedQuantity,
                 completedQuantity
         );
+    }
+
+    // 요청 기간에 걸친 달마다 생산량 통계
+    public List<DashboardDto.MonthlyProductionResponse> getMonthlyProduction(
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        validateDateRange(startDate, endDate);
+
+        List<DashboardDto.MonthlyProductionResponse> result = new ArrayList<>();
+        YearMonth month = YearMonth.from(startDate);
+        YearMonth last = YearMonth.from(endDate);
+        while (!month.isAfter(last)) {
+            LocalDate monthStart = month.atDay(1);
+            LocalDate monthEnd = month.atEndOfMonth();
+            LocalDate from = monthStart.isBefore(startDate) ? startDate : monthStart;
+            LocalDate to = monthEnd.isAfter(endDate) ? endDate : monthEnd;
+            result.add(new DashboardDto.MonthlyProductionResponse(
+                    month.getYear(),
+                    month.getMonthValue(),
+                    productionStatisticsRepository.sumPlannedQuantity(from, to.plusDays(1)),
+                    productionStatisticsRepository.sumCompletedQuantity(from, to.plusDays(1))
+            ));
+            month = month.plusMonths(1);
+        }
+        return result;
     }
 
     // 선택한 월의 주차별 생산 계획량 및 완료량

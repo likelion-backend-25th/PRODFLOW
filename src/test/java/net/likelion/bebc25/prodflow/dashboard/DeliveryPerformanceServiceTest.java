@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -14,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@Import(FixedDashboardClock.class)
 @Transactional
 class DeliveryPerformanceServiceTest {
 
@@ -98,5 +100,51 @@ class DeliveryPerformanceServiceTest {
         assertThat(response.totalOrderCount()).isZero();
         assertThat(response.onTimeOrderCount()).isZero();
         assertThat(response.onTimeDeliveryRate()).isEqualTo(0.0);
+    }
+
+    @Test
+    @DisplayName("배송 완료일이 요청 납기일 이전이면 정시 배송이다")
+    void onTimeDeliveryUsesDeliveredDate() {
+        DashboardDto.DeliveryPerformanceResponse response =
+                deliveryPerformanceService.getDeliveryPerformance(
+                        LocalDate.of(2026, 9, 26),
+                        LocalDate.of(2026, 9, 26)
+                );
+
+        assertThat(response.totalOrderCount()).isEqualTo(1);
+        assertThat(response.onTimeOrderCount()).isEqualTo(1);
+        assertThat(response.onTimeDeliveryRate()).isEqualTo(100.0);
+    }
+
+    @Test
+    @DisplayName("배송 완료 시각이 없으면 지연 배송이다")
+    void missingDeliveryIsLate() {
+        DashboardDto.DeliveryPerformanceResponse response =
+                deliveryPerformanceService.getDeliveryPerformance(
+                        LocalDate.of(2026, 10, 28),
+                        LocalDate.of(2026, 10, 28)
+                );
+
+        assertThat(response.totalOrderCount()).isEqualTo(2);
+        assertThat(response.onTimeOrderCount()).isZero();
+        assertThat(response.onTimeDeliveryRate()).isEqualTo(0.0);
+    }
+
+    @Test
+    @DisplayName("오늘 이후 납기와 취소 수주는 분모에 포함되지 않는다")
+    void futureAndCancelledOrdersAreExcluded() {
+        DashboardDto.DeliveryPerformanceResponse future =
+                deliveryPerformanceService.getDeliveryPerformance(
+                        LocalDate.of(2026, 11, 6),
+                        LocalDate.of(2026, 11, 7)
+                );
+        DashboardDto.DeliveryPerformanceResponse cancelled =
+                deliveryPerformanceService.getDeliveryPerformance(
+                        LocalDate.of(2026, 10, 18),
+                        LocalDate.of(2026, 10, 18)
+                );
+
+        assertThat(future.totalOrderCount()).isZero();
+        assertThat(cancelled.totalOrderCount()).isZero();
     }
 }

@@ -10,6 +10,14 @@ import java.util.List;
 import java.util.Optional;
 
 public interface CommonCodeRepository extends JpaRepository<CommonCode, Long> {
+    // 수주 등록의 납기 계산과 저장을 여러 서버에서도 순서대로 처리한다.
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select c from CommonCode c
+            where c.codeGroup.groupCode = 'ORDER_STATUS' and c.code = 'WAITING' and c.status = :status
+            """)
+    Optional<CommonCode> findOrderWaitingForUpdate(@Param("status") CodeStatus status);
+
 
     // 작업지시 등 기존 사용
     List<CommonCode> findByCodeGroup_GroupCodeAndStatus(

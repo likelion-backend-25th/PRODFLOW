@@ -11,6 +11,7 @@ import java.util.List;
 // 수주 품목을 id로 조회한다.
 public interface OrderProductRepository extends JpaRepository<OrderProduct, Long> {
 
+    // 품목별 최근 수주 이력 조회
     @Query("""
             SELECT op
             FROM OrderProduct op

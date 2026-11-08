@@ -78,7 +78,7 @@ public class LineNotificationService {
         lineNotificationRepository.save(notification);
     }
 
-    // 생산현장관리자 전체에게 알림 생성
+    // 생산 현장관리자 전체에게 알림 생성
     @Transactional
     public void notificationProductionManagers(
             Long lineId,

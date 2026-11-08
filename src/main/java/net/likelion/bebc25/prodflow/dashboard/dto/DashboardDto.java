@@ -32,13 +32,6 @@ public class DashboardDto {
     ) {
     }
 
-    // 수주 상태별 통계
-    public record OrderStatusResponse(
-            Long statusCode,
-            long orderCount
-    ) {
-    }
-
     // 날짜별 생산 계획 통계
     public record ProductionResponse(
             LocalDate date,

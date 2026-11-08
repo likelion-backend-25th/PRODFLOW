@@ -79,7 +79,7 @@ VALUES (1, 1, 'IP16', 'iPhone 16', 1, 'ACTIVE'),
        (12, 2, 'COMPLETED', '완료', 7, 'ACTIVE'),
        (13, 2, 'ON_HOLD', '생산보류', 8, 'ACTIVE'),
        (14, 2, 'PAUSE', '중지', 9, 'ACTIVE'),
-       (15, 2, 'CANCELLED', '취소', 1, 'ACTIVE'),
+       (15, 2, 'CANCELLED', '취소', 10, 'ACTIVE'),
        (16, 3, 'PREPARE', '준비', 2, 'ACTIVE'),
        (17, 3, 'PRODUCE', '생산', 3, 'ACTIVE'),
        (18, 3, 'PACK', '포장', 4, 'ACTIVE'),
@@ -507,3 +507,8 @@ VALUES (1, 'ORDER', 1, 'WAITING', 'PRODUCTION_READY', 2, '이서준', '계약금
        (2, 'ORDER', 11, 'WAITING', 'CANCELLED', 3, '박하은', '수주 취소 처리', '2026-09-20 14:00:00'),
        (3, 'WORK_ORDER', 6, 'PREPARE', 'PRODUCE', 4, '김태호', '작업지시 생산 시작', '2026-05-13 09:00:00'),
        (4, 'LINE', 4, 'OPERATING', 'BROKEN', 4, '김태호', '설비 고장 발생', '2026-10-24 08:40:00');
+
+
+-- 공휴일 (생산 일정 테스트용)
+INSERT INTO holiday (holiday_date, name)
+VALUES ('2026-12-25', '성탄절');
