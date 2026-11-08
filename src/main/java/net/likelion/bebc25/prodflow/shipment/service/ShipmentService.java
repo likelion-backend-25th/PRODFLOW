@@ -74,6 +74,19 @@ public class ShipmentService {
         return new ShipmentDto.ListResponse(normalized, countTabs(), items);
     }
 
+    // 외부 추적 조회 없이 저장된 배송 정보만 읽는다.
+    @Transactional(readOnly = true)
+    public ShipmentDto.OrderResponse getByOrderId(Long orderId) {
+        if (orderId == null) {
+            throw new IllegalArgumentException("수주 ID를 입력해 주세요.");
+        }
+        CustomerOrder order = customerOrderRepository.findById(orderId)
+                .orElseThrow(() -> new NoSuchElementException("수주를 찾을 수 없습니다."));
+        Shipment shipment = shipmentRepository.findByOrderId(orderId).orElse(null);
+
+        return ShipmentDto.OrderResponse.from(shipment, order.getStatusCode().getCode());
+    }
+
     // 출고대기 수주에 운송장을 등록하고 배송중으로 바꾼다.
     @Transactional
     public ShipmentDto.Response register(ShipmentDto.CreateRequest request, Long userId) {

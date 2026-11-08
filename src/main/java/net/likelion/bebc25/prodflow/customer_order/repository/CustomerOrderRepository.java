@@ -20,6 +20,31 @@ import java.util.Optional;
 import java.time.LocalDateTime;
 
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
+    // 현금 입금의 중복 처리와 상태 변경을 직렬화한다.
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from CustomerOrder o where o.id = :id")
+    Optional<CustomerOrder> findByIdForUpdate(@Param("id") Long id);
+
+    // 나중에 입금한 수주가 먼저 등록된 대기 수주의 생산 자리를 차지하지 않게 한다.
+    @Query("""
+            select o from CustomerOrder o
+            where o.statusCode.code = 'WAITING'
+              and (o.createdAt < :createdAt or (o.createdAt = :createdAt and o.id < :id))
+            order by o.createdAt, o.id
+            """)
+    List<CustomerOrder> findEarlierWaitingOrders(@Param("createdAt") LocalDateTime createdAt, @Param("id") Long id);
+
+    // 거래처·원본 견적·등록자·진행 상태를 포함한 수주 상세 조회
+    @Query("""
+            select o from CustomerOrder o
+            join fetch o.client
+            join fetch o.quotation
+            join fetch o.user
+            join fetch o.statusCode
+            where o.id = :id
+            """)
+    Optional<CustomerOrder> findDetailById(@Param("id") Long id);
+
     String SEARCH_CONDITION = """
             where o.statusCode.codeGroup.id = 2
               and ((:done = true and o.statusCode.code = 'COMPLETED')

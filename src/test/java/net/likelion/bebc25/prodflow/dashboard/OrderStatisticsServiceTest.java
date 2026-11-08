@@ -1,5 +1,7 @@
 package net.likelion.bebc25.prodflow.dashboard;
 
+import jakarta.persistence.EntityManager;
+import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
 import net.likelion.bebc25.prodflow.dashboard.service.OrderStatisticsService;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +22,9 @@ class OrderStatisticsServiceTest {
 
     @Autowired
     private OrderStatisticsService orderStatisticsService;
+
+    @Autowired
+    private EntityManager em;
 
     @Test
     @DisplayName("전체 수주 건수와 10월 수주 건수를 조회한다")
@@ -125,7 +130,7 @@ class OrderStatisticsServiceTest {
                 .extracting(DashboardDto.OrderStatusStatisticsResponse::statusCode)
                 .containsExactlyInAnyOrder(
                         "WAITING",
-                        "PRODUCTION_READY",
+                        "CONFIRMED",
                         "IN_PRODUCTION",
                         "PACKING",
                         "READY_TO_SHIP",
@@ -202,6 +207,12 @@ class OrderStatisticsServiceTest {
     @DisplayName("주문이 없는 상태는 통계 결과에 포함되지 않는다")
     void getOrderStatusStatistics_noneOrderStatus() {
 
+        // 생산대기 수주가 실제로 있는 시드에서 해당 상태의 수주만 비운다.
+        CommonCode waiting = em.find(CommonCode.class, 6L);
+        em.createQuery("update CustomerOrder o set o.statusCode = :waiting where o.statusCode.code = 'CONFIRMED'")
+                .setParameter("waiting", waiting).executeUpdate();
+        em.clear();
+
         // when
         List<DashboardDto.OrderStatusStatisticsResponse> result =
                 orderStatisticsService.getOrderStatusStatistics();
@@ -225,10 +236,10 @@ class OrderStatisticsServiceTest {
                 .containsExactlyInAnyOrder(
                         "CANCELLED",
                         "COMPLETED",
+                        "CONFIRMED",
                         "IN_PRODUCTION",
                         "ON_HOLD",
                         "PACKING",
-                        "PRODUCTION_READY",
                         "READY_TO_SHIP",
                         "SHIPPING",
                         "WAITING"

@@ -71,7 +71,7 @@ VALUES (1, 1, 'IP16', 'iPhone 16', 1, 'ACTIVE'),
        (4, 1, 'GS25U', 'Galaxy S25 Ultra', 4, 'ACTIVE'),
        (5, 1, 'IP15', 'iPhone 15', 5, 'ACTIVE'),
        (6, 2, 'WAITING', '대기', 1, 'ACTIVE'),
-       (7, 2, 'PRODUCTION_READY', '생산대기', 2, 'ACTIVE'),
+       (7, 2, 'CONFIRMED', '생산대기', 2, 'ACTIVE'),
        (8, 2, 'IN_PRODUCTION', '생산중', 3, 'ACTIVE'),
        (9, 2, 'PACKING', '포장중', 4, 'ACTIVE'),
        (10, 2, 'READY_TO_SHIP', '출고대기', 5, 'ACTIVE'),
@@ -503,7 +503,7 @@ VALUES (1, 1, 1, 'USER', '계약금이 아직 안 들어온 수주를 보여 줘
 
 -- 신규 Entity: 상태 변경 이력 (entity_id는 다형성 대상 ID이므로 DB FK가 아닌 논리 참조)
 INSERT INTO status_history (id, entity, entity_id, from_status, to_status, user_id, user_name, note, created_at)
-VALUES (1, 'ORDER', 1, 'WAITING', 'PRODUCTION_READY', 2, '이서준', '계약금 입금 확인 후 수주 확정', '2026-03-03 10:00:00'),
+VALUES (1, 'ORDER', 1, 'WAITING', 'CONFIRMED', 2, '이서준', '계약금 입금 확인 후 수주 확정', '2026-03-03 10:00:00'),
        (2, 'ORDER', 11, 'WAITING', 'CANCELLED', 3, '박하은', '수주 취소 처리', '2026-09-20 14:00:00'),
        (3, 'WORK_ORDER', 6, 'PREPARE', 'PRODUCE', 4, '김태호', '작업지시 생산 시작', '2026-05-13 09:00:00'),
        (4, 'LINE', 4, 'OPERATING', 'BROKEN', 4, '김태호', '설비 고장 발생', '2026-10-24 08:40:00');

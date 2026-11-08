@@ -55,7 +55,7 @@ class CustomerOrderQueryTest {
         assertThat(service.getOrders(condition(OrderListTab.OPEN, null, 7L), PageRequest.of(0, 8)).getContent())
                 .hasSize(2).allSatisfy(row -> {
                     assertThat(row.statusCodeId()).isEqualTo(7L);
-                    assertThat(row.status()).isEqualTo("PRODUCTION_READY");
+                    assertThat(row.status()).isEqualTo("CONFIRMED");
                     assertThat(row.statusName()).isEqualTo("생산대기");
                 });
         CustomerOrder order = em.find(CustomerOrder.class, 1L);

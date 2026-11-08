@@ -699,7 +699,7 @@ public class ProductionPlanRescheduleService {
         }
     }
 
-    // 원래 담당자가 생산 중이면 그 사람에게 새 준비 장을 주지 않는다.
+    // 활성 생산 현장 관리자인 기존 담당자는 유지한다. 미배정은 다음 날 장수 기준으로 고른다.
     private User assigneeFor(User current) {
         if (canTakePrepare(current)) {
             return current;
@@ -710,25 +710,19 @@ public class ProductionPlanRescheduleService {
             if (!canTakePrepare(user)) {
                 continue;
             }
-            long load = workOrderRepository.sumPrepareQuantityByUserId(user.getId());
-            // 준비 수량 합이 가장 적은 사람이다. 같으면 이름 순이다.
+            long load = workOrderRepository.countPlannedWorkByUserAndDate(user.getId(),
+                    LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).plusDays(1));
             if (chosen == null || load < least || (load == least && user.getName().compareTo(chosen.getName()) < 0)) {
                 chosen = user;
                 least = load;
             }
         }
-        if (chosen == null) {
-            throw new IllegalArgumentException("사용 중인 생산 현장 관리자만 담당자로 배정할 수 있습니다.");
-        }
         return chosen;
     }
 
-    // 생산 중인 담당자에게 준비 작업을 하나 더 만들지 않는다.
+    // 출근 여부나 현재 생산 여부와 관계없이 활성 생산 현장 관리자만 후보로 둔다.
     private boolean canTakePrepare(User user) {
-        if (user.getRole() != UserRole.PRODUCTION_MANAGER || user.getStatus() != UserStatus.ACTIVE) {
-            return false;
-        }
-        return !workOrderRepository.existsByUser_IdAndCommonCode_Code(user.getId(), "PRODUCE");
+        return user != null && user.getRole() == UserRole.PRODUCTION_MANAGER && user.getStatus() == UserStatus.ACTIVE;
     }
 
     // count()만 쓰면 이미 있는 WO-연도-번호와 겹칠 수 있다. 없을 때까지 올린다.
@@ -752,6 +746,9 @@ public class ProductionPlanRescheduleService {
 
     // 배정 가능한 사람은 사용 중인 생산 현장 관리자다.
     private void assertAssignable(User assignee) {
+        if (assignee == null) {
+            return;
+        }
         boolean isProductionManager = assignee.getRole() == UserRole.PRODUCTION_MANAGER;
         boolean isActive = assignee.getStatus() == UserStatus.ACTIVE;
         if (!isProductionManager || !isActive) {

@@ -1,6 +1,7 @@
 package net.likelion.bebc25.prodflow.shipment.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -63,6 +65,25 @@ public class ShipmentController {
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(shipmentService.complete(id, userDetails.getUserId()));
+    }
+
+    @Operation(
+            summary = "수주별 배송 정보 조회",
+            description = "수주 ID로 저장된 배송 정보만 조회한다. 배송 미등록 시 shipment는 null이다. "
+                    + "외부 배송 추적 API를 호출하거나 수주·배송 상태를 변경하지 않는다."
+    )
+    @ApiResponse(responseCode = "200", description = "조회 성공",
+            content = @Content(schema = @Schema(implementation = ShipmentDto.OrderResponse.class)))
+    @ApiResponse(responseCode = "400", description = "수주 ID 누락 또는 형식 오류")
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "404", description = "수주를 찾을 수 없음")
+    @GetMapping
+    public ResponseEntity<ShipmentDto.OrderResponse> getByOrderId(
+            @Parameter(description = "수주 ID", required = true)
+            @RequestParam(required = false) Long orderId) {
+        ShipmentDto.OrderResponse response = shipmentService.getByOrderId(orderId);
+
+        return ResponseEntity.ok(response);
     }
 
     @Operation(

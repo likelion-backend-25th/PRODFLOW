@@ -234,7 +234,7 @@ class QuotationSeedTest {
             assertThat(quotation.getClientPhone()).isNotBlank();
         });
         var orders = schedules.findActiveOrders();
-        assertThat(orders).anyMatch(order -> "PRODUCTION_READY".equals(order.getStatusCode().getCode()));
+        assertThat(orders).anyMatch(order -> "CONFIRMED".equals(order.getStatusCode().getCode()));
         var ids = orders.stream().map(order -> order.getId()).toList();
         assertThat(schedules.findOrderProducts(ids)).isNotEmpty();
         assertThat(schedules.findFixedPlans(ids)).isNotEmpty();

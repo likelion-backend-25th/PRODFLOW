@@ -98,7 +98,7 @@ public class LineService {
             orderNo = current.getOrderProduct().getCustomerOrder().getOrderNo();
             plannedStartDate = current.getPlannedStartDate();
             plannedEndDate = current.getPlannedEndDate();
-            managerName = current.getUser().getName();
+            managerName = current.getUser() == null ? null : current.getUser().getName();
         }
         List<LineDto.CapacityLog> capacityLogs = lineCapacityLogRepository
                 .findByLine_IdOrderByChangedAtDesc(lineId).stream()

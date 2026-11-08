@@ -38,6 +38,9 @@ public class CustomerOrderRepositoryTest {
     @Autowired
     private CustomerOrderRepository customerOrderRepository;
 
+    @Autowired
+    private OrderProductRepository orderProductRepository;
+
     private Long newQuotationId;
     private Long newOrderId;
 
@@ -87,6 +90,34 @@ public class CustomerOrderRepositoryTest {
         assertThat(findOrder.getOrderNo()).isEqualTo("PF-REPOSITORY-001");
         assertThat(findOrder.getQuotation().getId()).isEqualTo(newQuotationId);
         assertThat(findOrder.getClient().getCompany()).isEqualTo("레포지토리 테스트 회사");
+    }
+
+    @Test
+    @DisplayName("수주 상세의 거래처·견적·등록자·상태를 함께 조회")
+    void findDetailById() {
+        CustomerOrder order = customerOrderRepository.findDetailById(newOrderId).orElseThrow();
+        em.clear();
+
+        assertThat(order.getClient().getCompany()).isEqualTo("레포지토리 테스트 회사");
+        assertThat(order.getQuotation().getQuotationNo()).isEqualTo("QT-REPOSITORY-001");
+        assertThat(order.getUser().getName()).isEqualTo("수주 담당자");
+        assertThat(order.getStatusCode().getCode()).isEqualTo("WAITING");
+        assertThat(customerOrderRepository.findDetailById(Long.MAX_VALUE)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("선택한 수주의 품목과 기종만 조회")
+    void findAllByCustomerOrderId() {
+        List<OrderProduct> items = orderProductRepository.findAllByCustomerOrderId(newOrderId);
+        em.clear();
+
+        assertThat(items).hasSize(1);
+        OrderProduct item = items.getFirst();
+        assertThat(item.getCustomerOrder().getId()).isEqualTo(newOrderId);
+        assertThat(item.getProductName()).isEqualTo("검색용 테스트 품목");
+        assertThat(item.getProduct().getModelCode()).isEqualTo("REPOSITORY-001");
+        assertThat(item.getProduct().getDevice().getName()).isNotBlank();
+        assertThat(orderProductRepository.findAllByCustomerOrderId(Long.MAX_VALUE)).isEmpty();
     }
 
     @Test

@@ -143,7 +143,7 @@ public class CustomerOrderTest {
         em.clear();
 
         CustomerOrder updatedOrder = em.find(CustomerOrder.class, newOrderId);
-        assertThat(updatedOrder.getStatusCode().getCode()).isEqualTo("PRODUCTION_READY");
+        assertThat(updatedOrder.getStatusCode().getCode()).isEqualTo("CONFIRMED");
         assertThat(updatedOrder.getConfirmationStatus()).isEqualTo(ConfirmationStatus.CONFIRMED);
     }
 

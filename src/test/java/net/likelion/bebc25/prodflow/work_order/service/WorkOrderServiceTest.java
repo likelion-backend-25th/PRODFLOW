@@ -75,6 +75,70 @@ class WorkOrderServiceTest {
     HolidayRepository holidayRepository;
 
     @Test
+    @DisplayName("수주별 작업지시만 조회하고 생산 일정과 수주 품목 ID를 반환한다")
+    void listByOrderId() {
+        Page<PageResponse> result = workOrderService.findAll(1L, null, null, null, null, null, PageRequest.of(0, 10));
+
+        assertThat(result.getTotalElements()).isEqualTo(5);
+        assertThat(result.getContent()).allSatisfy(row -> {
+            assertThat(row.orderNo()).isEqualTo("PF-2026-001");
+            assertThat(row.orderProductId()).isIn(1L, 2L, 3L);
+            assertThat(row.plannedStartDate()).isNotNull();
+            assertThat(row.plannedEndDate()).isNotNull();
+            assertThat(row.completedAt()).isNull();
+        });
+        Page<PageResponse> completed = workOrderService.findAll(7L, null, null, null, null, null, PageRequest.of(0, 10));
+        assertThat(completed.getContent()).hasSize(1);
+        assertThat(completed.getContent().getFirst().completedAt()).isEqualTo(LocalDate.of(2026, 9, 21));
+    }
+
+    @Test
+    @DisplayName("수주 필터와 라인·상태·기간·검색어는 AND로 적용한다")
+    void listByOrderIdWithOtherConditions() {
+        WorkOrder target = workOrderRepository.findById(1L).orElseThrow();
+        Page<PageResponse> result = workOrderService.findAll(1L, target.getLine().getId(), " PREPARE ",
+                target.getWorkOrderDate(), target.getWorkOrderDate(), " PF-2026-001 ", PageRequest.of(0, 5));
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getContent().getFirst().id()).isEqualTo(target.getId());
+        Page<PageResponse> noMatch = workOrderService.findAll(2L, target.getLine().getId(), "PREPARE",
+                target.getWorkOrderDate(), target.getWorkOrderDate(), "PF-2026-001", PageRequest.of(0, 5));
+        assertThat(noMatch.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("수주별 조회에서도 완료 예정일·최근 등록 순서와 페이징을 유지한다")
+    void listByOrderIdWithPagination() {
+        List<PageResponse> rows = new ArrayList<>();
+        for (int page = 0; page < 3; page++) {
+            Page<PageResponse> result = workOrderService.findAll(1L, null, null, null, null, null, PageRequest.of(page, 2));
+            assertThat(result.getTotalElements()).isEqualTo(5);
+            assertThat(result.getTotalPages()).isEqualTo(3);
+            rows.addAll(result.getContent());
+        }
+
+        assertThat(rows).hasSize(5).isSortedAccordingTo(Comparator.comparing(PageResponse::plannedEndDate)
+                .thenComparing(Comparator.comparing(PageResponse::id).reversed()));
+        assertThat(rows).extracting(PageResponse::id).doesNotHaveDuplicates();
+    }
+
+    @Test
+    @DisplayName("작업지시가 없는 수주는 빈 페이지를 반환한다")
+    void listByOrderIdWithoutWorkOrders() {
+        Page<PageResponse> result = workOrderService.findAll(10L, null, null, null, null, null, PageRequest.of(0, 5));
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getTotalElements()).isZero();
+    }
+
+    @Test
+    @DisplayName("없는 수주 ID는 조회 실패한다")
+    void rejectUnknownOrderId() {
+        assertThatThrownBy(() -> workOrderService.findAll(Long.MAX_VALUE, null, null, null, null, null, PageRequest.of(0, 5)))
+                .isInstanceOf(NoSuchElementException.class).hasMessage("수주를 찾을 수 없습니다.");
+    }
+
+    @Test
     @DisplayName("한 라인의 기간 안에 들어가면 작업지시 한 장과 날짜별 계획이 저장된다")
     void createOnOneLineAcrossDays() {
         // 이미 계획이 있는 날 다음의 평일 이틀이다. 시드가 늘어도 같은 검증을 한다.

@@ -80,7 +80,10 @@ public class WorkOrderDto {
             String assignedName,
             LocalDate workOrderDate,
             LocalDate plannedEndDate,
-            String status
+            String status,
+            Long orderProductId, // 수주 품목 ID
+            LocalDate plannedStartDate,
+            LocalDate completedAt
     ) {
         public static PageResponse from(WorkOrder workOrder) {
             return new PageResponse(
@@ -91,10 +94,13 @@ public class WorkOrderDto {
                     workOrder.getOrderProduct().getProductName(),
                     workOrder.getQuantity(),
                     workOrder.getLine().getLineName(),
-                    workOrder.getUser().getName(),
+                    workOrder.getUser() == null ? null : workOrder.getUser().getName(),
                     workOrder.getWorkOrderDate(),
                     workOrder.getPlannedEndDate(),
-                    workOrder.getCommonCode().getCode()
+                    workOrder.getCommonCode().getCode(),
+                    workOrder.getOrderProduct().getId(),
+                    workOrder.getPlannedStartDate(),
+                    workOrder.getCompletedAt()
             );
         }
     }
@@ -130,8 +136,8 @@ public class WorkOrderDto {
                     workOrder.getQuantity(),
                     workOrder.getLine().getId(),
                     workOrder.getLine().getLineName(),
-                    workOrder.getUser().getId(),
-                    workOrder.getUser().getName(),
+                    workOrder.getUser() == null ? null : workOrder.getUser().getId(),
+                    workOrder.getUser() == null ? null : workOrder.getUser().getName(),
                     workOrder.getWorkOrderDate(),
                     workOrder.getPlannedStartDate(),
                     workOrder.getPlannedEndDate(),

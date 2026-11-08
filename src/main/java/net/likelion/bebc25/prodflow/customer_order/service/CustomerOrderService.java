@@ -1,19 +1,22 @@
 package net.likelion.bebc25.prodflow.customer_order.service;
 
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.common.dto.PageResponse;
+import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
+import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
 import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
+import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDetailDto;
 import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto;
 import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderListDto;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderListTab;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderListSortType;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderListSortType;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderListTab;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductRepository;
 import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
@@ -41,19 +44,22 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
-import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.time.ZoneId;
-import java.util.function.Function;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -67,6 +73,49 @@ public class CustomerOrderService {
     private final UserRepository userRepository;
     private final CommonCodeRepository commonCodeRepository;
     private final QuotationScheduleService scheduleService;
+    private final StatusHistoryRepository statusHistoryRepository;
+
+    // 수주 상태 변경 이력 전체 조회
+    public List<CustomerOrderDto.HistoryResponse> getHistories(Long orderId) {
+        if (!orderRepository.existsById(orderId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "수주를 찾을 수 없습니다.");
+        }
+        return statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(HistoryEntityType.ORDER, orderId)
+                .stream()
+                .map(CustomerOrderDto.HistoryResponse::from)
+                .toList();
+    }
+
+    // 수주 기본 정보와 저장 당시의 품목·금액을 조회한다.
+    public CustomerOrderDetailDto.Response getOrder(Long orderId) {
+        CustomerOrder order = orderRepository.findDetailById(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "수주를 찾을 수 없습니다."));
+
+        List<OrderProduct> items = orderProductRepository.findAllByCustomerOrderId(orderId);
+        List<CustomerOrderDetailDto.ItemResponse> itemResponses = new ArrayList<>();
+
+        long supplyAmount = 0;
+
+        for (OrderProduct item : items) {
+            long itemSupplyAmount = order.isVatIncluded() ? BigDecimal.valueOf(item.lineAmount())
+                    .divide(new BigDecimal("1.1"), 0, RoundingMode.HALF_UP).longValueExact()
+                    : item.getUnitPrice() * item.getQuantity();
+            supplyAmount += itemSupplyAmount;
+
+            itemResponses.add(CustomerOrderDetailDto.ItemResponse.from(item, itemSupplyAmount));
+        }
+
+        // VAT 포함 총액의 공급가액은 견적 상세와 동일하게 총액 기준으로 반올림한다.
+        if (order.isVatIncluded()) {
+            supplyAmount = BigDecimal.valueOf(order.getTotalAmount())
+                    .divide(new BigDecimal("1.1"), 0, RoundingMode.HALF_UP).longValueExact();
+        }
+
+        boolean unassigned = !orderRepository.findUnassignedOrders(List.of(orderId)).isEmpty();
+        CustomerOrderListDto.DelayResponse delay = delayOf(order, unassigned, LocalDate.now(ZoneId.of("Asia/Seoul")));
+
+        return CustomerOrderDetailDto.Response.from(order, itemResponses, supplyAmount, delay);
+    }
 
     // 수주 등록
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -74,6 +123,7 @@ public class CustomerOrderService {
     public CustomerOrderDto.CreateResponse create(@NotNull @Valid CustomerOrderDto.CreateRequest request, Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("등록자 계정을 찾을 수 없습니다."));
+
         if (user.getStatus() != UserStatus.ACTIVE || user.isMustChangePassword()
                 || (user.getRole() != UserRole.SUPER_ADMIN && user.getRole() != UserRole.ORDER_MANAGER)) {
             throw new AccessDeniedException("사용 중이며 비밀번호 변경을 완료한 계정만 수주를 등록할 수 있습니다.");
@@ -83,20 +133,25 @@ public class CustomerOrderService {
         // READ_COMMITTED로 잠금 대기 후 먼저 등록된 수주를 조회한다.
         CommonCode waiting = commonCodeRepository.findOrderWaitingForUpdate(CodeStatus.ACTIVE)
                 .orElseThrow(() -> new IllegalStateException("수주 대기 상태 코드가 등록되어 있지 않습니다."));
+
         Quotation quotation = quotationRepository.findByIdForUpdate(request.quotationId())
                 .orElseThrow(() -> new NoSuchElementException("존재하지 않는 견적입니다. ID: " + request.quotationId()));
+
         orderRepository.findByQuotationId(quotation.getId()).ifPresent(existing -> {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "이미 등록된 수주가 있습니다. 수주 ID: " + existing.getId() + ", 수주번호: " + existing.getOrderNo());
         });
+
         if (quotation.getStatus() != QuotationStatus.APPROVED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "승인된 견적으로만 수주를 등록할 수 있습니다.");
         }
 
         List<QuotationItem> quotedItems = quotationItemRepository.findByQuotationIdOrderByIdAsc(quotation.getId());
         Map<Long, Integer> quantities = validateItems(request.items(), quotedItems);
+
         long totalQuantity = 0;
         long totalAmount = 0;
+
         try {
             for (QuotationItem item : quotedItems) {
                 int quantity = quantities.get(item.getId());
@@ -107,8 +162,10 @@ public class CustomerOrderService {
         } catch (ArithmeticException ex) {
             throw new IllegalArgumentException("수주 수량 또는 금액이 허용 범위를 초과합니다.", ex);
         }
+
         String shippingAddress = resolveShippingAddress(request, quotation.getClient().getAddress());
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+
         QuotationScheduleResult schedule = scheduleService.calculate(totalQuantity, request.dueDate(), today);
 
         CustomerOrder order = new CustomerOrder("TEMP-" + UUID.randomUUID(), quotation, quotation.getClient(),
@@ -193,7 +250,7 @@ public class CustomerOrderService {
 
     // 수주 목록 응답 변환
     private CustomerOrderListDto.Response toResponse(CustomerOrder order, List<OrderProduct> items, Shipment shipment,
-                                                    boolean unassigned, LocalDate today) {
+                                                     boolean unassigned, LocalDate today) {
         List<CustomerOrderListDto.ItemResponse> responses = items.stream()
                 .map(item -> new CustomerOrderListDto.ItemResponse(item.getId(), item.getProduct().getId(),
                         item.getProductName(), item.getQuantity())).toList();
@@ -215,7 +272,7 @@ public class CustomerOrderService {
         long done = counts.getOrDefault("COMPLETED", 0L);
         long open = counts.entrySet().stream().filter(entry -> !Set.of("COMPLETED", "CANCELLED").contains(entry.getKey()))
                 .mapToLong(Map.Entry::getValue).sum();
-        return new CustomerOrderListDto.SummaryResponse(counts.getOrDefault("PRODUCTION_READY", 0L),
+        return new CustomerOrderListDto.SummaryResponse(counts.getOrDefault("CONFIRMED", 0L),
                 counts.getOrDefault("IN_PRODUCTION", 0L) + counts.getOrDefault("PACKING", 0L) + counts.getOrDefault("ON_HOLD", 0L),
                 counts.getOrDefault("READY_TO_SHIP", 0L) + counts.getOrDefault("SHIPPING", 0L),
                 orderRepository.countCompleted(month.atStartOfDay(), month.plusMonths(1).atStartOfDay()), open, done);
@@ -260,16 +317,16 @@ public class CustomerOrderService {
         if (order.getEstimatedDueDate().isBefore(today)) {
             return new CustomerOrderListDto.DelayResponse("late", "납기 " + ChronoUnit.DAYS.between(order.getEstimatedDueDate(), today) + "일 초과");
         }
-        if (Set.of("PRODUCTION_READY", "IN_PRODUCTION", "ON_HOLD").contains(status) && order.getPlannedEndDate().isBefore(today)) {
+        if (Set.of("CONFIRMED", "IN_PRODUCTION", "ON_HOLD").contains(status) && order.getPlannedEndDate().isBefore(today)) {
             return new CustomerOrderListDto.DelayResponse("late", "생산 완료 예정일 경과");
         }
         if (status.equals("ON_HOLD")) {
             return new CustomerOrderListDto.DelayResponse("risk", "생산 일시정지");
         }
-        if (status.equals("PRODUCTION_READY") && unassigned) {
+        if (status.equals("CONFIRMED") && unassigned) {
             return new CustomerOrderListDto.DelayResponse("risk", "담당자 미배정");
         }
-        if (status.equals("PRODUCTION_READY") && order.getPlannedStartDate().isBefore(today)) {
+        if (status.equals("CONFIRMED") && order.getPlannedStartDate().isBefore(today)) {
             return new CustomerOrderListDto.DelayResponse("risk", "생산 시작 예정일 경과");
         }
         if (status.equals("WAITING") && !order.getDepositDueDate().isAfter(today)) {
@@ -283,6 +340,7 @@ public class CustomerOrderService {
         }
         return null;
     }
+
     // 검색어 정규화
     private String normalizeKeyword(String keyword) {
         if (keyword == null || keyword.isBlank()) {

@@ -21,4 +21,7 @@ public interface WorkOrderHistoryRepository extends JpaRepository<WorkOrderHisto
     List<WorkOrderHistory> findTop5ByWorkOrder_IdOrderByChangedAtDesc(
             Long workOrderId
     );
+
+    // 지정한 작업지시의 라인·담당자 변경 이력을 모두 조회한다. 정렬 순서는 지정하지 않는다.
+    List<WorkOrderHistory> findByWorkOrder_Id(Long workOrderId);
 }
