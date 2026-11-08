@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,15 +38,16 @@ class OrderNotificationServiceTest {
                 OrderNotificationType.DELIVERY_IMMINENT
         )).isTrue();
 
-        assertThat(orderNotificationService.getNotifications(2L))
-                .anySatisfy(item -> {
-                    if ("PF-2026-009".equals(item.orderNo())) {
-                        assertThat(item.notificationType())
-                                .isEqualTo(OrderNotificationType.DELIVERY_IMMINENT);
-                        assertThat(item.clientName()).isEqualTo("한빛케이스(주)");
-                        assertThat(item.isRead()).isFalse();
-                    }
-                });
+        OrderNotificationDto created = orderNotificationService.getNotifications(2L)
+                .stream()
+                .filter(item -> "PF-2026-009".equals(item.orderNo()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(created.notificationType())
+                .isEqualTo(OrderNotificationType.DELIVERY_IMMINENT);
+        assertThat(created.clientName()).isEqualTo("한빛케이스(주)");
+        assertThat(created.isRead()).isFalse();
 
         assertThat(orderNotificationService.getNotifications(1L))
                 .extracting(OrderNotificationDto::orderNo)
@@ -152,5 +154,82 @@ class OrderNotificationServiceTest {
                         .findByTarget_IdOrderByCreatedAtDesc(2L)
                         .size()
         );
+    }
+
+    @Test
+    @DisplayName("납기 알림은 담당 직원에게만 가고 생산 관리자에게는 가지 않는다")
+    void notifiesAssigneeOnly() {
+        // given
+        LocalDate today = LocalDate.of(2026, 11, 4);
+
+        // when
+        orderNotificationService.createDueNotifications(today);
+
+        // then
+        assertThat(orderNotificationService.getNotifications(2L))
+                .extracting(OrderNotificationDto::orderNo)
+                .contains("PF-2026-009");
+
+        for (Long managerId : List.of(4L, 5L, 6L, 8L)) {
+            assertThat(orderNotificationService.getNotifications(managerId))
+                    .extracting(OrderNotificationDto::orderNo)
+                    .doesNotContain("PF-2026-009");
+        }
+    }
+
+    @Test
+    @DisplayName("임박 알림이 있는 수주는 납기가 지나면 지연 알림을 따로 만든다")
+    void createsDelayedNotificationAfterImminent() {
+        // given
+        LocalDate imminentDay = LocalDate.of(2026, 11, 4);
+        LocalDate delayedDay = LocalDate.of(2026, 11, 7);
+
+        // when
+        orderNotificationService.createDueNotifications(imminentDay);
+        orderNotificationService.createDueNotifications(delayedDay);
+
+        // then
+        assertThat(orderNotificationRepository.existsByCustomerOrder_IdAndNotificationType(
+                9L,
+                OrderNotificationType.DELIVERY_IMMINENT
+        )).isTrue();
+        assertThat(orderNotificationRepository.existsByCustomerOrder_IdAndNotificationType(
+                9L,
+                OrderNotificationType.DELIVERY_DELAYED
+        )).isTrue();
+    }
+
+    @Test
+    @DisplayName("담당 수주의 납기 알림 목록을 최신순으로 조회한다")
+    void getNotifications() {
+        // given
+        Long userId = 3L;
+
+        // when
+        List<OrderNotificationDto> notifications =
+                orderNotificationService.getNotifications(userId);
+
+        // then
+        assertThat(notifications)
+                .extracting(OrderNotificationDto::orderNo)
+                .containsExactly("PF-2026-004", "PF-2026-012");
+        assertThat(notifications)
+                .extracting(OrderNotificationDto::createdAt)
+                .isSortedAccordingTo(java.util.Comparator.reverseOrder());
+    }
+
+    @Test
+    @DisplayName("알림이 없는 사용자는 빈 목록과 미읽음 0을 받는다")
+    void getNotificationsWhenEmpty() {
+        // given
+        Long userId = 7L;
+
+        // when
+        List<OrderNotificationDto> notifications =
+                orderNotificationService.getNotifications(userId);
+
+        // then
+        assertThat(notifications).isEmpty();
+        assertThat(orderNotificationService.getUnreadCount(userId)).isZero();
     }
 }
