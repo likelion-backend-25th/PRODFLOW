@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.customer_order;
+package net.likelion.bebc25.prodflow.customer_order.service;
 
 import jakarta.persistence.EntityManager;
 import net.likelion.bebc25.prodflow.commoncode.entity.CodeGroup;

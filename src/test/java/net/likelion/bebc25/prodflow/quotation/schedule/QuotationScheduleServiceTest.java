@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.quotation;
+package net.likelion.bebc25.prodflow.quotation.schedule;
 
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;

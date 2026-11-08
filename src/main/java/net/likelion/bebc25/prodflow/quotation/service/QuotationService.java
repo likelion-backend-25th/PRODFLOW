@@ -295,7 +295,8 @@ public class QuotationService {
         Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sortType.toSort());
 
         String normalizedKeyword = keyword == null || keyword.isBlank() ? null : keyword.trim();
-        Page<Quotation> quotations = quotationRepository.search(normalizedKeyword, status, orderPending, sortedPageable);
+        Page<Quotation> quotations = quotationRepository.search(
+                normalizedKeyword, status, orderPending, sortedPageable);
 
         // 현재 페이지에 포함된 견적서 ID 추출
         List<Long> quotationIds = quotations.getContent().stream()

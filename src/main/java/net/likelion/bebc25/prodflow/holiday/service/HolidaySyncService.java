@@ -86,7 +86,8 @@ public class HolidaySyncService {
             // 요청 연도의 기존 날짜 일괄 조회
             // Set으로 기존 날짜 포함 여부 확인
             Set<LocalDate> existingDates = new HashSet<>();
-            holidayRepository.findByHolidayDateBetweenOrderByHolidayDateAsc(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))
+            holidayRepository.findByHolidayDateBetweenOrderByHolidayDateAsc(
+                            LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))
                     .forEach(holiday -> existingDates.add(holiday.getHolidayDate()));
 
             // 기존 날짜 제외, 순차 재실행 시 중복 방지

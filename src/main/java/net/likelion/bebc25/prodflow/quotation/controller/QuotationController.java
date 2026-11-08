@@ -77,7 +77,8 @@ public class QuotationController {
     public ResponseEntity<QuotationStatusDto.ExpirationResponse> expireQuotations(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        QuotationStatusDto.ExpirationResponse response = quotationStatusService.expireQuotations(userDetails.getUserId());
+        QuotationStatusDto.ExpirationResponse response =
+                quotationStatusService.expireQuotations(userDetails.getUserId());
         return ResponseEntity.ok(response);
     }
 
@@ -354,7 +355,8 @@ public class QuotationController {
             @Parameter(description = "검색어 (견적번호, 거래처명, 작성자)", example = "QT-20261103")
             @RequestParam(required = false) String keyword, // 값없으면 null
             @Parameter(description = "견적 상태 (생략 시 전체)",
-                    schema = @Schema(allowableValues = {"DRAFT", "SENT", "APPROVED", "REJECTED", "CANCELLED", "EXPIRED"}))
+                    schema = @Schema(allowableValues = {
+                            "DRAFT", "SENT", "APPROVED", "REJECTED", "CANCELLED", "EXPIRED"}))
             @RequestParam(required = false) QuotationStatus status,
             @Parameter(description = "수주 대기만 조회. true이면 승인(APPROVED) 상태이며 연결된 수주가 없는 견적만 조회. 상태 조건도 함께 적용",
                     schema = @Schema(defaultValue = "false"))

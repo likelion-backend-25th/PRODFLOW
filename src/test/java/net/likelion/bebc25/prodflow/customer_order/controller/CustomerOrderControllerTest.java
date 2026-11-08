@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.customer_order;
+package net.likelion.bebc25.prodflow.customer_order.controller;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;

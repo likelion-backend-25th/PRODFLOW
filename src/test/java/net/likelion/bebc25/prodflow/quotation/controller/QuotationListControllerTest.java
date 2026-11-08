@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.quotation;
+package net.likelion.bebc25.prodflow.quotation.controller;
 
 import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.global.exception.GlobalExceptionHandler;
