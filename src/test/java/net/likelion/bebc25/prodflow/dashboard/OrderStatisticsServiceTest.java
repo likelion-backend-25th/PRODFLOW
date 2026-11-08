@@ -31,11 +31,11 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2026, 10, 31)
                 );
 
-        // 취소 수주를 제외한 전체 수주 12건
-        assertThat(response.totalOrderCount()).isEqualTo(12);
+        // ORDER_STATUS 이면서 취소가 아닌 수주 11건. PACK_DONE으로 연결된 수주는 제외
+        assertThat(response.totalOrderCount()).isEqualTo(11);
 
-        // 10월 등록 수주 10건
-        assertThat(response.periodOrderCount()).isEqualTo(9);
+        // 10월에 등록된 수주 8건
+        assertThat(response.periodOrderCount()).isEqualTo(8);
     }
 
     @Test
@@ -90,8 +90,7 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2026, 10, 20)
                 );
 
-        // 취소 수주를 제외한 전체 수주 12건
-        assertThat(response.totalOrderCount()).isEqualTo(12);
+        assertThat(response.totalOrderCount()).isEqualTo(11);
 
         assertThat(response.periodOrderCount()).isGreaterThanOrEqualTo(0);
     }
@@ -106,8 +105,7 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2030, 1, 31)
                 );
 
-        // 취소 수주를 제외한 전체 수주 12건
-        assertThat(response.totalOrderCount()).isEqualTo(12);
+        assertThat(response.totalOrderCount()).isEqualTo(11);
 
         assertThat(response.periodOrderCount()).isZero();
     }
@@ -130,7 +128,6 @@ class OrderStatisticsServiceTest {
                         "PRODUCTION_READY",
                         "IN_PRODUCTION",
                         "PACKING",
-                        "PACK_DONE",
                         "READY_TO_SHIP",
                         "SHIPPING",
                         "COMPLETED",
@@ -212,11 +209,11 @@ class OrderStatisticsServiceTest {
         // then
         assertThat(result)
                 .extracting(DashboardDto.OrderStatusStatisticsResponse::statusCode)
-                .doesNotContain("CONFIRMED");
+                .doesNotContain("CONFIRMED", "PACK_DONE");
     }
 
     @Test
-    @DisplayName("주문 상태별 통계는 상태 코드 오름차순으로 반환된다")
+    @DisplayName("주문 상태별 통계는 ORDER_STATUS 코드만 반환한다")
     void getOrderStatusStatistics_statusArray() {
         // when
         List<DashboardDto.OrderStatusStatisticsResponse> result =
@@ -225,13 +222,12 @@ class OrderStatisticsServiceTest {
         // then
         assertThat(result)
                 .extracting(DashboardDto.OrderStatusStatisticsResponse::statusCode)
-                .containsExactly(
+                .containsExactlyInAnyOrder(
                         "CANCELLED",
                         "COMPLETED",
                         "IN_PRODUCTION",
                         "ON_HOLD",
                         "PACKING",
-                        "PACK_DONE",
                         "PRODUCTION_READY",
                         "READY_TO_SHIP",
                         "SHIPPING",

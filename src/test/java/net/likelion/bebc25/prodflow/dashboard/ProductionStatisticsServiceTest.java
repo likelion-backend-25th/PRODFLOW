@@ -1,7 +1,19 @@
 package net.likelion.bebc25.prodflow.dashboard;
 
+import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
+import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
+import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
+import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductRepository;
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
 import net.likelion.bebc25.prodflow.dashboard.service.ProductionStatisticsService;
+import net.likelion.bebc25.prodflow.line.entity.Line;
+import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.user.repository.UserRepository;
+import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
+import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
+import net.likelion.bebc25.prodflow.work_order.repsitory.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +32,24 @@ class ProductionStatisticsServiceTest {
 
     @Autowired
     private ProductionStatisticsService productionStatisticsService;
+
+    @Autowired
+    private OrderProductRepository orderProductRepository;
+
+    @Autowired
+    private LineRepository lineRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private CommonCodeRepository commonCodeRepository;
+
+    @Autowired
+    private WorkOrderRepository workOrderRepository;
+
+    @Autowired
+    private ProductionPlanRepository productionPlanRepository;
 
     @Test
     @DisplayName("선택한 기간의 일간 생산량 통계 조회")
@@ -121,5 +151,60 @@ class ProductionStatisticsServiceTest {
         )
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("1월부터 12월까지 입력 가능합니다.");
+    }
+
+    @Test
+    @DisplayName("시작일과 종료일이 같으면 해당 날짜만 조회한다")
+    void dailyProductionOnBoundaryDate() {
+        LocalDate date = LocalDate.of(2026, 10, 8);
+
+        List<DashboardDto.ProductionResponse> response =
+                productionStatisticsService.getDailyProduction(date, date);
+
+        assertThat(response).hasSize(1);
+        assertThat(response.getFirst().date()).isEqualTo(date);
+        assertThat(response.getFirst().plannedQuantity()).isEqualTo(1000);
+        assertThat(response.getFirst().completedQuantity()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("생산 데이터가 없는 기간은 0이다")
+    void emptyProductionPeriod() {
+        DashboardDto.MonthlyProductionResponse response =
+                productionStatisticsService.getMonthlyProduction(2030, 1);
+
+        assertThat(response.plannedQuantity()).isZero();
+        assertThat(response.completedQuantity()).isZero();
+    }
+
+    @Test
+    @DisplayName("취소 수주의 생산 계획은 집계하지 않는다")
+    void cancelledOrderPlanIsExcluded() {
+        OrderProduct cancelledProduct = orderProductRepository.findById(13L).orElseThrow();
+        Line line = lineRepository.findById(1L).orElseThrow();
+        User user = userRepository.findById(4L).orElseThrow();
+        CommonCode prepare = commonCodeRepository.findById(16L).orElseThrow();
+
+        WorkOrder workOrder = new WorkOrder(
+                "WI-CANCEL-TEST",
+                cancelledProduct,
+                line,
+                user,
+                100,
+                LocalDate.of(2026, 10, 1),
+                LocalDate.of(2026, 10, 1),
+                "취소 수주"
+        );
+        workOrder.changeStatus(prepare);
+        workOrderRepository.save(workOrder);
+        productionPlanRepository.save(
+                new ProductionPlan(workOrder, LocalDate.of(2026, 10, 1), 100)
+        );
+
+        DashboardDto.MonthlyProductionResponse response =
+                productionStatisticsService.getMonthlyProduction(2026, 10);
+
+        assertThat(response.plannedQuantity()).isEqualTo(17000);
+        assertThat(response.completedQuantity()).isEqualTo(7500);
     }
 }
