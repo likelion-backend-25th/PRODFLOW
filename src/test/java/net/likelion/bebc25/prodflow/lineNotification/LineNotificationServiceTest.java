@@ -245,4 +245,30 @@ class LineNotificationServiceTest {
                 .countByTarget_IdAndReadAtIsNull(6L))
                 .isEqualTo(beforeUser6);
     }
+
+    @Test
+    @DisplayName("비활성 생산 관리자와 다른 역할에는 라인 알림을 만들지 않는다")
+    void notifyLineStatusChangedSkipsInactiveAndOtherRoles() {
+        long beforeInactive =
+                lineNotificationRepository.countByTarget_IdAndReadAtIsNull(8L);
+        long beforeOrderManager =
+                lineNotificationRepository.countByTarget_IdAndReadAtIsNull(2L);
+
+        lineNotificationService.notifyLineStatusChanged(1L, LineStatus.BROKEN);
+
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(8L))
+                .isEqualTo(beforeInactive);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(2L))
+                .isEqualTo(beforeOrderManager);
+    }
+
+    @Test
+    @DisplayName("없는 생산라인의 상태 알림은 만들지 않는다")
+    void notifyLineStatusChangedWhenLineMissing() {
+        assertThatThrownBy(() ->
+                lineNotificationService.notifyLineStatusChanged(99999L, LineStatus.BROKEN)
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("생산라인을 찾을 수 없습니다.");
+    }
 }
