@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.client.dto.ClientDto;
 import net.likelion.bebc25.prodflow.client.service.ClientService;
@@ -17,6 +18,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -43,7 +45,7 @@ public class ClientController {
     @PostMapping
     public ResponseEntity<ClientDto.DetailResponse> createClient(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestBody ClientDto.Request request
+            @Valid @RequestBody ClientDto.Request request
     ) {
         ClientDto.DetailResponse response = clientService.createClient(request);
         return ResponseEntity.created(URI.create("/api/v1/clients/" + response.id())).body(response);
@@ -56,7 +58,7 @@ public class ClientController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "등록 성공")
     })
-    @PostMapping("/{id}")
+    @PutMapping("/{id}")
     public ResponseEntity<ClientDto.DetailResponse> updateClient(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "거래처 ID", example = "1")

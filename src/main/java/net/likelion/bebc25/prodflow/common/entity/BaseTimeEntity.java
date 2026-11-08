@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDateTime;
 
+// 엑셀 정보 기입 정책 등 정해야할 것들이 존재해서 보류
 @Getter
 @Setter
 @MappedSuperclass // 다른 Entity의 부모 클래스로 사용
@@ -23,23 +24,23 @@ public abstract class BaseTimeEntity { // 추상 클래스 new 생성 안됨
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column(nullable = false)
+    @Column(updatable = false)
     private String createdBy;
 
-    @Column(nullable = false)
+    @Column
     private String updatedBy;
 
     // Entity 최초 저장될 때 일시와 사용자의 이름이 존재하지 않으면 자동으로 주입
     @PrePersist
-    public void prePersist() {
+    public void prePersistTime() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
-        if (createdBy == null) {
-            createdBy = getPrincipalUserName();
-        }
         if (updatedAt == null) {
             updatedAt = LocalDateTime.now();
+        }
+        if (createdBy == null) {
+            createdBy = getPrincipalUserName();
         }
         if (updatedBy == null) {
             updatedBy = getPrincipalUserName();

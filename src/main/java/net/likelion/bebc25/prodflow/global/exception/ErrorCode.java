@@ -16,6 +16,12 @@ public enum ErrorCode {
             HttpStatus.BAD_REQUEST
     ),
 
+    WRONG_OBJECT_STATE(
+            "WRONG_OBJECT_STATE",
+            "부적절한 객체 상태로 인한 메소드 호출 수행이 불가합니다.",
+            HttpStatus.BAD_REQUEST
+    ),
+
     RESOURCE_NOT_FOUND(
             "RESOURCE_NOT_FOUND",
             "요청한 자원을 찾을 수 없습니다.",
