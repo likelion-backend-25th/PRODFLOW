@@ -48,6 +48,11 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public String getUsername() {
+        return email;
+    }
+
+    // 직원 실명 조회
+    public String getName() {
         return name;
     }
 

@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
 
 import java.time.LocalDateTime;
@@ -13,7 +14,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class VirtualAccount {
+public class VirtualAccount extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -69,13 +70,13 @@ public class VirtualAccount {
         this.status = VirtualAccountStatus.CANCELLED;
     }
 
-    // 현재 입금 가능한 계좌인지 확인
+    // 가상계좌가 정상 발급된 ACTIVE 상태인지 확인
     public boolean isActive() {
         return this.status == VirtualAccountStatus.ACTIVE;
     }
 
     // 실제 시간 기준 만료 여부 확인
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
+        return !LocalDateTime.now().isBefore(expiresAt);
     }
 }

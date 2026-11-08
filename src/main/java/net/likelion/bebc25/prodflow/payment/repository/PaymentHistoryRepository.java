@@ -1,0 +1,22 @@
+package net.likelion.bebc25.prodflow.payment.repository;
+
+import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+public interface PaymentHistoryRepository
+        extends JpaRepository<PaymentHistory, Long> {
+
+    // 결제건 하나의 입금내역 조회
+    Optional<PaymentHistory> findByPayment_Id(
+            Long paymentId
+    );
+
+    // 여러 결제건의 입금내역 일괄 조회
+    List<PaymentHistory> findByPayment_IdIn(
+            Collection<Long> paymentIds
+    );
+}
