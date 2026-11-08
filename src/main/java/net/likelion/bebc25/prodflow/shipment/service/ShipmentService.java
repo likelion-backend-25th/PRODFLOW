@@ -125,22 +125,6 @@ public class ShipmentService {
         return ShipmentDto.Response.from(shipment, order);
     }
 
-    // 배송조회 결과가 완료면 수주를 COMPLETED로 바꾼다. 이미 완료면 그냥 둔다.
-    @Transactional
-    public void completeOrderIfDelivered(Shipment shipment, Long userId) {
-        if (!Boolean.TRUE.equals(shipment.getComplete())) {
-            return;
-        }
-
-        CustomerOrder order = customerOrderRepository.findById(shipment.getOrderId())
-                .orElseThrow(() -> new NoSuchElementException("수주를 찾을 수 없습니다."));
-
-        String currentStatus = order.getStatusCode().getCode();
-        if ("COMPLETED".equals(currentStatus)) {
-            return;
-        }
-        if (!SHIPPING.equals(currentStatus)) {
-            return;
     // 화면의 배송 완료 버튼. 운송장을 완료로 두고 수주도 COMPLETED로 바꾼다.
     @Transactional
     public ShipmentDto.CompleteResponse complete(Long shipmentId, Long userId) {
@@ -188,9 +172,6 @@ public class ShipmentService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NoSuchElementException("처리한 직원을 찾을 수 없습니다."));
-
-        CommonCode completed = commonCodeRepository
-                .findByCodeGroup_GroupCodeAndCodeAndStatus(ORDER_STATUS, "COMPLETED", CodeStatus.ACTIVE)
         completeOrder(order, user);
         return COMPLETED;
     }
@@ -205,7 +186,6 @@ public class ShipmentService {
         statusHistoryRepository.save(new StatusHistory(
                 HistoryEntityType.ORDER,
                 order.getId(),
-                currentStatus,
                 fromStatus,
                 completed.getCode(),
                 user

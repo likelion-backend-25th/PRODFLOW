@@ -39,9 +39,6 @@ public class ShipmentTrackingService {
         );
 
         // 조회 결과가 배송완료면 수주도 COMPLETED로 맞춘다.
-        shipmentService.completeOrderIfDelivered(shipment, userId);
-
-        return ShipmentTrackingDto.from(shipment);
         String orderStatus = shipmentService.completeOrderIfDelivered(shipment, userId);
 
         return ShipmentTrackingDto.from(shipment, orderStatus);
