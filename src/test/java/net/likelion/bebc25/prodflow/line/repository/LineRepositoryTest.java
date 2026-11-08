@@ -79,7 +79,7 @@ class LineRepositoryTest {
         LineList producingRow = row(rows, "조회-생산");
         assertThat(producingRow.lineId()).isEqualTo(producing.getId());
         assertThat(producingRow.workNo()).isEqualTo("WO-LINE-LIST");
-        assertThat(producingRow.orderNo()).isEqualTo("PF-2026-013");
+        assertThat(producingRow.orderNo()).isEqualTo("PF-20261103-13");
         assertThat(producingRow.managerName()).isEqualTo("김태호");
         assertThat(idle.getId()).isNotNull();
     }

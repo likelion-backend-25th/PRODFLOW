@@ -70,7 +70,7 @@ class LineNotificationServiceTest {
     void markAsRead() {
         // given
         Long notificationId = 1L;
-        Long userId = 4L;
+        Long userId = 6L;
 
         // when
         LineNotificationDto result =

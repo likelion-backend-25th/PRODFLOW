@@ -34,9 +34,11 @@ class ProductionPlanRepositoryTest {
 
     Line line;
     Long prepareWorkOrderId;
+    long existingProductPlanQuantity;
 
     @BeforeEach
     void setUp() {
+        existingProductPlanQuantity = productionPlanRepository.sumQuantityByOrderProductId(15L);
         line = saveLine("계획-조회");
         User user = em.find(User.class, 4L);
         OrderProduct activeProduct = em.find(OrderProduct.class, 15L);
@@ -79,7 +81,8 @@ class ProductionPlanRepositoryTest {
         assertThat(productionPlanRepository.findByWorkOrder_Id(prepareWorkOrderId))
                 .extracting(ProductionPlan::getPlanDate, ProductionPlan::getQuantity)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple(DAY, 100));
-        assertThat(productionPlanRepository.sumQuantityByOrderProductId(15L)).isEqualTo(190);
+        assertThat(productionPlanRepository.sumQuantityByOrderProductId(15L))
+                .isEqualTo(existingProductPlanQuantity + 190);
         assertThat(productionPlanRepository.sumQuantityByOrderProductId(13L)).isEqualTo(50);
     }
 

@@ -36,11 +36,11 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2026, 10, 31)
                 );
 
-        // ORDER_STATUS 이면서 취소가 아닌 수주 11건. PACK_DONE으로 연결된 수주는 제외
-        assertThat(response.totalOrderCount()).isEqualTo(11);
+        // ORDER_STATUS에 속한 수주 13건 중 취소 1건을 제외한다.
+        assertThat(response.totalOrderCount()).isEqualTo(12);
 
-        // 10월에 등록된 수주 8건
-        assertThat(response.periodOrderCount()).isEqualTo(8);
+        // 10월 등록 수주 8건 중 취소 1건을 제외한다.
+        assertThat(response.periodOrderCount()).isEqualTo(7);
     }
 
     @Test
@@ -95,7 +95,7 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2026, 10, 20)
                 );
 
-        assertThat(response.totalOrderCount()).isEqualTo(11);
+        assertThat(response.totalOrderCount()).isEqualTo(12);
 
         assertThat(response.periodOrderCount()).isGreaterThanOrEqualTo(0);
     }
@@ -110,7 +110,7 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2030, 1, 31)
                 );
 
-        assertThat(response.totalOrderCount()).isEqualTo(11);
+        assertThat(response.totalOrderCount()).isEqualTo(12);
 
         assertThat(response.periodOrderCount()).isZero();
     }

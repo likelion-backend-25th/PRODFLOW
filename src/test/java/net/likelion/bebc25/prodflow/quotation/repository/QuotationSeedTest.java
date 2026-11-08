@@ -109,7 +109,7 @@ class QuotationSeedTest {
                 .containsExactlyInAnyOrder(5L, 9L, 15L);
         assertThat(search.getTotalElements()).isEqualTo(3);
 
-        var noMatch = service.getQuotationList("QT-2026-001", QuotationStatus.APPROVED,
+        var noMatch = service.getQuotationList("QT-20261105-1", QuotationStatus.APPROVED,
                 QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
         assertThat(noMatch.getContent()).isEmpty();
         assertThat(noMatch.getTotalElements()).isZero();
@@ -154,8 +154,8 @@ class QuotationSeedTest {
                 .extracting(quotation -> quotation.id()).containsExactly(3L, 1L, 16L);
         assertThat(service.getQuotationList(null, null, QuotationSortType.VALID_UNTIL, pageable).getContent())
                 .extracting(quotation -> quotation.id()).containsExactly(16L, 15L, 14L);
-        assertThat(service.getQuotationList("QT-2026-00", null, QuotationSortType.REQUESTED_DUE_DATE, pageable).getContent())
-                .extracting(quotation -> quotation.id()).containsExactly(2L, 3L, 9L);
+        assertThat(service.getQuotationList("QT-", null, QuotationSortType.REQUESTED_DUE_DATE, pageable).getContent())
+                .extracting(quotation -> quotation.id()).containsExactly(2L, 3L, 16L);
         var nextPage = service.getQuotationList(null, null, QuotationSortType.VALID_UNTIL, PageRequest.of(1, 3));
         assertThat(nextPage.getContent()).extracting(quotation -> quotation.id())
                 .containsExactly(13L, 12L, 11L);
@@ -164,17 +164,18 @@ class QuotationSeedTest {
 
     @Test
     void listReturnsPageResponseWithAmountsAndLinkedOrder() {
-        var response = service.getQuotationList(" QT-2026-001 ", null, QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
+        var response = service.getQuotationList(
+                " QT-20261105-1 ", null, QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
         assertThat(response.getPage()).isZero();
         assertThat(response.getSize()).isEqualTo(12);
         assertThat(response.getTotalElements()).isEqualTo(1);
         assertThat(response.getTotalPages()).isEqualTo(1);
         long total = quotations.findById(1L).orElseThrow().getTotalAmount();
         assertThat(response.getContent()).singleElement().satisfies(quotation -> {
-            assertThat(quotation.quotationNo()).isEqualTo("QT-2026-001");
+            assertThat(quotation.quotationNo()).isEqualTo("QT-20261105-1");
             assertThat(quotation.totalAmount()).isEqualTo(total);
             assertThat(quotation.customerOrderId()).isEqualTo(1L);
-            assertThat(quotation.orderNo()).isEqualTo("PF-2026-001");
+            assertThat(quotation.orderNo()).isEqualTo("PF-20261106-1");
         });
     }
 
@@ -217,7 +218,7 @@ class QuotationSeedTest {
     void findsOnlyRequestedQuotationsLinkedOrders() {
         assertThat(orders.findByQuotationIdIn(List.of(1L, 2L)))
                 .extracting(order -> order.getOrderNo())
-                .containsExactlyInAnyOrder("PF-2026-001", "PF-2026-002");
+                .containsExactlyInAnyOrder("PF-20261106-1", "PF-20261030-2");
         assertThat(orders.findByQuotationIdIn(List.of(Long.MAX_VALUE))).isEmpty();
     }
 

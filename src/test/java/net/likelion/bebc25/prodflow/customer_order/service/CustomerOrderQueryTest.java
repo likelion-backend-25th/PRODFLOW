@@ -43,7 +43,7 @@ class CustomerOrderQueryTest {
         assertThat(service.getOrders(open, PageRequest.of(99, 8)).getTotalElements()).isEqualTo(9);
         assertThat(service.getOrders(open, PageRequest.of(99, 8)).getContent()).isEmpty();
         assertThat(service.getOrders(condition(OrderListTab.DONE, null, null), PageRequest.of(0, 8)).getContent())
-                .hasSize(2).allSatisfy(row -> assertThat(row.status()).isEqualTo("COMPLETED"));
+                .hasSize(3).allSatisfy(row -> assertThat(row.status()).isEqualTo("COMPLETED"));
     }
 
     // 그룹 ID 2의 진행 상태 검색 검증
@@ -86,7 +86,8 @@ class CustomerOrderQueryTest {
     @Test
     void combinesFiltersAndSearchesSnapshotNamesWithoutDuplicateOrders() {
         assertThat(service.getOrders(condition(OrderListTab.OPEN, " 케이스 ", null), PageRequest.of(0, 20)).getTotalElements()).isEqualTo(9);
-        assertThat(service.getOrders(condition(OrderListTab.OPEN, "PF-2026-001", null), PageRequest.of(0, 8)).getContent())
+        assertThat(service.getOrders(
+                condition(OrderListTab.OPEN, "PF-20261106-1", null), PageRequest.of(0, 8)).getContent())
                 .singleElement().satisfies(row -> {
                     assertThat(row.itemCount()).isEqualTo(3);
                     assertThat(row.totalQuantity()).isEqualTo(6000);
@@ -105,6 +106,9 @@ class CustomerOrderQueryTest {
     @Test
     void sortsByDeliveryCompletionAndUsesKoreanCalendarMonth() {
         LocalDate month = LocalDate.now(ZoneId.of("Asia/Seoul")).withDayOfMonth(1);
+        // 추가 완료 수주는 이전 달로 옮겨 월 경계와 NULL 정렬을 독립적으로 검증한다.
+        em.createQuery("update Shipment s set s.deliveredAt = :date where s.orderId = 5")
+                .setParameter("date", month.minusDays(1).atStartOfDay()).executeUpdate();
         em.createQuery("update Shipment s set s.deliveredAt = :date where s.orderId = 7")
                 .setParameter("date", month.atStartOfDay()).executeUpdate();
         em.createQuery("update Shipment s set s.deliveredAt = :date where s.orderId = 8")
@@ -113,17 +117,17 @@ class CustomerOrderQueryTest {
         CustomerOrderListDto.SearchCondition done = new CustomerOrderListDto.SearchCondition(OrderListTab.DONE,
                 null, null, null, null, OrderListSortType.COMPLETED_AT);
         assertThat(service.getOrders(done, PageRequest.of(0, 3)).getContent())
-                .extracting(CustomerOrderListDto.Response::id).containsExactly(8L, 7L);
+                .extracting(CustomerOrderListDto.Response::id).containsExactly(8L, 7L, 5L);
         CustomerOrderListDto.SummaryResponse summary = service.getSummary();
         assertThat(summary.waiting()).isEqualTo(2);
         assertThat(summary.doneThisMonth()).isEqualTo(1);
         assertThat(summary.openCount()).isEqualTo(9);
-        assertThat(summary.doneCount()).isEqualTo(2);
+        assertThat(summary.doneCount()).isEqualTo(3);
         em.createQuery("update Shipment s set s.deliveredAt = null where s.orderId = 8").executeUpdate();
         em.clear();
         assertThat(service.getOrders(done, PageRequest.of(0, 3)).getContent())
-                .extracting(CustomerOrderListDto.Response::id).containsExactly(7L, 8L);
-        assertThat(service.getOrders(done, PageRequest.of(0, 3)).getContent().get(1).completedAt()).isNull();
+                .extracting(CustomerOrderListDto.Response::id).containsExactly(7L, 5L, 8L);
+        assertThat(service.getOrders(done, PageRequest.of(0, 3)).getContent().get(2).completedAt()).isNull();
     }
 
     // 전체 검색 결과 CSV 검증
