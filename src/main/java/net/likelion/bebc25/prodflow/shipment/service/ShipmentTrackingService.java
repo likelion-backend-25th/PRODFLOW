@@ -42,5 +42,8 @@ public class ShipmentTrackingService {
         shipmentService.completeOrderIfDelivered(shipment, userId);
 
         return ShipmentTrackingDto.from(shipment);
+        String orderStatus = shipmentService.completeOrderIfDelivered(shipment, userId);
+
+        return ShipmentTrackingDto.from(shipment, orderStatus);
     }
 }

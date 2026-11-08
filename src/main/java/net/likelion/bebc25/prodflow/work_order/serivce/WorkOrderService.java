@@ -21,6 +21,7 @@ import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.dto.ProductionPlanDto;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
+import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderHistoryDto;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrderHistory;
@@ -353,6 +354,24 @@ public class WorkOrderService {
                 historyReason
         ));
         return WorkOrderDto.DetailResponse.from(workOrder, plans);
+    }
+
+    /**
+     * 특정 작업지시서의 라인 및 담당자 변경 이력 조회
+     *
+     * @param workOrderId 작업지시서 ID
+     * @return 최근 변경 이력 최대 5개
+     */
+    public List<WorkOrderHistoryDto.Response> getWorkOrderHistories(
+            Long workOrderId
+    ) {
+
+        // 해당 작업지시서의 변경 이력 최근 5개 조회
+        return workOrderHistoryRepository
+                .findTop5ByWorkOrder_IdOrderByChangedAtDesc(workOrderId)
+                .stream()
+                .map(WorkOrderHistoryDto.Response::from)
+                .toList();
     }
 
     @Transactional
