@@ -74,4 +74,15 @@ public class Shipment {
         }
     }
 
+    // 화면에서 수동 배송 완료할 때 사용
+    public void markDelivered() {
+        this.complete = true;
+        if (this.level == null || this.level < 6) {
+            this.level = 6;
+        }
+        if (this.deliveredAt == null) {
+            this.deliveredAt = LocalDateTime.now();
+        }
+    }
+
 }
