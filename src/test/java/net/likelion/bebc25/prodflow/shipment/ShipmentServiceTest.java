@@ -9,7 +9,6 @@ import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductRepository;
 import net.likelion.bebc25.prodflow.shipment.dto.ShipmentDto;
-import net.likelion.bebc25.prodflow.shipment.entity.Shipment;
 import net.likelion.bebc25.prodflow.shipment.dto.ShipmentDto.CreateRequest;
 import net.likelion.bebc25.prodflow.shipment.dto.ShipmentDto.Response;
 import net.likelion.bebc25.prodflow.shipment.entity.Carrier;
@@ -26,15 +25,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +41,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class ShipmentServiceTest {
 
     @Mock
@@ -55,6 +51,8 @@ class ShipmentServiceTest {
     @Mock
     ShipmentRepository shipmentRepository;
     @Mock
+    CarrierRepository carrierRepository;
+    @Mock
     CommonCodeRepository commonCodeRepository;
     @Mock
     StatusHistoryRepository statusHistoryRepository;
@@ -63,13 +61,16 @@ class ShipmentServiceTest {
     @InjectMocks
     ShipmentService shipmentService;
 
-    @Test
-    @DisplayName("배송중 운송장을 완료하면 수주도 COMPLETED가 된다")
-    void completeShipment() {
+    @BeforeEach
+    void setUp() {
         User user = mock(User.class);
         when(user.getName()).thenReturn("서도윤");
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+    }
 
+    @Test
+    @DisplayName("배송중 운송장을 완료하면 수주도 COMPLETED가 된다")
+    void completeShipment() {
         Shipment shipment = mock(Shipment.class);
         when(shipment.getId()).thenReturn(10L);
         when(shipment.getOrderId()).thenReturn(3L);
@@ -77,15 +78,12 @@ class ShipmentServiceTest {
         when(shipment.getDeliveredAt()).thenReturn(LocalDateTime.of(2026, 11, 8, 15, 0));
         when(shipmentRepository.findById(10L)).thenReturn(Optional.of(shipment));
 
-        CommonCode shipping = mock(CommonCode.class);
-        when(shipping.getCode()).thenReturn("SHIPPING");
-        CommonCode completed = mock(CommonCode.class);
-        when(completed.getCode()).thenReturn("COMPLETED");
+        CommonCode shipping = code("SHIPPING");
+        CommonCode completed = code("COMPLETED");
 
         CustomerOrder order = mock(CustomerOrder.class);
         when(order.getId()).thenReturn(3L);
         when(order.getOrderNo()).thenReturn("ORD-3");
-        // 배송중 검사 → 이력 fromStatus → 응답 orderStatus
         when(order.getStatusCode()).thenReturn(shipping, shipping, completed);
         when(customerOrderRepository.findById(3L)).thenReturn(Optional.of(order));
         when(commonCodeRepository.findByCodeGroup_GroupCodeAndCodeAndStatus(
@@ -101,29 +99,6 @@ class ShipmentServiceTest {
                 "SHIPPING".equals(history.getFromStatus())
                         && "COMPLETED".equals(history.getToStatus())
         ));
-@MockitoSettings(strictness = Strictness.LENIENT)
-class ShipmentServiceTest {
-
-    @Mock
-    ShipmentRepository shipmentRepository;
-    @Mock
-    CarrierRepository carrierRepository;
-    @Mock
-    CustomerOrderRepository customerOrderRepository;
-    @Mock
-    CommonCodeRepository commonCodeRepository;
-    @Mock
-    UserRepository userRepository;
-    @Mock
-    StatusHistoryRepository statusHistoryRepository;
-    @InjectMocks
-    ShipmentService shipmentService;
-
-    @BeforeEach
-    void setUp() {
-        User user = mock(User.class);
-        when(user.getName()).thenReturn("서도윤");
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
     }
 
     @Test

@@ -1,6 +1,8 @@
 package net.likelion.bebc25.prodflow.shipment.dto;
 
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
+import net.likelion.bebc25.prodflow.shipment.entity.Shipment;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -58,12 +60,7 @@ public class ShipmentDto {
             Boolean complete,
             LocalDateTime deliveredAt
     ) {
-import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
-import net.likelion.bebc25.prodflow.shipment.entity.Shipment;
-
-import java.time.LocalDateTime;
-
-public class ShipmentDto {
+    }
 
     public record CreateRequest(
             Long orderId,

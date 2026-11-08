@@ -13,13 +13,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -67,6 +63,9 @@ public class ShipmentController {
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(shipmentService.complete(id, userDetails.getUserId()));
+    }
+
+    @Operation(
             summary = "운송장 등록",
             description = "출고대기 수주에 택배사와 운송장 번호를 저장하고 수주 상태를 배송중으로 바꾼다. 수주당 운송장은 하나이고, 같은 택배사의 운송장 번호는 중복할 수 없다."
     )
