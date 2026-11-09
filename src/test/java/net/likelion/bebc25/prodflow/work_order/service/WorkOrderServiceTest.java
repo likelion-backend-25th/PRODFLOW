@@ -25,6 +25,8 @@ import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
 import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.access.AccessDeniedException;
@@ -571,6 +573,60 @@ class WorkOrderServiceTest {
                 .hasMessage("라인의 생산능력을 초과하여 생산을 시작할 수 없습니다.");
         assertThat(workOrder.getCommonCode().getCode()).isEqualTo("PREPARE");
         assertThat(line.getProductionCapacity()).isEqualTo(40);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "PREPARE, BROKEN, 고장 상태인 라인에서는 생산을 시작하거나 재개할 수 없습니다.",
+            "PREPARE, INSPECTION, 점검 중인 라인에서는 생산을 시작하거나 재개할 수 없습니다.",
+            "SUSPEND, BROKEN, 고장 상태인 라인에서는 생산을 시작하거나 재개할 수 없습니다.",
+            "SUSPEND, INSPECTION, 점검 중인 라인에서는 생산을 시작하거나 재개할 수 없습니다."
+    })
+    @DisplayName("고장·점검 라인에서는 생산 시작과 재개를 거절하고 상태와 이력을 유지한다")
+    void rejectProduceOnUnavailableLine(String workStatus, LineStatus lineStatus, String message) {
+        Line line = lineRepository.save(new Line("생산시작-상태검증", 1000));
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
+        ReflectionTestUtils.setField(workOrder, "plannedStartDate", LocalDate.now());
+        if ("SUSPEND".equals(workStatus)) {
+            workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L);
+            workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("SUSPEND", null), 1L);
+        }
+        line.changeStatus(lineStatus);
+        String orderStatus = workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode();
+        long historyCount = statusHistoryRepository.count();
+
+        assertThatThrownBy(() -> workOrderService.changeStatus(
+                workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage(message);
+
+        assertThat(workOrder.getCommonCode().getCode()).isEqualTo(workStatus);
+        assertThat(line.getStatus()).isEqualTo(lineStatus);
+        assertThat(workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode()).isEqualTo(orderStatus);
+        assertThat(statusHistoryRepository.count()).isEqualTo(historyCount);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"PREPARE, AVAILABLE", "PREPARE, OPERATING", "SUSPEND, OPERATING"})
+    @DisplayName("정상 라인에서는 생산 시작과 재개를 허용한다")
+    void produceOnUsableLine(String workStatus, LineStatus lineStatus) {
+        Line line = lineRepository.save(new Line("생산시작-정상라인", 1000));
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
+        ReflectionTestUtils.setField(workOrder, "plannedStartDate", LocalDate.now());
+        if ("SUSPEND".equals(workStatus)) {
+            workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L);
+            workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("SUSPEND", null), 1L);
+        }
+        line.changeStatus(lineStatus);
+
+        workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L);
+
+        assertThat(workOrder.getCommonCode().getCode()).isEqualTo("PRODUCE");
+        assertThat(line.getStatus()).isEqualTo(LineStatus.OPERATING);
+        assertThat(workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode()).isEqualTo("IN_PRODUCTION");
     }
 
     @Test

@@ -746,6 +746,13 @@ public class WorkOrderService {
 
     // 생산 시작. 라인은 가동 중이 되고 수주는 생산중이 된다.
     private void startProduction(WorkOrder workOrder, User user) {
+        LineStatus lineStatus = workOrder.getLine().getStatus();
+        if (lineStatus == LineStatus.BROKEN) {
+            throw new IllegalArgumentException("고장 상태인 라인에서는 생산을 시작하거나 재개할 수 없습니다.");
+        }
+        if (lineStatus == LineStatus.INSPECTION) {
+            throw new IllegalArgumentException("점검 중인 라인에서는 생산을 시작하거나 재개할 수 없습니다.");
+        }
         if (workOrder.getUser() == null) {
             throw new IllegalArgumentException("담당자를 배정한 후 생산을 시작해주세요.");
         }
