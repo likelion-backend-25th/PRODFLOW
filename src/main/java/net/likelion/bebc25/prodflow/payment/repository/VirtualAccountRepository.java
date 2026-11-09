@@ -25,8 +25,6 @@ public interface VirtualAccountRepository
             """)
     List<VirtualAccount> findLatestByOrderId(@Param("orderId") Long orderId);
 
-    List<VirtualAccount> findByPayment_IdOrderByIdDesc(Long paymentId);
-
     // 특정 결제의 최신 가상계좌
     Optional<VirtualAccount> findFirstByPayment_IdOrderByIdDesc(
             Long paymentId
