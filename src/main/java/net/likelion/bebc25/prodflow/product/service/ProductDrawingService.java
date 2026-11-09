@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.product.service;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.common.storage.StorageClient;
+import net.likelion.bebc25.prodflow.product.dto.ProductDrawingDto.CurrentResponse;
 import net.likelion.bebc25.prodflow.product.dto.ProductDrawingDto.Response;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.entity.ProductDrawing;
@@ -14,6 +15,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,6 +27,7 @@ import java.util.UUID;
 public class ProductDrawingService {
 
     private static final long MAX_FILE_SIZE = 100L * 1024 * 1024; // 100MB
+    private static final Duration PREVIEW_EXPIRATION = Duration.ofMinutes(10);
 
     private final ProductRepository productRepository;
     private final ProductDrawingRepository productDrawingRepository;
@@ -67,13 +71,17 @@ public class ProductDrawingService {
         return Response.from(saved);
     }
 
-    public List<Response> getCurrentFiles(Long productId) {
-
+    public List<CurrentResponse> getCurrentFiles(Long productId) {
         if (!productRepository.existsById(productId)) {
             throw new EntityNotFoundException("품목을 찾을 수 없습니다: id=" + productId);
         }
+        Instant expiresAt = Instant.now().plus(PREVIEW_EXPIRATION);
         return productDrawingRepository.findByProductIdAndReplacedAtIsNull(productId).stream()
-                .map(Response::from)
+                .map(drawing -> CurrentResponse.from(
+                        drawing,
+                        storageClient.createPresignedGetUrl(drawing.getObjectKey(), PREVIEW_EXPIRATION),
+                        expiresAt
+                ))
                 .toList();
     }
 
