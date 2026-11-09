@@ -26,10 +26,12 @@ public class PortOneClient {
     }
 
     // 수기 결제 (가상계좌 발급)
-    public PortOneDto.IssueResponse issueInstantPayment(PortOneDto.IssueRequest request) {
+    public void issueInstantPayment(PortOneDto.IssueRequest request) {
         properties.requireConfigured();
 
-        // 발급 응답은 요약 정보뿐이므로 계좌 정보는 이어지는 단건 조회에서 가져옵니다.
+        // 발급 API 응답은 {payment:{...}}이며 계좌 상세는 단건 조회에서 가져온다.
+        // PortOne 고객 주소는 별도 타입(ONE_LINE/SEPARATED)으로 정의되어 있어
+        // 잘못된 addressLine1/addressLine2 형태 대신 선택 필드는 제외한다.
         Map<String, Object> body = new HashMap<String, Object>(Map.of(
                 "storeId", properties.storeId(),
                 "channelKey", properties.channelKey(),
@@ -39,11 +41,7 @@ public class PortOneClient {
                 "customer", Map.of(
                         "name", Map.of("full", request.companyName()),
                         "email", request.email(),
-                        "phoneNumber", request.phone(),
-                        "address", Map.of(
-                                "addressLine1", request.roadAddress(),
-                                "addressLine2", request.detailAddress()
-                        )
+                        "phoneNumber", request.phone()
                 ),
                 "method", Map.of(
                         "virtualAccount", Map.of(
@@ -55,13 +53,13 @@ public class PortOneClient {
         ));
 
         try {
-            return restClient.post().uri("/payments/{id}/instant", request.paymentId())
+            restClient.post().uri("/payments/{id}/instant", request.paymentId())
                     .header(HttpHeaders.AUTHORIZATION, authorization())
                     .header("Idempotency-Key", "\"" + request.idempotencyKey() + "\"")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
-                    .body(PortOneDto.IssueResponse.class);
+                    .toBodilessEntity();
 
         } catch (RestClientResponseException e) {
             throw e;
@@ -70,6 +68,22 @@ public class PortOneClient {
                     "PortOne 발급 응답을 받지 못했습니다. 중복 발급을 피하려면 이 결제의 상태를 먼저 조회해 주세요."
             );
         }
+    }
+
+    /**
+     * PortOne V2 POST /payments/{paymentId}/virtual-account/close.
+     * 정상 응답의 closedAt을 받아야만 재발급 다음 단계로 진행한다.
+     * 이미 입금된 결제 취소/환불 API와 다른 엔드포인트다.
+     */
+    public PortOneDto.CloseVirtualAccountResponse closeVirtualAccount(String paymentId) {
+        properties.requireConfigured();
+        return restClient.post()
+                .uri(uri -> uri.path("/payments/{id}/virtual-account/close")
+                        .queryParam("storeId", properties.storeId())
+                        .build(paymentId))
+                .header(HttpHeaders.AUTHORIZATION, authorization())
+                .retrieve()
+                .body(PortOneDto.CloseVirtualAccountResponse.class);
     }
 
     public PortOneDto.PaymentSnapshot getPayment(String paymentId) {

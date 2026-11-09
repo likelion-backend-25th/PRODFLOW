@@ -12,6 +12,8 @@ import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductRepository;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
+import net.likelion.bebc25.prodflow.payment.service.PaymentService;
 import net.likelion.bebc25.prodflow.shipment.dto.ShipmentDto;
 import net.likelion.bebc25.prodflow.shipment.entity.Carrier;
 import net.likelion.bebc25.prodflow.shipment.entity.Shipment;
@@ -23,11 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -48,6 +46,7 @@ public class ShipmentService {
     private final CommonCodeRepository commonCodeRepository;
     private final StatusHistoryRepository statusHistoryRepository;
     private final UserRepository userRepository;
+    private final PaymentService paymentService;
 
     // 배송 관리 화면용 목록. 탭별로 수주를 모으고 상단 건수도 같이 내려준다.
     public ShipmentDto.ListResponse findList(String tab) {
@@ -135,6 +134,7 @@ public class ShipmentService {
                 shipping.getCode(),
                 user
         ));
+        paymentService.prepareAndScheduleIssue(order, PaymentType.BALANCE);
         return ShipmentDto.Response.from(shipment, order);
     }
 

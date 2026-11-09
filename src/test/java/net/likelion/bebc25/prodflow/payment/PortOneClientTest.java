@@ -27,21 +27,33 @@ public class PortOneClientTest {
     @Autowired
     private CustomerOrderRepository customerOrderRepository;
 
-    @Disabled
+    @Disabled("실제 PortOne API 호출 테스트")
     @Test
     @DisplayName("수주와 거래처 정보로 신한은행 가상계좌를 발급한다")
     void issueInstantPayment() {
         // given
         PortOneDto.IssueRequest request = createIssueRequest();
 
-        // when: 실제 PortOne API를 호출한다. 외부 발급 결과는 @Transactional로 롤백되지 않는다.
-        PortOneDto.IssueResponse response = portOneClient.issueInstantPayment(request);
+        // when: PortOne 가상계좌 발급 요청
+        portOneClient.issueInstantPayment(request);
 
-        System.out.println(response.pgTxId());
+        // 발급된 결제 정보 재조회
+        PortOneDto.PaymentSnapshot snapshot =
+                portOneClient.getPayment(request.paymentId());
 
-        // then: 가상계좌 발급은 입금 전이므로 paidAt은 검증하지 않는다.
-        assertThat(response).isNotNull();
-        assertThat(response.pgTxId()).isNotBlank();
+        // then
+        assertThat(snapshot).isNotNull();
+        assertThat(snapshot.id()).isEqualTo(request.paymentId());
+
+        // 가상계좌 정보 확인
+        assertThat(snapshot.method()).isNotNull();
+        assertThat(snapshot.method().bank()).isNotBlank();
+        assertThat(snapshot.method().accountNumber()).isNotBlank();
+
+        // 발급 결과 출력
+        System.out.println("결제 ID: " + snapshot.id());
+        System.out.println("은행: " + snapshot.method().bank());
+        System.out.println("계좌번호: " + snapshot.method().accountNumber());
     }
 
     @Disabled

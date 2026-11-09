@@ -3,7 +3,6 @@ package net.likelion.bebc25.prodflow.payment.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.ToString;
 
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 
 @ToString
@@ -45,21 +44,37 @@ public class PortOneDto {
     ) {
     }
 
-    public record IssueResponse(
-            String pgTxId,
-            String paidAt
-    ) {
+    // PortOne V2 POST /payments/{id}/instant 응답은 payment 객체로 감싸져 있다.
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record IssueResponse(IssueSummary payment) {
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public record IssueSummary(String pgTxId, OffsetDateTime paidAt) {
+        }
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record CloseVirtualAccountResponse(OffsetDateTime closedAt) {
+    }
+
+    // API 응답값을 엔티티에 바로 넣기 전에 정규화하는 내부 DTO.
     public record IssueResult(
             String paymentId,
             String bankCode,
             String accountNumber,
             String accountName,
-            LocalDateTime expiresAt
+            OffsetDateTime expiresAt
     ) {
+        public static IssueResult from(PaymentSnapshot snapshot) {
+            if (snapshot == null || snapshot.method() == null) {
+                throw new IllegalStateException("PortOne 가상계좌 상세 정보가 없습니다.");
+            }
+            return new IssueResult(snapshot.id(), snapshot.method().bank(),
+                    snapshot.method().accountNumber(), snapshot.method().remitteeName(),
+                    snapshot.method().expiredAt());
+        }
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record PaymentSnapshot(
             String id,
             String pgTxId,
@@ -85,12 +100,13 @@ public class PortOneDto {
                 String type,
                 String bank,
                 String accountNumber,
+                String remitteeName,
                 OffsetDateTime expiredAt
         ) {
         }
 
         @JsonIgnoreProperties(ignoreUnknown = true)
-        public record Customer(String name) {
+        public record Customer(Object name) {
         }
 
         @JsonIgnoreProperties(ignoreUnknown = true)
@@ -98,6 +114,7 @@ public class PortOneDto {
         }
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record Webhook(
             String type,
             Data data
