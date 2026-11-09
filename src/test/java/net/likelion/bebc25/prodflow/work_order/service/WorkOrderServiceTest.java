@@ -552,6 +552,59 @@ class WorkOrderServiceTest {
     }
 
     @Test
+    @DisplayName("작업지시의 생산·보류·재개·중지·포장 처리로 바뀐 수주 상태를 이력으로 남긴다")
+    void recordOrderHistoryThroughoutWorkProgress() {
+        WorkOrder work = workOrderRepository.findById(15L).orElseThrow();
+        Line line = lineRepository.save(new Line("수주이력-생산라인", 1000));
+        work.changeLine(line);
+        ReflectionTestUtils.setField(work, "plannedStartDate", LocalDate.now());
+        Long orderId = work.getOrderProduct().getCustomerOrder().getId();
+
+        var existingHistoryIds = statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(
+                HistoryEntityType.ORDER, orderId).stream().map(history -> history.getId()).toList();
+
+        for (String status : List.of("PRODUCE", "SUSPEND", "PRODUCE", "HALT", "PREPARE", "PRODUCE", "PACK", "PACK_DONE")) {
+            workOrderService.changeStatus(work.getId(), new UpdateStatusRequest(status, null), 1L);
+        }
+        em.flush();
+        em.clear();
+
+        var histories = statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(
+                HistoryEntityType.ORDER, orderId).stream()
+                .filter(history -> !existingHistoryIds.contains(history.getId())).toList();
+        assertThat(histories).extracting(history -> history.getFromStatus()).containsExactly(
+                "IN_PRODUCTION", "CONFIRMED", "IN_PRODUCTION", "ON_HOLD", "IN_PRODUCTION", "CONFIRMED");
+        assertThat(histories).extracting(history -> history.getToStatus()).containsExactly(
+                "PACKING", "IN_PRODUCTION", "CONFIRMED", "IN_PRODUCTION", "ON_HOLD", "IN_PRODUCTION");
+        assertThat(histories).allSatisfy(history -> {
+            assertThat(history.getUser().getId()).isEqualTo(1L);
+            assertThat(history.getUserName()).isEqualTo("서도윤");
+            assertThat(history.getNote()).contains(work.getWorkNo());
+        });
+    }
+
+    @Test
+    @DisplayName("같은 수주의 다른 작업이 생산을 시작해도 수주가 이미 생산중이면 이력을 중복 저장하지 않는다")
+    void skipOrderHistoryWhenAnotherWorkStarts() {
+        Line line = lineRepository.save(new Line("수주이력-추가라인", 1000));
+        LocalDate day = firstOpenWeekday();
+        Long workId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        WorkOrder work = workOrderRepository.findById(workId).orElseThrow();
+        ReflectionTestUtils.setField(work, "plannedStartDate", LocalDate.now());
+        work.getOrderProduct().getCustomerOrder().changeProgress(em.find(CommonCode.class, 8L));
+        Long orderId = work.getOrderProduct().getCustomerOrder().getId();
+        long count = statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(
+                HistoryEntityType.ORDER, orderId).size();
+
+        workOrderService.changeStatus(workId, new UpdateStatusRequest("PRODUCE", null), 1L);
+
+        assertThat(statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(
+                HistoryEntityType.ORDER, orderId)).hasSize((int) count);
+        assertThat(statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(
+                HistoryEntityType.WORK_ORDER, workId)).singleElement();
+    }
+
+    @Test
     @DisplayName("생산을 중지했다가 준비로 돌아와도 줄어든 생산능력보다 큰 계획은 다시 시작할 수 없다")
     void rejectProduceWhenPlanExceedsReducedCapacity() {
         Line line = lineRepository.save(new Line("생산시작-용량", 1000));

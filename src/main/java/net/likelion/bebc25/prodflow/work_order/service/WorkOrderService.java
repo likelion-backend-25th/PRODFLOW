@@ -12,6 +12,7 @@ import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductRepository;
+import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderProgressService;
 import net.likelion.bebc25.prodflow.holiday.entity.Holiday;
 import net.likelion.bebc25.prodflow.holiday.repository.HolidayRepository;
 import net.likelion.bebc25.prodflow.line.entity.Line;
@@ -80,6 +81,7 @@ public class WorkOrderService {
     private final WorkOrderHistoryRepository workOrderHistoryRepository;
     private final ProductionPlanRescheduleService productionPlanRescheduleService;
     private final QuotationScheduleRepository quotationScheduleRepository;
+    private final CustomerOrderProgressService customerOrderProgressService;
 
     // 계약금 확인 시 등록 순서로 미시작 물량을 재배치한다. 생산 이력이 있는 작업은 수정하지 않는다.
     @Transactional
@@ -734,8 +736,8 @@ public class WorkOrderService {
         switch (afterCode.getCode()) {
             case "PRODUCE" -> startProduction(workOrder, user);
             case "SUSPEND" -> changeOrder(
-                    workOrder, otherProduceRemains(workOrder) ? "IN_PRODUCTION" : "ON_HOLD");
-            case "HALT" -> haltWork(workOrder);
+                    workOrder, otherProduceRemains(workOrder) ? "IN_PRODUCTION" : "ON_HOLD", user);
+            case "HALT" -> haltWork(workOrder, user);
             case "PACK" -> finishProduction(workOrder, user);
             case "PACK_DONE" -> {
             }
@@ -779,15 +781,15 @@ public class WorkOrderService {
             }
         }
         changeLineStatus(workOrder.getLine(), LineStatus.OPERATING, user);
-        changeOrder(workOrder, "IN_PRODUCTION");
+        changeOrder(workOrder, "IN_PRODUCTION", user);
     }
 
     // 생산 중지. 수주가 취소면 생산대기로 되돌리지 않는다.
-    private void haltWork(WorkOrder workOrder) {
+    private void haltWork(WorkOrder workOrder, User user) {
         if ("CANCELLED".equals(orderStatus(workOrder))) {
             return;
         }
-        changeOrder(workOrder, "CONFIRMED");
+        changeOrder(workOrder, "CONFIRMED", user);
     }
 
     // 수주 진행 상태는 ORDER_STATUS 그룹의 코드다.
@@ -806,7 +808,7 @@ public class WorkOrderService {
         boolean packingRemains = workOrderRepository
                 .existsByOrderProduct_CustomerOrder_IdAndCommonCode_CodeNotInAndIdNot(
                         customerOrderId, List.of("PACK", "PACK_DONE"), workOrder.getId());
-        changeOrder(workOrder, packingRemains ? "IN_PRODUCTION" : "PACKING");
+        changeOrder(workOrder, packingRemains ? "IN_PRODUCTION" : "PACKING", user);
     }
 
     // 이 작업을 빼도 같은 수주에 생산 중인 작업이 있는지
@@ -837,12 +839,10 @@ public class WorkOrderService {
         return line.getProductionCapacity() - (int) occupied;
     }
 
-    // 수주 진행 상태를 ORDER_STATUS 코드로 바꾼다.
-    private void changeOrder(WorkOrder workOrder, String orderStatus) {
-        CommonCode orderCode = commonCodeRepository
-                .findByCodeGroup_GroupCodeAndCodeAndStatus("ORDER_STATUS", orderStatus, CodeStatus.ACTIVE)
-                .orElseThrow(() -> new IllegalArgumentException("수주 상태 코드를 찾을 수 없습니다."));
-        workOrder.getOrderProduct().getCustomerOrder().changeProgress(orderCode);
+    // 수주 도메인이 상태 변경과 이력 저장을 담당한다.
+    private void changeOrder(WorkOrder workOrder, String orderStatus, User actor) {
+        customerOrderProgressService.changeProgress(workOrder.getOrderProduct().getCustomerOrder(),
+                orderStatus, actor, "작업지시 " + workOrder.getWorkNo() + " 처리에 따른 수주 진행 상태 변경");
     }
 
     // 저장 전 하루 계획. 날짜와 수량을 한 건으로 둔다.
