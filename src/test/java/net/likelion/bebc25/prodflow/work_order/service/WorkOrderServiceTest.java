@@ -25,6 +25,8 @@ import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
 import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.access.AccessDeniedException;
@@ -550,6 +552,59 @@ class WorkOrderServiceTest {
     }
 
     @Test
+    @DisplayName("작업지시의 생산·보류·재개·중지·포장 처리로 바뀐 수주 상태를 이력으로 남긴다")
+    void recordOrderHistoryThroughoutWorkProgress() {
+        WorkOrder work = workOrderRepository.findById(15L).orElseThrow();
+        Line line = lineRepository.save(new Line("수주이력-생산라인", 1000));
+        work.changeLine(line);
+        ReflectionTestUtils.setField(work, "plannedStartDate", LocalDate.now());
+        Long orderId = work.getOrderProduct().getCustomerOrder().getId();
+
+        var existingHistoryIds = statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(
+                HistoryEntityType.ORDER, orderId).stream().map(history -> history.getId()).toList();
+
+        for (String status : List.of("PRODUCE", "SUSPEND", "PRODUCE", "HALT", "PREPARE", "PRODUCE", "PACK", "PACK_DONE")) {
+            workOrderService.changeStatus(work.getId(), new UpdateStatusRequest(status, null), 1L);
+        }
+        em.flush();
+        em.clear();
+
+        var histories = statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(
+                HistoryEntityType.ORDER, orderId).stream()
+                .filter(history -> !existingHistoryIds.contains(history.getId())).toList();
+        assertThat(histories).extracting(history -> history.getFromStatus()).containsExactly(
+                "IN_PRODUCTION", "CONFIRMED", "IN_PRODUCTION", "ON_HOLD", "IN_PRODUCTION", "CONFIRMED");
+        assertThat(histories).extracting(history -> history.getToStatus()).containsExactly(
+                "PACKING", "IN_PRODUCTION", "CONFIRMED", "IN_PRODUCTION", "ON_HOLD", "IN_PRODUCTION");
+        assertThat(histories).allSatisfy(history -> {
+            assertThat(history.getUser().getId()).isEqualTo(1L);
+            assertThat(history.getUserName()).isEqualTo("서도윤");
+            assertThat(history.getNote()).contains(work.getWorkNo());
+        });
+    }
+
+    @Test
+    @DisplayName("같은 수주의 다른 작업이 생산을 시작해도 수주가 이미 생산중이면 이력을 중복 저장하지 않는다")
+    void skipOrderHistoryWhenAnotherWorkStarts() {
+        Line line = lineRepository.save(new Line("수주이력-추가라인", 1000));
+        LocalDate day = firstOpenWeekday();
+        Long workId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        WorkOrder work = workOrderRepository.findById(workId).orElseThrow();
+        ReflectionTestUtils.setField(work, "plannedStartDate", LocalDate.now());
+        work.getOrderProduct().getCustomerOrder().changeProgress(em.find(CommonCode.class, 8L));
+        Long orderId = work.getOrderProduct().getCustomerOrder().getId();
+        long count = statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(
+                HistoryEntityType.ORDER, orderId).size();
+
+        workOrderService.changeStatus(workId, new UpdateStatusRequest("PRODUCE", null), 1L);
+
+        assertThat(statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(
+                HistoryEntityType.ORDER, orderId)).hasSize((int) count);
+        assertThat(statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(
+                HistoryEntityType.WORK_ORDER, workId)).singleElement();
+    }
+
+    @Test
     @DisplayName("생산을 중지했다가 준비로 돌아와도 줄어든 생산능력보다 큰 계획은 다시 시작할 수 없다")
     void rejectProduceWhenPlanExceedsReducedCapacity() {
         Line line = lineRepository.save(new Line("생산시작-용량", 1000));
@@ -571,6 +626,60 @@ class WorkOrderServiceTest {
                 .hasMessage("라인의 생산능력을 초과하여 생산을 시작할 수 없습니다.");
         assertThat(workOrder.getCommonCode().getCode()).isEqualTo("PREPARE");
         assertThat(line.getProductionCapacity()).isEqualTo(40);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "PREPARE, BROKEN, 고장 상태인 라인에서는 생산을 시작하거나 재개할 수 없습니다.",
+            "PREPARE, INSPECTION, 점검 중인 라인에서는 생산을 시작하거나 재개할 수 없습니다.",
+            "SUSPEND, BROKEN, 고장 상태인 라인에서는 생산을 시작하거나 재개할 수 없습니다.",
+            "SUSPEND, INSPECTION, 점검 중인 라인에서는 생산을 시작하거나 재개할 수 없습니다."
+    })
+    @DisplayName("고장·점검 라인에서는 생산 시작과 재개를 거절하고 상태와 이력을 유지한다")
+    void rejectProduceOnUnavailableLine(String workStatus, LineStatus lineStatus, String message) {
+        Line line = lineRepository.save(new Line("생산시작-상태검증", 1000));
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
+        ReflectionTestUtils.setField(workOrder, "plannedStartDate", LocalDate.now());
+        if ("SUSPEND".equals(workStatus)) {
+            workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L);
+            workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("SUSPEND", null), 1L);
+        }
+        line.changeStatus(lineStatus);
+        String orderStatus = workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode();
+        long historyCount = statusHistoryRepository.count();
+
+        assertThatThrownBy(() -> workOrderService.changeStatus(
+                workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage(message);
+
+        assertThat(workOrder.getCommonCode().getCode()).isEqualTo(workStatus);
+        assertThat(line.getStatus()).isEqualTo(lineStatus);
+        assertThat(workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode()).isEqualTo(orderStatus);
+        assertThat(statusHistoryRepository.count()).isEqualTo(historyCount);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"PREPARE, AVAILABLE", "PREPARE, OPERATING", "SUSPEND, OPERATING"})
+    @DisplayName("정상 라인에서는 생산 시작과 재개를 허용한다")
+    void produceOnUsableLine(String workStatus, LineStatus lineStatus) {
+        Line line = lineRepository.save(new Line("생산시작-정상라인", 1000));
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
+        ReflectionTestUtils.setField(workOrder, "plannedStartDate", LocalDate.now());
+        if ("SUSPEND".equals(workStatus)) {
+            workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L);
+            workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("SUSPEND", null), 1L);
+        }
+        line.changeStatus(lineStatus);
+
+        workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L);
+
+        assertThat(workOrder.getCommonCode().getCode()).isEqualTo("PRODUCE");
+        assertThat(line.getStatus()).isEqualTo(LineStatus.OPERATING);
+        assertThat(workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode()).isEqualTo("IN_PRODUCTION");
     }
 
     @Test

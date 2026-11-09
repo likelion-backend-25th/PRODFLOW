@@ -19,8 +19,8 @@ public class WorkOrderHistoryDto {
             return new Response(
                     history.getPreviousLine().getLineName(),
                     history.getNewLine().getLineName(),
-                    history.getPreviousUser().getName(),
-                    history.getNewUser().getName(),
+                    history.getPreviousUser() == null ? null : history.getPreviousUser().getName(),
+                    history.getNewUser() == null ? null : history.getNewUser().getName(),
                     history.getChangedBy().getName()
             );
         }
