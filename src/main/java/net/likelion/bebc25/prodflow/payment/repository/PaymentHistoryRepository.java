@@ -18,11 +18,9 @@ public interface PaymentHistoryRepository
     // 여러 결제건의 입금내역 일괄 조회
     List<PaymentHistory> findByPayment_IdIn(
             Collection<Long> paymentIds
-    );
-import java.util.List;
 
-public interface PaymentHistoryRepository extends JpaRepository<PaymentHistory, Long> {
     boolean existsByPayment_Id(Long paymentId);
     // 선택한 수주 결제에 연결된 입금 내역 조회
     List<PaymentHistory> findByPayment_Order_Id(Long orderId);
+    );    
 }
