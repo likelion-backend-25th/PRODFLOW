@@ -65,3 +65,7 @@ jobs:
 
           #HOLIDAY_INITIALIZATION_ENABLED: "false"
           SHIPMENT_TRACKING_REFRESH_ENABLED: "false"
+
+          # AI API 인증키
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
