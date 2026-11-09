@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class ProductService {
 
@@ -119,6 +119,7 @@ public class ProductService {
         return responses;
     }
 
+    @Transactional
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public Response updateStatus(Long id, ProductDto.UpdateStatusRequest request) {
         Optional<Product> optionalProduct = productRepository.findById(id);
@@ -133,6 +134,7 @@ public class ProductService {
 
     }
 
+    @Transactional
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ORDER_MANAGER')")
     public Response update(Long id, ProductDto.UpdateRequest request) {
         Optional<Product> optionalProduct = productRepository.findById(id);
@@ -161,7 +163,6 @@ public class ProductService {
         return Response.from(product);
     }
 
-    @Transactional(readOnly = true)
     public ProductDto.ModelCodeExistsResponse checkModelCodeExists(String modelCode) {
         if (modelCode == null || modelCode.isBlank()) {
             throw new IllegalArgumentException("모델코드는 필수입니다.");
@@ -171,7 +172,6 @@ public class ProductService {
         return new ProductDto.ModelCodeExistsResponse(trimmed, !exists);
     }
 
-    @Transactional(readOnly = true)
     public List<OrderHistoryResponse> getOrderHistories(Long productId, int size) {
         if (!productRepository.existsById(productId)) {
             throw new EntityNotFoundException("품목을 찾을 수 없습니다: id=" + productId);
