@@ -221,20 +221,20 @@ class LineBreakRescheduleTest {
         }
 
         @Test
-        @DisplayName("생산 작업도 다른 라인으로 옮기고 받는 라인은 가동 중이 된다")
-        void moveProducingWork() {
+        @DisplayName("생산 작업은 고장 라인에 남고 받는 라인은 가동 중으로 바뀌지 않는다")
+        void keepProducingWorkOnBrokenLine() {
             lineService.changeStatus(sourceId, new UpdateStatusRequest(LineStatus.BROKEN), ACTOR_ID);
             em.flush();
             em.clear();
 
-            WorkOrder moved = workOrderRepository.findById(workOrderId).orElseThrow();
-            assertThat(moved.getLine().getId()).isEqualTo(receiverId);
-            assertThat(moved.getCommonCode().getCode()).isEqualTo("PRODUCE");
-            assertThat(moved.getQuantity()).isEqualTo(100);
+            WorkOrder stayed = workOrderRepository.findById(workOrderId).orElseThrow();
+            assertThat(stayed.getLine().getId()).isEqualTo(sourceId);
+            assertThat(stayed.getCommonCode().getCode()).isEqualTo("PRODUCE");
+            assertThat(stayed.getQuantity()).isEqualTo(100);
             assertThat(lineRepository.findById(sourceId).orElseThrow().getStatus()).isEqualTo(LineStatus.BROKEN);
-            assertThat(lineRepository.findById(receiverId).orElseThrow().getStatus()).isEqualTo(LineStatus.OPERATING);
-            assertThat(productionPlanRepository.sumQuantityByLineAndDate(sourceId, PRODUCE_DAY)).isZero();
-            assertThat(productionPlanRepository.sumQuantityByLineAndDate(receiverId, PRODUCE_DAY)).isEqualTo(100);
+            assertThat(lineRepository.findById(receiverId).orElseThrow().getStatus()).isEqualTo(LineStatus.AVAILABLE);
+            assertThat(productionPlanRepository.sumQuantityByLineAndDate(sourceId, PRODUCE_DAY)).isEqualTo(100);
+            assertThat(productionPlanRepository.sumQuantityByLineAndDate(receiverId, PRODUCE_DAY)).isZero();
         }
     }
 

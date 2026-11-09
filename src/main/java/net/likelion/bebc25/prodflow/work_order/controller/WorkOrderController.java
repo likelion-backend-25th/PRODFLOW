@@ -118,7 +118,7 @@ public class WorkOrderController {
 
     @Operation(
             summary = "작업지시서 수정",
-            description = "작업지시서의 배정 생산 라인과 담당자를 변경한다. 라인 또는 담당자 중 변경할 항목만 전달할 수 있으며, 두 항목 모두 변경할 수도 있다."
+            description = "작업지시서의 배정 생산 라인과 담당자를 변경한다. 라인 또는 담당자 중 변경할 항목만 전달할 수 있으며, 두 항목 모두 변경할 수도 있다. 생산·일시정지 작업은 라인을 바꾸지 않는다."
     )
     @ApiResponse(
             responseCode = "200",

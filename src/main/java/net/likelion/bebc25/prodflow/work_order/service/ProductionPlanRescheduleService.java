@@ -39,8 +39,9 @@ import java.util.Map;
 import java.util.Set;
 
 // 점검에서는 준비 작업만 다른 라인으로 옮긴다. 생산이 있으면 점검으로 바꾸지 않는다.
-// 고장에서는 준비와 생산·일시정지를 다른 라인으로 옮긴다.
-// 옮길 라인이 없어도 고장 처리는 되고, 그 작업지시는 고장 라인에 남는다.
+// 고장에서도 아직 시작하지 않은 준비 작업만 다른 라인으로 옮긴다.
+// 생산·일시정지는 배정과 계획을 그 라인에 남긴다. 다른 라인에서 이어 할지는 수동이다.
+// 옮길 라인이 없어도 고장 처리는 되고, 못 옮긴 준비 작업은 고장 라인에 남는다.
 // 가동 가능으로 돌아올 때는 작업지시를 옮기지 않는다.
 // 그 라인으로 작업지시를 직접 옮길 때만, 앞날이 비어 있으면 밀린 일정을 당긴다.
 // 다른 라인으로의 일반 변경은 기존 날짜가 들어가는지만 본다.
@@ -128,32 +129,16 @@ public class ProductionPlanRescheduleService {
         placeCleared(locked, line, targets, null, true, actor, reason, "재배치할 생산 가능량이 없습니다.", false);
     }
 
-    // 고장은 준비뿐 아니라 생산·일시정지도 다른 라인으로 옮긴다.
-    // 점검은 생산이 남아 있으면 상태를 바꾸지 않는다.
+    // 고장은 준비 작업만 다른 라인으로 옮긴다. 생산·일시정지는 건드리지 않는다.
+    // 자리가 없는 준비 작업은 고장 라인에 남기므로 고장 처리 자체는 거절되지 않는다.
     @Transactional
     public void rescheduleBroken(Line line, LocalDate fromDate, User actor, String reason) {
         List<Line> locked = lineRepository.findAllForUpdate();
-        List<ProductionPlan> targets = productionPlanRepository.findBrokenTargets(line.getId(), fromDate);
-        if (!targets.isEmpty()) {
-            // 자리가 없는 작업은 고장 라인에 남긴다. 그래서 고장 처리가 거절되지 않는다.
-            placeCleared(locked, line, targets, null, true, actor, reason, "재배치할 생산 가능량이 없습니다.", true);
+        List<ProductionPlan> targets = productionPlanRepository.findRescheduleTargets(line.getId(), fromDate);
+        if (targets.isEmpty()) {
+            return;
         }
-        workOrderRepository.flush();
-        // 오늘 이후 계획이 없는 생산·일시정지도 가능하면 다른 라인으로 옮긴다.
-        for (WorkOrder workOrder : workOrderRepository.findByLine_IdAndCommonCode_CodeIn(
-                line.getId(), List.of("PRODUCE", "SUSPEND"))) {
-            if ("CANCELLED".equals(workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode())) {
-                continue;
-            }
-            Line destination = lineForInProgress(locked, line, workOrder);
-            // 받을 라인이 없으면 그 작업은 남겨 두고 고장 처리는 계속한다.
-            if (destination == null) {
-                continue;
-            }
-            moveLine(new Context(actor, reason, Set.of(), "재배치할 생산 가능량이 없습니다.",
-                    workOrderRepository.count() + 1, line.getId(), null), workOrder, destination);
-            markOperating(actor, destination);
-        }
+        placeCleared(locked, line, targets, null, true, actor, reason, "재배치할 생산 가능량이 없습니다.", true);
     }
 
     // 복구 라인으로 직접 옮길 때, 원래 시작일부터 현재 시작일 전이 비어 있으면 일정을 당긴다.
@@ -536,7 +521,8 @@ public class ProductionPlanRescheduleService {
         WorkOrder workOrder = job.workOrder;
         List<ProductionPlan> remaining = productionPlanRepository.findByWorkOrder_Id(workOrder.getId());
         boolean sameLine = job.destination.getId().equals(workOrder.getLine().getId());
-        // 생산·일시정지는 지난 계획이 있어도 작업지시 행을 고장 라인에 남기지 않는다.
+        // 생산·일시정지가 대상에 들어와도 지난 계획이 있으면 같은 장을 통째로 옮긴다.
+        // 고장 재배치는 이 상태를 대상에 넣지 않는다.
         boolean inProgress = "PRODUCE".equals(job.statusCode) || "SUSPEND".equals(job.statusCode);
         if (remaining.isEmpty() || sameLine || inProgress) {
             if (!sameLine) {
@@ -579,24 +565,6 @@ public class ProductionPlanRescheduleService {
         }
         return !workOrderRepository.existsByLine_IdAndCommonCode_CodeAndIdNot(
                 line.getId(), "PRODUCE", workOrder.getId());
-    }
-
-    // 미래 계획이 없는 생산·일시정지를 받을 가동 라인이다.
-    private Line lineForInProgress(List<Line> locked, Line source, WorkOrder workOrder) {
-        boolean produce = "PRODUCE".equals(workOrder.getCommonCode().getCode());
-        for (Line candidate : locked) {
-            if (candidate.getId().equals(source.getId())) {
-                continue;
-            }
-            if (candidate.getStatus() != LineStatus.AVAILABLE && candidate.getStatus() != LineStatus.OPERATING) {
-                continue;
-            }
-            if (produce && !canHostProduce(Set.of(), candidate, workOrder)) {
-                continue;
-            }
-            return candidate;
-        }
-        return null;
     }
 
     // 생산·일시정지가 옮겨 가면 받는 라인은 가동 중이 된다.
