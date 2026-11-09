@@ -40,12 +40,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @Transactional(readOnly = true)
@@ -104,8 +99,14 @@ public class PaymentService {
             }
         } else {
             // 외부 결제는 생성하지 않는다. NOT NULL인 내부 결제 식별값만 부여한다.
-            payment = paymentRepository.save(Payment.builder().order(order).paymentType(PaymentType.DEPOSIT)
-                    .amount(depositAmount).portonePaymentId("MANUAL-" + UUID.randomUUID()).createdBy(actor.getName()).build());
+            payment = paymentRepository.save(
+                    Payment.builder()
+                            .order(order)
+                            .paymentType(PaymentType.DEPOSIT)
+                            .amount(depositAmount)
+                            .portonePaymentId("MANUAL-" + UUID.randomUUID())
+                            .build()
+            );
         }
         CommonCode confirmed = commonCodeRepository.findByCodeGroup_GroupCodeAndCodeAndStatus(
                         "ORDER_STATUS", "CONFIRMED", CodeStatus.ACTIVE)
