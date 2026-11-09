@@ -1,15 +1,13 @@
 package net.likelion.bebc25.prodflow.payment.repository;
 
+import jakarta.persistence.LockModeType;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
@@ -36,18 +34,26 @@ public interface PaymentRepository extends
             String portonePaymentId
     );
 
+    // PortOne 결제 ID 존재 여부 확인
+    boolean existsByPortonePaymentId(
+            String portonePaymentId
+    );
+
     // 수주 상세에 표시할 결제 목록 조회
     List<Payment> findByOrder_IdOrderByIdAsc(Long orderId);
 
     // 검색 + 페이징 시 수주와 거래처 함께 조회
     @Override
-    @EntityGraph(attributePaths = {"order", "order.client"})
+    @EntityGraph(attributePaths = {
+            "order",
+            "order.client"
+    })
     Page<Payment> findAll(
             Specification<Payment> spec,
             Pageable pageable
     );
 
-    // 결제 상세 조회 시 수주와 거래처 함께 조회
+    // 결제 상세 조회 시 수주와 거래처, 수주 상태 함께 조회
     @Override
     @EntityGraph(attributePaths = {
             "order",
@@ -55,6 +61,17 @@ public interface PaymentRepository extends
             "order.statusCode"
     })
     Optional<Payment> findById(Long id);
+
+    // 동시성 제어를 위한 비관적 쓰기 락 조회
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT p
+            FROM Payment p
+            WHERE p.id = :id
+            """)
+    Optional<Payment> getForUpdate(
+            @Param("id") Long id
+    );
 
     // 취소되지 않은 전체 수주 금액
     // 아직 생성되지 않은 잔금도 포함

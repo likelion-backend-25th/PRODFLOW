@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
+import net.likelion.bebc25.prodflow.payment.enums.Bank;
 import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,8 +56,11 @@ class PaymentRepositoryTest {
     void findLatestAccountsByOrderId() {
         Payment deposit = paymentRepository.findById(7L).orElseThrow();
         VirtualAccount latest = virtualAccountRepository.save(VirtualAccount.builder().payment(deposit)
-                .bankCode("004").accountNumber("NEWEST-ACCOUNT").accountName("재발급 계좌")
-                .expiresAt(LocalDateTime.of(2027, 1, 1, 0, 0)).build());
+                .bank(Bank.SHINHAN).accountNumber("NEWEST-ACCOUNT").accountName("재발급 계좌")
+                .expiresAt(OffsetDateTime.of(
+                        LocalDateTime.of(2027, 1, 1, 0, 0),
+                        ZoneOffset.of("+09:00")
+                )).build());
         latest.cancel();
         em.flush();
         em.clear();

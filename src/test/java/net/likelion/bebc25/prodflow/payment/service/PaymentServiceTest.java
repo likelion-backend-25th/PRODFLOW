@@ -10,6 +10,7 @@ import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
+import net.likelion.bebc25.prodflow.payment.enums.Bank;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentMethod;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
 import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
@@ -29,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,7 +118,8 @@ class PaymentServiceTest {
         assertThat(payment.virtualAccount().accountNumber()).isEqualTo("LATEST-ACCOUNT");
         assertThat(payment.paymentHistory().paymentHistoryId()).isEqualTo(history.getId());
         assertThat(payment.paymentHistory().virtualAccountId()).isEqualTo(oldAccount.getId());
-        assertThat(payment.paymentHistory().receivedAt()).isEqualTo(LocalDateTime.of(2026, 11, 6, 10, 0));
+        assertThat(payment.paymentHistory().paidAt())
+                .isEqualTo(OffsetDateTime.parse("2026-11-06T10:00:00+09:00"));
     }
 
     @Test
@@ -202,12 +206,15 @@ class PaymentServiceTest {
     }
 
     private VirtualAccount saveAccount(Payment payment, String accountNumber) {
-        return virtualAccountRepository.save(VirtualAccount.builder().payment(payment).bankCode("004")
-                .accountNumber(accountNumber).accountName("테스트 계좌").expiresAt(LocalDateTime.of(2027, 1, 1, 0, 0)).build());
+        return virtualAccountRepository.save(VirtualAccount.builder().payment(payment).bank(Bank.SHINHAN)
+                .accountNumber(accountNumber).accountName("테스트 계좌")
+                .expiresAt(OffsetDateTime.of(LocalDateTime.of(2027, 1, 1, 0, 0),
+                        ZoneOffset.of("+09:00"))).build());
     }
 
     private PaymentHistory saveHistory(Payment payment, VirtualAccount account) {
         return paymentHistoryRepository.save(PaymentHistory.builder().payment(payment).virtualAccount(account)
-                .receivedAt(LocalDateTime.of(2026, 11, 6, 10, 0)).build());
+                .paidAt(OffsetDateTime.of(LocalDateTime.of(2026, 11, 6, 10, 0),
+                        ZoneOffset.of("+09:00"))).build());
     }
 }

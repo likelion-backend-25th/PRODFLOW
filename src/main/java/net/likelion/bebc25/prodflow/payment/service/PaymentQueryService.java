@@ -10,6 +10,7 @@ import net.likelion.bebc25.prodflow.payment.dto.VirtualAccountDto;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
+import net.likelion.bebc25.prodflow.payment.enums.Bank;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
 import net.likelion.bebc25.prodflow.payment.repository.PaymentHistoryRepository;
 import net.likelion.bebc25.prodflow.payment.repository.PaymentRepository;
@@ -23,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -30,11 +33,14 @@ import java.util.*;
 @Transactional(readOnly = true)
 public class PaymentQueryService {
 
+    private static final ZoneId KOREA_ZONE =
+            ZoneId.of("Asia/Seoul");
+
     private final PaymentRepository paymentRepository;
     private final VirtualAccountRepository virtualAccountRepository;
     private final PaymentHistoryRepository paymentHistoryRepository;
 
-    //  입금관리 통계 조회
+    // 입금관리 통계 조회
     public PaymentDto.SummaryResponse getSummary() {
 
         // 취소되지 않은 수주의 총액 (미발급 잔금 포함)
@@ -67,6 +73,13 @@ public class PaymentQueryService {
             Pageable pageable
     ) {
 
+        if (condition == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "검색 조건을 입력해 주세요."
+            );
+        }
+
         // 조회 기간 유효성 검사
         if (condition.startDate() != null
                 && condition.endDate() != null
@@ -78,7 +91,7 @@ public class PaymentQueryService {
             );
         }
 
-        // Spring Data JPA가 검색, 페이징, COUNT 처리
+        // 검색, 페이징 및 COUNT 처리
         Page<Payment> paymentPage = paymentRepository.findAll(
                 searchSpec(condition),
                 pageable
@@ -100,6 +113,7 @@ public class PaymentQueryService {
                 virtualAccountRepository
                         .findByPayment_IdInOrderByIdDesc(paymentIds);
 
+        // 각 결제에서 가장 최근 가상계좌만 사용
         Map<Long, VirtualAccount> accountMap = new HashMap<>();
 
         for (VirtualAccount account : accounts) {
@@ -122,7 +136,7 @@ public class PaymentQueryService {
             );
         }
 
-        // DTO 변환: 페이지 정보는 그대로 유지
+        // 페이지 정보는 그대로 유지하고 DTO만 변환
         return paymentPage.map(payment ->
                 toListResponse(
                         payment,
@@ -132,23 +146,25 @@ public class PaymentQueryService {
         );
     }
 
-    //  입금 상세 조회
-    public PaymentDto.DetailResponse getPaymentDetail(
-            Long paymentId
-    ) {
+    // 입금 상세 조회
+    public PaymentDto.DetailResponse getPaymentDetail(Long paymentId) {
 
         Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "결제건을 찾을 수 없습니다."
-                ));
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "결제건을 찾을 수 없습니다."
+                        )
+                );
 
         CustomerOrder order = payment.getOrder();
 
+        // 가장 최근 발급된 가상계좌 조회
         VirtualAccount account = virtualAccountRepository
                 .findFirstByPayment_IdOrderByIdDesc(paymentId)
                 .orElse(null);
 
+        // 실제 입금 내역 조회
         PaymentHistory history = paymentHistoryRepository
                 .findByPayment_Id(paymentId)
                 .orElse(null);
@@ -162,7 +178,7 @@ public class PaymentQueryService {
                 order.getStatusCode().getCode()
         );
 
-        // 결제건 정보
+        // 결제 정보
         PaymentDto.PaymentInfo paymentInfo = new PaymentDto.PaymentInfo(
                 payment.getId(),
                 payment.getPaymentType(),
@@ -178,7 +194,7 @@ public class PaymentQueryService {
                         ? null
                         : VirtualAccountDto.Response.from(account);
 
-        // 실제 입금내역
+        // 입금내역 정보
         PaymentHistoryDto.Response historyInfo =
                 history == null
                         ? null
@@ -193,8 +209,6 @@ public class PaymentQueryService {
     }
 
     // 목록 검색 조건
-    // 별도 PaymentSpecification 클래스를 만들지 않고
-    // Service 내부에서 Specification 생성
     private Specification<Payment> searchSpec(
             PaymentDto.SearchRequest condition
     ) {
@@ -205,65 +219,79 @@ public class PaymentQueryService {
 
             // 수주번호 검색
             if (hasText(condition.orderNumber())) {
-                predicates.add(cb.like(
-                        cb.lower(
-                                root.join("order", JoinType.INNER)
-                                        .get("orderNo")
-                        ),
-                        keyword(condition.orderNumber())
-                ));
+                predicates.add(
+                        cb.like(
+                                cb.lower(
+                                        root.join("order", JoinType.INNER)
+                                                .get("orderNo")
+                                ),
+                                keyword(condition.orderNumber())
+                        )
+                );
             }
 
             // 거래처명 검색
             if (hasText(condition.clientName())) {
-                predicates.add(cb.like(
-                        cb.lower(
-                                root.join("order", JoinType.INNER)
-                                        .join("client", JoinType.INNER)
-                                        .get("company")
-                        ),
-                        keyword(condition.clientName())
-                ));
+                predicates.add(
+                        cb.like(
+                                cb.lower(
+                                        root.join("order", JoinType.INNER)
+                                                .join("client", JoinType.INNER)
+                                                .get("company")
+                                ),
+                                keyword(condition.clientName())
+                        )
+                );
             }
 
             // 계약금 / 잔금 필터
             if (condition.paymentType() != null) {
-                predicates.add(cb.equal(
-                        root.get("paymentType"),
-                        condition.paymentType()
-                ));
+                predicates.add(
+                        cb.equal(
+                                root.get("paymentType"),
+                                condition.paymentType()
+                        )
+                );
             }
 
             // 결제 상태 필터
             if (condition.paymentStatus() != null) {
-                predicates.add(cb.equal(
-                        root.get("status"),
-                        condition.paymentStatus()
-                ));
+                predicates.add(
+                        cb.equal(
+                                root.get("status"),
+                                condition.paymentStatus()
+                        )
+                );
             }
 
-            // 시작일 포함
+            // 조회 시작일 포함
             if (condition.startDate() != null) {
+
                 LocalDateTime start =
                         condition.startDate().atStartOfDay();
 
-                predicates.add(cb.greaterThanOrEqualTo(
-                        root.get("createdAt"),
-                        start
-                ));
+                predicates.add(
+                        cb.greaterThanOrEqualTo(
+                                root.get("createdAt"),
+                                start
+                        )
+                );
             }
 
-            // 종료일 당일까지 포함
+            // 조회 종료일 당일까지 포함
             if (condition.endDate() != null) {
+
                 LocalDateTime end =
                         condition.endDate()
                                 .plusDays(1)
                                 .atStartOfDay();
 
-                predicates.add(cb.lessThan(
-                        root.get("createdAt"),
-                        end
-                ));
+                predicates.add(
+                        cb.lessThan(
+                                root.get("createdAt"),
+                                end
+                        )
+                );
             }
 
             return cb.and(
@@ -272,7 +300,7 @@ public class PaymentQueryService {
         };
     }
 
-    //  목록 응답 DTO 변환
+    // 목록 응답 DTO 변환
     private PaymentDto.ListResponse toListResponse(
             Payment payment,
             VirtualAccount account,
@@ -287,17 +315,25 @@ public class PaymentQueryService {
                 payment.getAmount(),
                 payment.getStatus(),
                 payment.getPaymentMethod(),
+
+                // Bank enum을 화면 표시용 문자열로 변환
                 account != null
-                        ? resolveBankName(account.getBankCode())
+                        ? resolveBankName(account.getBank())
                         : null,
+
+                // 가상계좌 번호
                 account != null
                         ? account.getAccountNumber()
                         : null,
+
+                // 가상계좌 입금기한
                 account != null
-                        ? account.getExpiresAt()
+                        ? toKoreanLocalDateTime(account.getExpiresAt())
                         : null,
+
+                // 실제 입금완료일
                 history != null
-                        ? history.getReceivedAt()
+                        ? toKoreanLocalDateTime(history.getPaidAt())
                         : null
         );
     }
@@ -312,23 +348,28 @@ public class PaymentQueryService {
                 "%";
     }
 
-    // 은행 코드 -> 화면 표시명
-    // 실제 PG 은행 코드와 일치하는지 확인 필요
-    private String resolveBankName(String bankCode) {
+    // Bank enum의 표시 문자열
+    private String resolveBankName(Bank bank) {
 
-        if (bankCode == null) {
+        if (bank == null) {
             return null;
         }
 
-        return switch (bankCode) {
-            case "003" -> "IBK기업은행";
-            case "004" -> "KB국민은행";
-            case "011" -> "NH농협은행";
-            case "020" -> "우리은행";
-            case "081" -> "하나은행";
-            case "088" -> "신한은행";
-            case "090" -> "카카오뱅크";
-            default -> bankCode;
-        };
+        return bank.toString();
+    }
+
+    // OffsetDateTime -> 한국 시간 LocalDateTime
+    // 기존 목록 DTO의 LocalDateTime 필드에 맞추기 위한 변환
+    private LocalDateTime toKoreanLocalDateTime(
+            OffsetDateTime dateTime
+    ) {
+
+        if (dateTime == null) {
+            return null;
+        }
+
+        return dateTime
+                .atZoneSameInstant(KOREA_ZONE)
+                .toLocalDateTime();
     }
 }

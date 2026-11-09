@@ -18,10 +18,7 @@ import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
-import net.likelion.bebc25.prodflow.payment.enums.PaymentMethod;
-import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
-import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
-import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
+import net.likelion.bebc25.prodflow.payment.enums.*;
 import net.likelion.bebc25.prodflow.payment.repository.PaymentHistoryRepository;
 import net.likelion.bebc25.prodflow.payment.repository.PaymentRepository;
 import net.likelion.bebc25.prodflow.payment.repository.VirtualAccountRepository;
@@ -56,7 +53,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -166,14 +163,15 @@ class ManualDepositServiceTest {
     @Test
     @DisplayName("현금 계약금과 상태 이력·작업지시·날짜별 계획을 함께 저장한다")
     void recordManualDeposit() {
-        LocalDateTime receivedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(1);
-        PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(orderId, 5000L, receivedAt), actorId);
+        OffsetDateTime paidAt = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(1);
+        PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(
+                new PaymentDto.ManualDepositRequest(orderId, 5000L, paidAt), actorId);
         em.flush();
         em.clear();
 
         assertThat(response.amount()).isEqualTo(5000);
         assertThat(response.paymentMethod()).isEqualTo(PaymentMethod.MD);
-        assertThat(response.receivedAt()).isEqualTo(receivedAt);
+        assertThat(response.paidAt()).isEqualTo(paidAt);
         assertThat(response.orderStatus()).isEqualTo("CONFIRMED");
         assertThat(response.confirmationStatus().name()).isEqualTo("CONFIRMED");
         assertThat(response.paymentStatus()).isEqualTo(OrderPaymentStatus.PARTIALLY_PAID);
@@ -206,7 +204,12 @@ class ManualDepositServiceTest {
     void reuseExistingPaymentWithoutAccountOperations() {
         Payment payment = paymentRepository.save(Payment.builder().order(em.find(CustomerOrder.class, orderId)).paymentType(PaymentType.DEPOSIT).amount(5000L).portonePaymentId("EXISTING-CASH").build());
         payment.waitForDeposit();
-        VirtualAccount account = virtualAccountRepository.save(VirtualAccount.builder().payment(payment).bankCode("004").accountNumber("EXISTING-ACCOUNT").accountName("기존 계좌").expiresAt(LocalDateTime.now().plusDays(30)).build());
+        VirtualAccount account = virtualAccountRepository.save(VirtualAccount.builder()
+                .payment(payment).bank(Bank.SHINHAN)
+                .accountNumber("EXISTING-ACCOUNT")
+                .accountName("기존 계좌")
+                .expiresAt(OffsetDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(30))
+                .build());
 
         PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(request(), actorId);
 
@@ -218,8 +221,11 @@ class ManualDepositServiceTest {
     @Test
     @DisplayName("계약금과 다른 금액·미래 입금일시는 거부한다")
     void rejectInvalidAmountOrTime() {
-        assertThatThrownBy(() -> paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(orderId, 4999L, null), actorId)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("계약금 예정액");
-        assertThatThrownBy(() -> paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(orderId, 5000L, LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1)), actorId)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("미래");
+        assertThatThrownBy(() -> paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(orderId, 4999L, null), actorId))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("계약금 예정액");
+        assertThatThrownBy(() -> paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(
+                orderId, 5000L, OffsetDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1)), actorId))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("미래");
         assertThat(paymentRepository.findByOrder_IdOrderByIdAsc(orderId)).isEmpty();
     }
 

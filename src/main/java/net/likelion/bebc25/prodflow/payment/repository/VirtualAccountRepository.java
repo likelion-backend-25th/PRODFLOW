@@ -1,7 +1,9 @@
 package net.likelion.bebc25.prodflow.payment.repository;
 
+import jakarta.persistence.LockModeType;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -9,13 +11,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface VirtualAccountRepository
-        extends JpaRepository<VirtualAccount, Long> {
+public interface VirtualAccountRepository extends JpaRepository<VirtualAccount, Long> {
 
     // 특정 결제의 가상계좌 목록 (최신순)
-    List<VirtualAccount> findByPayment_IdOrderByIdDesc(
-            Long paymentId
-    );
+    List<VirtualAccount> findByPayment_IdOrderByIdDesc(Long paymentId);
 
     // 상태와 무관하게 수주별 각 결제의 가장 최근 발급된 계좌 조회
     @Query("""
@@ -36,6 +35,21 @@ public interface VirtualAccountRepository
     // 특정 결제의 최신 가상계좌 한 건
     Optional<VirtualAccount> findFirstByPayment_IdOrderByIdDesc(
             Long paymentId
+    );
+
+    // 특정 결제의 최신 가상계좌를 비관적 쓰기 락으로 조회
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT vc
+            FROM VirtualAccount vc
+            WHERE vc.id = (
+                SELECT MAX(latest.id)
+                FROM VirtualAccount latest
+                WHERE latest.payment.id = :paymentId
+            )
+            """)
+    Optional<VirtualAccount> findRecentByPayment_IdForUpdate(
+            @Param("paymentId") Long paymentId
     );
 
     // 여러 결제건의 가상계좌 일괄 조회 (최신순)

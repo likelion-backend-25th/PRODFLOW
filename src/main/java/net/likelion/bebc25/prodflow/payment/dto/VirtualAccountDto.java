@@ -1,9 +1,10 @@
 package net.likelion.bebc25.prodflow.payment.dto;
 
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
+import net.likelion.bebc25.prodflow.payment.enums.Bank;
 import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public class VirtualAccountDto {
 
@@ -17,7 +18,7 @@ public class VirtualAccountDto {
             Long paymentId,
 
             // 은행 코드
-            String bankCode,
+            Bank bank,
 
             // 계좌번호
             String accountNumber,
@@ -26,7 +27,7 @@ public class VirtualAccountDto {
             String accountName,
 
             // 입금기한
-            LocalDateTime expiresAt,
+            OffsetDateTime expiresAt,
 
             // 가상계좌 상태
             VirtualAccountStatus status
@@ -37,7 +38,7 @@ public class VirtualAccountDto {
             return new Response(
                     account.getId(),
                     account.getPayment().getId(),
-                    account.getBankCode(),
+                    account.getBank(),
                     account.getAccountNumber(),
                     account.getAccountName(),
                     account.getExpiresAt(),

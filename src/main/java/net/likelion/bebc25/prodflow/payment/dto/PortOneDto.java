@@ -64,12 +64,14 @@ public class PortOneDto {
             String id,
             String pgTxId,
             String status,
+            String storeId,
             String transactionId,
             Customer customer,
             String currency,
             Amount amount,
             Method method,
             Channel channel,
+            OffsetDateTime updatedAt,
             OffsetDateTime paidAt,
             OffsetDateTime cancelledAt,
             OffsetDateTime failedAt
@@ -93,6 +95,15 @@ public class PortOneDto {
 
         @JsonIgnoreProperties(ignoreUnknown = true)
         public record Channel(String key, String pgProvider) {
+        }
+    }
+
+    public record Webhook(
+            String type,
+            Data data
+    ) {
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public record Data(String storeId, String paymentId) {
         }
     }
 }

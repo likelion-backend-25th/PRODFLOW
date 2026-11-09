@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.payment.service;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
 import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
@@ -12,7 +13,10 @@ import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.line.repository.LineRepository;
+import net.likelion.bebc25.prodflow.payment.client.PortOneClient;
+import net.likelion.bebc25.prodflow.payment.config.PortOneProperties;
 import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
+import net.likelion.bebc25.prodflow.payment.dto.PortOneDto;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
@@ -38,15 +42,17 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.*;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @Validated
 public class PaymentService {
+
     private final CustomerOrderRepository customerOrderRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentHistoryRepository paymentHistoryRepository;
@@ -56,89 +62,425 @@ public class PaymentService {
     private final StatusHistoryRepository statusHistoryRepository;
     private final WorkOrderService workOrderService;
     private final LineRepository lineRepository;
+    private final PaymentStore paymentStore;
+    private final PortOneClient portOneClient;
+    private final PortOneProperties properties;
 
     // 현금 수령 기록부터 작업 배정까지 같은 트랜잭션으로 처리한다.
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
-    public PaymentDto.ManualDepositResponse recordManualDeposit(@NotNull @Valid PaymentDto.ManualDepositRequest request, Long userId) {
-        User actor = userRepository.findById(userId).orElseThrow(() -> new AuthenticationCredentialsNotFoundException("처리 직원을 찾을 수 없습니다."));
-        if (actor.getStatus() != UserStatus.ACTIVE || actor.isMustChangePassword() || (actor.getRole() != UserRole.SUPER_ADMIN && actor.getRole() != UserRole.ORDER_MANAGER)) {
-            throw new AccessDeniedException("사용 중이며 비밀번호 변경을 완료한 관리자만 입금을 처리할 수 있습니다.");
-        }
-        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
-        LocalDateTime receivedAt = request.receivedAt() == null ? now : request.receivedAt();
-        if (receivedAt.isAfter(now)) {
-            throw new IllegalArgumentException("입금일시는 미래일 수 없습니다.");
+    public PaymentDto.ManualDepositResponse recordManualDeposit(
+            @NotNull @Valid PaymentDto.ManualDepositRequest request,
+            Long userId
+    ) {
+        User actor = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new AuthenticationCredentialsNotFoundException(
+                                "처리 직원을 찾을 수 없습니다."
+                        )
+                );
+
+        if (actor.getStatus() != UserStatus.ACTIVE
+                || actor.isMustChangePassword()
+                || (actor.getRole() != UserRole.SUPER_ADMIN
+                && actor.getRole() != UserRole.ORDER_MANAGER)) {
+
+            throw new AccessDeniedException(
+                    "사용 중이며 비밀번호 변경을 완료한 관리자만 입금을 처리할 수 있습니다."
+            );
         }
 
-        // 수주 등록과 같은 잠금으로 생산 자리 계산을 직렬화한다. 라인 변경과는 라인→수주 순으로 잠근다.
-        commonCodeRepository.findOrderWaitingForUpdate(CodeStatus.ACTIVE).orElseThrow(() -> new IllegalStateException("수주 대기 상태 코드가 등록되어 있지 않습니다."));
+        OffsetDateTime now = OffsetDateTime.now(
+                ZoneId.of("Asia/Seoul")
+        );
+
+        OffsetDateTime paidAt =
+                request.paidAt() == null ? now : request.paidAt();
+
+        if (paidAt.isAfter(now)) {
+            throw new IllegalArgumentException(
+                    "입금일시는 미래일 수 없습니다."
+            );
+        }
+
+        // 수주 등록과 같은 잠금으로 생산 자리 계산을 직렬화한다.
+        // 라인 변경과는 라인 -> 수주 순으로 잠근다.
+        commonCodeRepository.findOrderWaitingForUpdate(CodeStatus.ACTIVE)
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "수주 대기 상태 코드가 등록되어 있지 않습니다."
+                        )
+                );
+
         lineRepository.findAllForUpdate();
-        CustomerOrder order = customerOrderRepository.findByIdForUpdate(request.orderId()).orElseThrow(() -> new NoSuchElementException("수주를 찾을 수 없습니다."));
+
+        CustomerOrder order = customerOrderRepository
+                .findByIdForUpdate(request.orderId())
+                .orElseThrow(() ->
+                        new NoSuchElementException(
+                                "수주를 찾을 수 없습니다."
+                        )
+                );
+
         if (!"WAITING".equals(order.getStatusCode().getCode())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "대기 수주만 계약금을 처리할 수 있습니다.");
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "대기 수주만 계약금을 처리할 수 있습니다."
+            );
         }
-        long depositAmount = PaymentAmountPolicy.calculate(order.getTotalAmount(), PaymentType.DEPOSIT);
+
+        long depositAmount = PaymentAmountPolicy.calculate(
+                order.getTotalAmount(),
+                PaymentType.DEPOSIT
+        );
+
         if (request.amount() != depositAmount) {
-            throw new IllegalArgumentException("입금 금액은 계약금 예정액 " + depositAmount + "원과 같아야 합니다.");
+            throw new IllegalArgumentException(
+                    "입금 금액은 계약금 예정액 "
+                            + depositAmount
+                            + "원과 같아야 합니다."
+            );
         }
-        Payment payment = paymentRepository.findByOrder_IdAndPaymentType(order.getId(), PaymentType.DEPOSIT).orElse(null);
+
+        Payment payment = paymentRepository
+                .findByOrder_IdAndPaymentType(
+                        order.getId(),
+                        PaymentType.DEPOSIT
+                )
+                .orElse(null);
+
         if (payment != null) {
-            if (payment.getStatus() == PaymentStatus.PAID || payment.getStatus() == PaymentStatus.CANCELLED || paymentHistoryRepository.existsByPayment_Id(payment.getId())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 계약금 또는 입금 내역이 있습니다.");
+            if (payment.getStatus() == PaymentStatus.PAID
+                    || payment.getStatus() == PaymentStatus.CANCELLED
+                    || paymentHistoryRepository.existsByPayment_Id(
+                    payment.getId()
+            )) {
+
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "이미 처리된 계약금 또는 입금 내역이 있습니다."
+                );
             }
+
             if (payment.getAmount() != depositAmount) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "기존 계약금 청구액과 수주 계약금 예정액이 다릅니다.");
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "기존 계약금 청구액과 수주 계약금 예정액이 다릅니다."
+                );
             }
         } else {
-            // 외부 결제는 생성하지 않는다. 내부 결제 식별값만 부여한다.
-            payment = paymentRepository.save(Payment.builder().order(order).paymentType(PaymentType.DEPOSIT).amount(depositAmount).portonePaymentId("MANUAL-" + UUID.randomUUID()).build());
+            // 외부 결제는 생성하지 않는다.
+            // 내부 결제 식별값만 부여한다.
+            payment = paymentRepository.save(
+                    Payment.builder()
+                            .order(order)
+                            .paymentType(PaymentType.DEPOSIT)
+                            .amount(depositAmount)
+                            .portonePaymentId(
+                                    "MANUAL-" + UUID.randomUUID()
+                            )
+                            .build()
+            );
         }
-        CommonCode confirmed = commonCodeRepository.findByCodeGroup_GroupCodeAndCodeAndStatus("ORDER_STATUS", "CONFIRMED", CodeStatus.ACTIVE).orElseThrow(() -> new IllegalStateException("생산대기 상태 코드가 등록되어 있지 않습니다."));
+
+        CommonCode confirmed = commonCodeRepository
+                .findByCodeGroup_GroupCodeAndCodeAndStatus(
+                        "ORDER_STATUS",
+                        "CONFIRMED",
+                        CodeStatus.ACTIVE
+                )
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "생산대기 상태 코드가 등록되어 있지 않습니다."
+                        )
+                );
+
         payment.paidManually();
-        PaymentHistory history = paymentHistoryRepository.save(PaymentHistory.builder().payment(payment).receivedAt(receivedAt).build());
+
+        // 머지 충돌로 중복된 history 선언을 하나로 정리
+        PaymentHistory history = paymentHistoryRepository.save(
+                PaymentHistory.builder()
+                        .payment(payment)
+                        .paidAt(paidAt)
+                        .build()
+        );
+
         order.markPartiallyPaid();
         order.changeProgress(confirmed);
-        StatusHistory statusHistory = new StatusHistory(HistoryEntityType.ORDER, order.getId(), "WAITING", "CONFIRMED", actor);
-        statusHistory.writeNote("현금 계약금 " + depositAmount + "원 수동 입금 확인 (입금일시: " + receivedAt + ")");
+
+        StatusHistory statusHistory = new StatusHistory(
+                HistoryEntityType.ORDER,
+                order.getId(),
+                "WAITING",
+                "CONFIRMED",
+                actor
+        );
+
+        statusHistory.writeNote(
+                "현금 계약금 "
+                        + depositAmount
+                        + "원 수동 입금 확인 (입금일시: "
+                        + paidAt
+                        + ")"
+        );
+
         statusHistoryRepository.save(statusHistory);
-        List<Long> workOrderIds = workOrderService.createForConfirmedOrder(order, actor).stream().map(WorkOrderDto.Response::id).toList();
-        return PaymentDto.ManualDepositResponse.from(payment, history, order, workOrderIds);
+
+        List<Long> workOrderIds = workOrderService
+                .createForConfirmedOrder(order, actor)
+                .stream()
+                .map(WorkOrderDto.Response::id)
+                .toList();
+
+        return PaymentDto.ManualDepositResponse.from(
+                payment,
+                history,
+                order,
+                workOrderIds
+        );
     }
 
     // 결제·계좌 발급이나 상태 변경 없이 수주의 저장된 결제 정보를 조회한다.
     public PaymentDto.OrderResponse getByOrderId(Long orderId) {
         if (orderId == null) {
-            throw new IllegalArgumentException("수주 ID를 입력해 주세요.");
+            throw new IllegalArgumentException(
+                    "수주 ID를 입력해 주세요."
+            );
         }
-        CustomerOrder order = customerOrderRepository.findById(orderId).orElseThrow(() -> new NoSuchElementException("수주를 찾을 수 없습니다."));
 
-        long depositAmount = PaymentAmountPolicy.calculate(order.getTotalAmount(), PaymentType.DEPOSIT);
-        List<Payment> payments = paymentRepository.findByOrder_IdOrderByIdAsc(orderId);
+        CustomerOrder order = customerOrderRepository
+                .findById(orderId)
+                .orElseThrow(() ->
+                        new NoSuchElementException(
+                                "수주를 찾을 수 없습니다."
+                        )
+                );
+
+        long depositAmount = PaymentAmountPolicy.calculate(
+                order.getTotalAmount(),
+                PaymentType.DEPOSIT
+        );
+
+        List<Payment> payments =
+                paymentRepository.findByOrder_IdOrderByIdAsc(orderId);
 
         if (payments.isEmpty()) {
-            return PaymentDto.OrderResponse.from(order, depositAmount, 0, List.of());
+            return PaymentDto.OrderResponse.from(
+                    order,
+                    depositAmount,
+                    0,
+                    List.of()
+            );
         }
 
         Map<Long, PaymentHistory> histories = new HashMap<>();
-        for (PaymentHistory history : paymentHistoryRepository.findByPayment_Order_Id(orderId)) {
-            histories.put(history.getPayment().getId(), history);
+
+        for (PaymentHistory history :
+                paymentHistoryRepository.findByPayment_Order_Id(orderId)) {
+
+            histories.put(
+                    history.getPayment().getId(),
+                    history
+            );
         }
 
         Map<Long, VirtualAccount> accounts = new HashMap<>();
-        for (VirtualAccount account : virtualAccountRepository.findLatestByOrderId(orderId)) {
-            accounts.put(account.getPayment().getId(), account);
+
+        for (VirtualAccount account :
+                virtualAccountRepository.findLatestByOrderId(orderId)) {
+
+            accounts.put(
+                    account.getPayment().getId(),
+                    account
+            );
         }
 
         long paidAmount = 0;
-        List<PaymentDto.OrderPaymentResponse> responses = new ArrayList<>();
+
+        List<PaymentDto.OrderPaymentResponse> responses =
+                new ArrayList<>();
+
         for (Payment payment : payments) {
             if (payment.getStatus() == PaymentStatus.PAID) {
                 paidAmount += payment.getAmount();
             }
-            responses.add(PaymentDto.OrderPaymentResponse.from(payment, accounts.get(payment.getId()), histories.get(payment.getId())));
+
+            responses.add(
+                    PaymentDto.OrderPaymentResponse.from(
+                            payment,
+                            accounts.get(payment.getId()),
+                            histories.get(payment.getId())
+                    )
+            );
         }
 
-        return PaymentDto.OrderResponse.from(order, depositAmount, paidAmount, responses);
+        return PaymentDto.OrderResponse.from(
+                order,
+                depositAmount,
+                paidAmount,
+                responses
+        );
+    }
+
+    // Payment를 만들면서 수기결제(가상계좌 생성) 요청이 진행되어야 함
+//    @Transactional
+//    public Payment issue(String portonePaymentId, PortOneDto.IssueRequest request) {
+//        properties.requireConfigured();
+//        if (paymentRepository.existsByPortonePaymentId(portonePaymentId)) {
+//            return getByPortonePaymentId(portonePaymentId);
+//        }
+//        // 외부 API 전에 주문을 커밋합니다.
+//        // 타임아웃/웹훅 선도착에도 같은 ID로 복구 가능합니다.
+//        Payment payment = paymentRepository.saveAndFlush(Payment.requested(id, request));
+//        try {
+//            portOneClient.issueInstantPayment(request);
+//            return synchronize(id);
+//        } catch (PortOneException e) {
+//            store.markIssueUncertain(id, e.getMessage());
+//            return get(id);
+//        }
+//    }
+
+    @Transactional
+    public void handleWebhook(PortOneDto.Webhook webhook) {
+        if (webhook.type() == null
+                || !List.of(
+                "Transaction.Ready",
+                "Transaction.Paid",
+                "Transaction.VirtualAccountIssued",
+                "Transaction.PartialCancelled",
+                "Transaction.Cancelled",
+                "Transaction.Failed",
+                "Transaction.PayPending",
+                "Transaction.CancelPending"
+        ).contains(webhook.type())) {
+
+            log.info("PortOne 웹훅 무시: 지원 대상이 아닌 이벤트");
+            return;
+        }
+
+        // 본문은 알림으로만 취급한다.
+        // 모르는 주문은 무시하고 자체 주문만 API로 검증한다.
+        if (!Objects.equals(
+                properties.storeId(),
+                webhook.data().storeId()
+        )) {
+            log.warn("PortOne 웹훅 무시: 설정된 상점 ID와 불일치");
+            return;
+        }
+
+        if (webhook.data().paymentId() == null
+                || !paymentRepository.existsByPortonePaymentId(
+                webhook.data().paymentId()
+        )) {
+
+            log.info("PortOne 웹훅 무시: 이 서버에 저장되지 않은 결제");
+            return;
+        }
+
+        Payment payment = getByPortonePaymentId(
+                webhook.data().paymentId()
+        );
+
+        PortOneDto.PaymentSnapshot snapshot =
+                portOneClient.getPayment(webhook.data().paymentId());
+
+        validate(payment, snapshot);
+
+        // 통지 직후 조회 상태 반영이 지연되면 502로 응답하여 재전송을 유도한다.
+        // 알림의 Paid 문자열만으로 DB를 완료 처리하지 않는다.
+        if ("Transaction.Paid".equals(webhook.type())
+                && List.of(
+                "READY",
+                "PENDING",
+                "PAY_PENDING",
+                "VIRTUAL_ACCOUNT_ISSUED"
+        ).contains(snapshot.status())) {
+
+            throw new IllegalStateException(
+                    "입금 완료 통지의 조회 결과가 아직 입금 대기입니다. "
+                            + "웹훅 재전송이 필요합니다."
+            );
+        }
+
+        Payment updated = paymentStore.applyWebhook(
+                payment.getId(),
+                snapshot,
+                webhook.type()
+        );
+
+        log.info(
+                "PortOne 웹훅 처리 완료: paymentId={}, event={}, status={}",
+                updated.getId(),
+                webhook.type(),
+                updated.getStatus()
+        );
+    }
+
+    Payment getByPortonePaymentId(String portonePaymentId) {
+        return paymentRepository
+                .findByPortonePaymentId(portonePaymentId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "해당 결제 내역을 찾을 수 없습니다."
+                        )
+                );
+    }
+
+    private void validate(
+            Payment payment,
+            PortOneDto.PaymentSnapshot snapshot
+    ) {
+        if (!payment.getPortonePaymentId().equals(snapshot.id())
+                || !properties.storeId().equals(snapshot.storeId())
+                || !"KRW".equals(snapshot.currency())
+                || snapshot.amount() == null
+                || snapshot.amount().total() == null
+                || !payment.getAmount().equals(snapshot.amount().total())
+                || snapshot.channel() == null
+                || !properties.channelKey().equals(snapshot.channel().key())
+                || !"TOSSPAYMENTS".equals(snapshot.channel().pgProvider())
+                || snapshot.updatedAt() == null) {
+
+            throw new IllegalStateException(
+                    "결제 ID·상점·채널·금액·통화 검증에 실패하여 "
+                            + "상태를 반영하지 않았습니다."
+            );
+        }
+
+        try {
+            PaymentStatus.valueOf(snapshot.status());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new IllegalArgumentException(
+                    "지원하지 않는 PortOne 결제 상태입니다. "
+                            + "상태를 반영하지 않았습니다."
+            );
+        }
+
+        VirtualAccount virtualAccount = virtualAccountRepository
+                .findFirstByPayment_IdOrderByIdDesc(payment.getId())
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "해당 결제 내역의 가상 계좌를 찾을 수 없습니다."
+                        )
+                );
+
+        if (List.of(
+                "VIRTUAL_ACCOUNT_ISSUED",
+                "PAID"
+        ).contains(snapshot.status())
+                && (snapshot.method() == null
+                || !"PaymentMethodVirtualAccount".equals(
+                snapshot.method().type()
+        )
+                || snapshot.method().accountNumber() == null
+                || !virtualAccount.getBank().name().equals(
+                snapshot.method().bank()
+        ))) {
+
+            throw new IllegalStateException(
+                    "가상계좌 정보 검증에 실패하여 상태를 반영하지 않았습니다."
+            );
+        }
     }
 }

@@ -1,36 +1,44 @@
 package net.likelion.bebc25.prodflow.payment.controller;
 
+import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.global.exception.GlobalExceptionHandler;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
 import net.likelion.bebc25.prodflow.payment.dto.PaymentHistoryDto;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentMethod;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
 import net.likelion.bebc25.prodflow.payment.service.PaymentService;
-import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
-import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
-import org.springframework.http.MediaType;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.argThat;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class PaymentControllerTest {
     private final PaymentService paymentService = mock(PaymentService.class);
@@ -55,7 +63,7 @@ class PaymentControllerTest {
     @DisplayName("현금 계약금 요청은 로그인 직원을 전달하고 생산대기 상태와 작업지시 ID를 응답한다")
     void recordManualDeposit() throws Exception {
         PaymentDto.ManualDepositResponse response = new PaymentDto.ManualDepositResponse(31L, 123L,
-                5000L, PaymentMethod.MD, LocalDateTime.of(2026, 11, 8, 10, 0), "CONFIRMED",
+                5000L, PaymentMethod.MD, OffsetDateTime.parse("2026-11-08T10:00:00+09:00"), "CONFIRMED",
                 ConfirmationStatus.CONFIRMED, OrderPaymentStatus.PARTIALLY_PAID, List.of(41L, 42L));
         when(paymentService.recordManualDeposit(any(), eq(7L))).thenReturn(response);
 
@@ -68,7 +76,7 @@ class PaymentControllerTest {
                 .andExpect(jsonPath("$.paymentStatus").value("PARTIALLY_PAID"))
                 .andExpect(jsonPath("$.workOrderIds[0]").value(41));
         verify(paymentService).recordManualDeposit(argThat(request -> request.orderId() == 123L
-                && request.amount() == 5000L && request.receivedAt() == null), eq(7L));
+                && request.amount() == 5000L && request.paidAt() == null), eq(7L));
     }
 
     @Test
@@ -96,10 +104,11 @@ class PaymentControllerTest {
     @Test
     @DisplayName("수주별 금액 요약과 수동 입금 내역을 응답한다")
     void getByOrderId() throws Exception {
-        LocalDateTime receivedAt = LocalDateTime.of(2026, 11, 6, 10, 0);
-        PaymentHistoryDto.Response history = new PaymentHistoryDto.Response(31L, 7L, null, null, receivedAt, receivedAt);
+        OffsetDateTime paidAt = OffsetDateTime.parse("2026-11-06T10:00:00+09:00");
+        LocalDateTime createdAt = LocalDateTime.of(2026, 11, 6, 10, 0);
+        PaymentHistoryDto.Response history = new PaymentHistoryDto.Response(31L, 7L, null, null, paidAt, createdAt);
         PaymentDto.OrderPaymentResponse payment = new PaymentDto.OrderPaymentResponse(7L, PaymentType.DEPOSIT,
-                5000L, PaymentStatus.PAID, PaymentMethod.MD, receivedAt, null, history);
+                5000L, PaymentStatus.PAID, PaymentMethod.MD, createdAt, null, history);
         when(paymentService.getByOrderId(123L))
                 .thenReturn(new PaymentDto.OrderResponse(123L, 10001L, 5000, 5000, 5001, List.of(payment)));
 
@@ -113,7 +122,7 @@ class PaymentControllerTest {
                 .andExpect(jsonPath("$.payments[0].paymentId").value(7))
                 .andExpect(jsonPath("$.payments[0].paymentType").value("DEPOSIT"))
                 .andExpect(jsonPath("$.payments[0].paymentMethod").value("MD"))
-                .andExpect(jsonPath("$.payments[0].paymentHistory.receivedAt").value("2026-11-06T10:00:00"));
+                .andExpect(jsonPath("$.payments[0].paymentHistory.paidAt").value("2026-11-06T10:00:00+09:00"));
         verify(paymentService).getByOrderId(123L);
     }
 
