@@ -58,6 +58,19 @@ public class AiConversation extends BaseTimeEntity {
         this.closedAt = LocalDateTime.now();
     }
 
+    // 첫 질문을 대화방 제목으로 설정
+    public void setInitialTitle(String question) {
+
+        // 사용자가 직접 변경한 제목은 덮어쓰지 않음
+        if (Boolean.TRUE.equals(this.titleEdited)) {
+            return;
+        }
+
+        this.title = question.strip()
+                .substring(0, Math.min(question.strip().length(), 20));
+    }
+
+
     // 대화방 제목 변경
     public void changeTitle(String title) {
         this.title = title;
