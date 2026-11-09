@@ -267,8 +267,9 @@ public class LineService {
         if (request.status() == LineStatus.INSPECTION) {
             productionPlanRescheduleService.rescheduleAway(line, LocalDate.now(), user, "라인 점검으로 재배치");
         }
-        // 고장은 옮길 수 있는 준비와 생산 중 작업을 다른 라인으로 옮긴 뒤에 상태를 바꾼다.
-        // 받을 곳이 없어도 고장으로 바꾸고, 못 옮긴 작업은 그 라인에 남긴다.
+        // 고장은 아직 시작하지 않은 준비 작업만 다른 라인으로 옮긴 뒤에 상태를 바꾼다.
+        // 생산·일시정지는 이 라인 배정과 계획을 유지한다.
+        // 받을 곳이 없어도 고장으로 바꾸고, 못 옮긴 준비 작업은 그 라인에 남긴다.
         if (request.status() == LineStatus.BROKEN) {
             productionPlanRescheduleService.rescheduleBroken(line, LocalDate.now(), user, "라인 고장으로 재배치");
         }

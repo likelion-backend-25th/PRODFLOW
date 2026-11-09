@@ -181,7 +181,7 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     // 이 작업을 뺀 같은 라인에 해당 상태의 작업이 있는지
     boolean existsByLine_IdAndCommonCode_CodeAndIdNot(Long lineId, String code, Long workOrderId);
 
-    // 고장 라인에 남은 생산·일시정지 작업. 미래 계획이 없어도 라인을 비운다.
+    // 같은 라인에서 지정한 상태의 작업지시를 조회한다.
     List<WorkOrder> findByLine_IdAndCommonCode_CodeIn(Long lineId, Collection<String> codes);
 
     // 같은 품목, 같은 라인의 준비 작업. 재배치로 넘긴 수량을 새 장 대신 여기에 더한다.

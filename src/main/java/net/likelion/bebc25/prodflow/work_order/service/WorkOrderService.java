@@ -592,18 +592,26 @@ public class WorkOrderService {
         if (isChangedLine) {
             Line line = lineRepository.findById(request.lineId())
                     .orElseThrow(() -> new IllegalArgumentException("변경할 라인을 찾을 수 없습니다."));
-            if (line.getStatus() != LineStatus.AVAILABLE) {
-                throw new IllegalArgumentException(
-                        "가동 가능한 라인만 배정할 수 있습니다.");
-            }
-            if (productionPlanRescheduleService.shouldPullForward(workOrder, line)) {
-                // 복구 라인의 앞날이 비어 있을 때만 밀린 일정을 당긴다.
-                productionPlanRescheduleService.replanOnRecoveredLine(workOrder, line, modifier);
-                historyReason = "복구 라인으로 재이동";
-            } else {
-                // 앞날에 다른 작업이 있거나 일반 이동이면 기존 날짜가 들어가는지만 본다.
-                productionPlanRescheduleService.assertFits(workOrder, line);
-                workOrder.changeLine(line);
+            // 같은 라인을 다시 보내는 수정은 배정을 건드리지 않는다. 생산 중 라인도 여기 해당한다.
+            if (!line.getId().equals(previousLine.getId())) {
+                // 생산·일시정지는 배정을 이 라인에 남긴다.
+                String workStatus = workOrder.getCommonCode().getCode();
+                if ("PRODUCE".equals(workStatus) || "SUSPEND".equals(workStatus)) {
+                    throw new IllegalArgumentException("생산을 시작한 작업은 라인을 변경할 수 없습니다.");
+                }
+                if (line.getStatus() != LineStatus.AVAILABLE) {
+                    throw new IllegalArgumentException(
+                            "가동 가능한 라인만 배정할 수 있습니다.");
+                }
+                if (productionPlanRescheduleService.shouldPullForward(workOrder, line)) {
+                    // 복구 라인의 앞날이 비어 있을 때만 밀린 일정을 당긴다.
+                    productionPlanRescheduleService.replanOnRecoveredLine(workOrder, line, modifier);
+                    historyReason = "복구 라인으로 재이동";
+                } else {
+                    // 앞날에 다른 작업이 있거나 일반 이동이면 기존 날짜가 들어가는지만 본다.
+                    productionPlanRescheduleService.assertFits(workOrder, line);
+                    workOrder.changeLine(line);
+                }
             }
         }
         // 담당자 변경
