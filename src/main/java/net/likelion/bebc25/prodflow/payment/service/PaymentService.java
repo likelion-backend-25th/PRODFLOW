@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.payment.service;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
 import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
@@ -12,7 +13,10 @@ import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.line.repository.LineRepository;
+import net.likelion.bebc25.prodflow.payment.client.PortOneClient;
+import net.likelion.bebc25.prodflow.payment.config.PortOneProperties;
 import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
+import net.likelion.bebc25.prodflow.payment.dto.PortOneDto;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
@@ -38,15 +42,17 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -61,6 +67,9 @@ public class PaymentService {
     private final StatusHistoryRepository statusHistoryRepository;
     private final WorkOrderService workOrderService;
     private final LineRepository lineRepository;
+    private final PaymentStore paymentStore;
+    private final PortOneClient portOneClient;
+    private final PortOneProperties properties;
 
     // 현금 수령 기록부터 작업 배정까지 같은 트랜잭션으로 처리한다.
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -73,9 +82,9 @@ public class PaymentService {
                 || (actor.getRole() != UserRole.SUPER_ADMIN && actor.getRole() != UserRole.ORDER_MANAGER)) {
             throw new AccessDeniedException("사용 중이며 비밀번호 변경을 완료한 관리자만 입금을 처리할 수 있습니다.");
         }
-        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
-        LocalDateTime receivedAt = request.receivedAt() == null ? now : request.receivedAt();
-        if (receivedAt.isAfter(now)) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneId.of("Asia/Seoul"));
+        OffsetDateTime paidAt = request.paidAt() == null ? now : request.paidAt();
+        if (paidAt.isAfter(now)) {
             throw new IllegalArgumentException("입금일시는 미래일 수 없습니다.");
         }
 
@@ -112,11 +121,11 @@ public class PaymentService {
                 .orElseThrow(() -> new IllegalStateException("생산대기 상태 코드가 등록되어 있지 않습니다."));
         payment.paidManually();
         PaymentHistory history = paymentHistoryRepository.save(PaymentHistory.builder()
-                .payment(payment).receivedAt(receivedAt).build());
+                .payment(payment).paidAt(paidAt).build());
         order.markPartiallyPaid();
         order.changeProgress(confirmed);
         StatusHistory statusHistory = new StatusHistory(HistoryEntityType.ORDER, order.getId(), "WAITING", "CONFIRMED", actor);
-        statusHistory.writeNote("현금 계약금 " + depositAmount + "원 수동 입금 확인 (입금일시: " + receivedAt + ")");
+        statusHistory.writeNote("현금 계약금 " + depositAmount + "원 수동 입금 확인 (입금일시: " + paidAt + ")");
         statusHistoryRepository.save(statusHistory);
         List<Long> workOrderIds = workOrderService.createForConfirmedOrder(order, actor).stream()
                 .map(WorkOrderDto.Response::id).toList();
@@ -159,5 +168,97 @@ public class PaymentService {
         }
 
         return PaymentDto.OrderResponse.from(order, depositAmount, paidAmount, responses);
+    }
+
+    // Payment를 만들면서 수기결제(가상계좌 생성) 요청이 진행되어야 함
+//    @Transactional
+//    public Payment issue(String portonePaymentId, PortOneDto.IssueRequest request) {
+//        properties.requireConfigured();
+//        if (paymentRepository.existsByPortonePaymentId(portonePaymentId)) {
+//            return getByPortonePaymentId(portonePaymentId);
+//        }
+//        // 외부 API 전에 주문을 커밋합니다. 타임아웃/웹훅 선도착에도 같은 ID로 복구 가능합니다.
+//        Payment payment = paymentRepository.saveAndFlush(Payment.requested(id, request));
+//        try {
+//            portOneClient.issueInstantPayment(request);
+//            return synchronize(id);
+//        } catch (PortOneException e) {
+//            store.markIssueUncertain(id, e.getMessage());
+//            return get(id);
+//        }
+//    }
+
+
+    @Transactional
+    public void handleWebhook(PortOneDto.Webhook webhook) {
+        if (webhook.type() == null || !List.of("Transaction.Ready", "Transaction.Paid",
+                "Transaction.VirtualAccountIssued", "Transaction.PartialCancelled",
+                "Transaction.Cancelled", "Transaction.Failed", "Transaction.PayPending",
+                "Transaction.CancelPending").contains(webhook.type())) {
+            log.info("PortOne 웹훅 무시: 지원 대상이 아닌 이벤트");
+            return;
+        }
+        // 본문은 알림으로만 취급합니다. 모르는 주문은 무시하고 자체 주문만 API로 검증합니다.
+        if (!Objects.equals(properties.storeId(), webhook.data().storeId())) {
+            log.warn("PortOne 웹훅 무시: 설정된 상점 ID와 불일치");
+            return;
+        }
+        if (webhook.data().paymentId() == null
+                || !paymentRepository.existsByPortonePaymentId(webhook.data().paymentId())) {
+            log.info("PortOne 웹훅 무시: 이 서버에 저장되지 않은 결제");
+            return;
+        }
+        Payment payment = getByPortonePaymentId(webhook.data().paymentId());
+        PortOneDto.PaymentSnapshot snapshot = portOneClient.getPayment(webhook.data().paymentId());
+        validate(payment, snapshot);
+        // 통지 직후 조회 상태 반영이 지연되면 502로 응답하여 재전송을 유도합니다.
+        // 알림의 Paid 문자열만으로 DB를 완료 처리하지 않습니다.
+        if ("Transaction.Paid".equals(webhook.type())
+                && List.of("READY", "PENDING", "PAY_PENDING", "VIRTUAL_ACCOUNT_ISSUED").contains(snapshot.status())
+        ) {
+            throw new IllegalStateException("입금 완료 통지의 조회 결과가 아직 입금 대기입니다. 웹훅 재전송이 필요합니다.");
+        }
+        Payment updated = paymentStore.applyWebhook(payment.getId(), snapshot, webhook.type());
+        log.info("PortOne 웹훅 처리 완료: paymentId={}, event={}, status={}",
+                updated.getId(), webhook.type(), updated.getStatus());
+    }
+
+    Payment getByPortonePaymentId(String portonePaymentId) {
+        return paymentRepository.findByPortonePaymentId(portonePaymentId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 결제 내역을 찾을 수 없습니다."));
+    }
+
+    private void validate(Payment payment, PortOneDto.PaymentSnapshot snapshot) {
+        if (!payment.getPortonePaymentId().equals(snapshot.id())
+                || !properties.storeId().equals(snapshot.storeId())
+                || !"KRW".equals(snapshot.currency())
+                || snapshot.amount() == null
+                || snapshot.amount().total() == null
+                || !payment.getAmount().equals(snapshot.amount().total())
+                || snapshot.channel() == null
+                || !properties.channelKey().equals(snapshot.channel().key())
+                || !"TOSSPAYMENTS".equals(snapshot.channel().pgProvider())
+                || snapshot.updatedAt() == null
+        ) {
+            throw new IllegalStateException("결제 ID·상점·채널·금액·통화 검증에 실패하여 상태를 반영하지 않았습니다.");
+        }
+
+        try {
+            PaymentStatus.valueOf(snapshot.status());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new IllegalArgumentException("지원하지 않는 PortOne 결제 상태입니다. 상태를 반영하지 않았습니다.");
+        }
+
+        VirtualAccount virtualAccount = virtualAccountRepository.findFirstByPayment_IdOrderByIdDesc(payment.getId())
+                .orElseThrow(() -> new IllegalArgumentException("해당 결제 내역의 가상 계좌를 찾을 수 없습니다."));
+
+        if (List.of("VIRTUAL_ACCOUNT_ISSUED", "PAID").contains(snapshot.status())
+                && (snapshot.method() == null
+                || !"PaymentMethodVirtualAccount".equals(snapshot.method().type())
+                || snapshot.method().accountNumber() == null
+                || !virtualAccount.getBank().name().equals(snapshot.method().bank()))
+        ) {
+            throw new IllegalStateException("가상계좌 정보 검증에 실패하여 상태를 반영하지 않았습니다.");
+        }
     }
 }

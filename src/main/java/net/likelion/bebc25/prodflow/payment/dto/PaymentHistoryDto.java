@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.payment.dto;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public class PaymentHistoryDto {
 
@@ -22,7 +23,7 @@ public class PaymentHistoryDto {
             String transactionId,
 
             // 실제 입금일시
-            LocalDateTime receivedAt,
+            OffsetDateTime paidAt,
 
             // 입금내역 생성일시
             LocalDateTime createdAt
@@ -37,7 +38,7 @@ public class PaymentHistoryDto {
                             ? history.getVirtualAccount().getId()
                             : null,
                     history.getTransactionId(),
-                    history.getReceivedAt(),
+                    history.getPaidAt(),
                     history.getCreatedAt()
             );
         }

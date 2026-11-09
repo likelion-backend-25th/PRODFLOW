@@ -1,13 +1,24 @@
 package net.likelion.bebc25.prodflow.payment.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.payment.enums.Bank;
 import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Getter
 @Entity
@@ -27,7 +38,7 @@ public class VirtualAccount {
 
     @Column(
             nullable = false)
-    private String bankCode;
+    private Bank bank;
 
     @Column(
             nullable = false)
@@ -41,18 +52,18 @@ public class VirtualAccount {
     private String accountName;
 
     @Column(name = "expires_at", nullable = false)
-    private LocalDateTime expiresAt;
+    private OffsetDateTime expiresAt;
 
     @Builder
     private VirtualAccount(
             Payment payment,
-            String bankCode,
+            Bank bank,
             String accountNumber,
             String accountName,
-            LocalDateTime expiresAt
+            OffsetDateTime expiresAt
     ) {
         this.payment = payment;
-        this.bankCode = bankCode;
+        this.bank = bank;
         this.accountNumber = accountNumber;
         this.accountName = accountName;
         this.expiresAt = expiresAt;
@@ -76,6 +87,14 @@ public class VirtualAccount {
 
     // 실제 시간 기준 만료 여부 확인
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
+        return OffsetDateTime.now().isAfter(expiresAt);
+    }
+
+    public void updateAccountNumber(String accountNumber) {
+        this.accountNumber = accountNumber;
+    }
+
+    public void updateExpiresAt(OffsetDateTime expiresAt) {
+        this.expiresAt = expiresAt;
     }
 }

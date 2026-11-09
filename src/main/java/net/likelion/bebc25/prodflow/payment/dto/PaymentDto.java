@@ -1,6 +1,10 @@
 package net.likelion.bebc25.prodflow.payment.dto;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
@@ -11,11 +15,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 
 public final class PaymentDto {
 
@@ -26,7 +27,7 @@ public final class PaymentDto {
     public record ManualDepositRequest(
             @NotNull @Positive Long orderId,
             @NotNull @Positive Long amount,
-            LocalDateTime receivedAt
+            OffsetDateTime paidAt
     ) {
     }
 
@@ -35,7 +36,7 @@ public final class PaymentDto {
             Long orderId,
             long amount,
             PaymentMethod paymentMethod,
-            LocalDateTime receivedAt,
+            OffsetDateTime paidAt,
             String orderStatus,
             ConfirmationStatus confirmationStatus,
             OrderPaymentStatus paymentStatus,
@@ -44,7 +45,7 @@ public final class PaymentDto {
         public static ManualDepositResponse from(Payment payment, PaymentHistory history,
                                                  CustomerOrder order, List<Long> workOrderIds) {
             return new ManualDepositResponse(payment.getId(), order.getId(), payment.getAmount(),
-                    payment.getPaymentMethod(), history.getReceivedAt(), order.getStatusCode().getCode(),
+                    payment.getPaymentMethod(), history.getPaidAt(), order.getStatusCode().getCode(),
                     order.getConfirmationStatus(), order.getPaymentStatus(), workOrderIds);
         }
     }

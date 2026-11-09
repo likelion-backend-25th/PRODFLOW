@@ -3,8 +3,8 @@ package net.likelion.bebc25.prodflow.payment.service;
 import jakarta.persistence.EntityManager;
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.common.domain.Address;
-import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
+import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
@@ -12,10 +12,13 @@ import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
+import net.likelion.bebc25.prodflow.line.entity.Line;
+import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
+import net.likelion.bebc25.prodflow.payment.enums.Bank;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentMethod;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
@@ -29,15 +32,13 @@ import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
-import net.likelion.bebc25.prodflow.line.entity.Line;
-import net.likelion.bebc25.prodflow.line.enums.LineStatus;
-import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
-import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
-import net.likelion.bebc25.prodflow.work_order.entity.WorkOrderHistory;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
-import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
-import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderHistoryRepository;
+import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
+import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
+import net.likelion.bebc25.prodflow.work_order.entity.WorkOrderHistory;
 import net.likelion.bebc25.prodflow.work_order.repository.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderHistoryRepository;
+import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,7 +57,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -69,16 +70,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:manual-deposit-${random.uuid};MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=USER,LINE")
 @Transactional
 class ManualDepositServiceTest {
-    @Autowired private EntityManager em;
-    @Autowired private PaymentService paymentService;
-    @Autowired private PaymentRepository paymentRepository;
-    @Autowired private PaymentHistoryRepository paymentHistoryRepository;
-    @Autowired private VirtualAccountRepository virtualAccountRepository;
-    @Autowired private ProductionPlanRepository productionPlanRepository;
-    @Autowired private StatusHistoryRepository statusHistoryRepository;
-    @Autowired private WorkOrderService workOrderService;
-    @Autowired private WorkOrderHistoryRepository workOrderHistoryRepository;
-    @Autowired private PlatformTransactionManager transactionManager;
+    @Autowired
+    private EntityManager em;
+    @Autowired
+    private PaymentService paymentService;
+    @Autowired
+    private PaymentRepository paymentRepository;
+    @Autowired
+    private PaymentHistoryRepository paymentHistoryRepository;
+    @Autowired
+    private VirtualAccountRepository virtualAccountRepository;
+    @Autowired
+    private ProductionPlanRepository productionPlanRepository;
+    @Autowired
+    private StatusHistoryRepository statusHistoryRepository;
+    @Autowired
+    private WorkOrderService workOrderService;
+    @Autowired
+    private WorkOrderHistoryRepository workOrderHistoryRepository;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private Long orderId;
     private Long quotationId;
@@ -169,15 +180,15 @@ class ManualDepositServiceTest {
     @Test
     @DisplayName("현금 계약금과 상태 이력·작업지시·날짜별 계획을 함께 저장한다")
     void recordManualDeposit() {
-        LocalDateTime receivedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(1);
+        OffsetDateTime paidAt = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(1);
         PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(
-                new PaymentDto.ManualDepositRequest(orderId, 5000L, receivedAt), actorId);
+                new PaymentDto.ManualDepositRequest(orderId, 5000L, paidAt), actorId);
         em.flush();
         em.clear();
 
         assertThat(response.amount()).isEqualTo(5000);
         assertThat(response.paymentMethod()).isEqualTo(PaymentMethod.MD);
-        assertThat(response.receivedAt()).isEqualTo(receivedAt);
+        assertThat(response.paidAt()).isEqualTo(paidAt);
         assertThat(response.orderStatus()).isEqualTo("CONFIRMED");
         assertThat(response.confirmationStatus().name()).isEqualTo("CONFIRMED");
         assertThat(response.paymentStatus()).isEqualTo(OrderPaymentStatus.PARTIALLY_PAID);
@@ -213,8 +224,12 @@ class ManualDepositServiceTest {
         Payment payment = paymentRepository.save(Payment.builder().order(em.find(CustomerOrder.class, orderId))
                 .paymentType(PaymentType.DEPOSIT).amount(5000L).portonePaymentId("EXISTING-CASH").createdBy("test").build());
         payment.waitForDeposit();
-        VirtualAccount account = virtualAccountRepository.save(VirtualAccount.builder().payment(payment).bankCode("004")
-                .accountNumber("EXISTING-ACCOUNT").accountName("기존 계좌").expiresAt(LocalDateTime.now().plusDays(30)).build());
+        VirtualAccount account = virtualAccountRepository.save(VirtualAccount.builder()
+                .payment(payment).bank(Bank.SHINHAN)
+                .accountNumber("EXISTING-ACCOUNT")
+                .accountName("기존 계좌")
+                .expiresAt(OffsetDateTime.now().plusDays(30))
+                .build());
 
         PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(request(), actorId);
 
@@ -229,7 +244,7 @@ class ManualDepositServiceTest {
         assertThatThrownBy(() -> paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(orderId, 4999L, null), actorId))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("계약금 예정액");
         assertThatThrownBy(() -> paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(
-                orderId, 5000L, LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1)), actorId))
+                orderId, 5000L, OffsetDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1)), actorId))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("미래");
         assertThat(paymentRepository.findByOrder_IdOrderByIdAsc(orderId)).isEmpty();
     }
