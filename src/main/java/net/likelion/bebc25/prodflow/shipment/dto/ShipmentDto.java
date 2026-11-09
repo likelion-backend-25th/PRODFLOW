@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.shipment.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.shipment.entity.Shipment;
@@ -14,6 +15,7 @@ public class ShipmentDto {
     }
 
     // 배송 관리 목록의 한 줄
+    @Schema(name = "ShipmentListItem")
     public record ListItem(
             Long orderId,
             String orderNo,
@@ -35,6 +37,7 @@ public class ShipmentDto {
     }
 
     // 상단 탭 건수
+    @Schema(name = "ShipmentTabCounts")
     public record TabCounts(
             long packing,
             long readyToShip,
@@ -44,6 +47,7 @@ public class ShipmentDto {
     }
 
     // 배송 목록 응답
+    @Schema(name = "ShipmentListResponse")
     public record ListResponse(
             String tab,
             TabCounts counts,
@@ -52,6 +56,7 @@ public class ShipmentDto {
     }
 
     // 배송 완료 처리 응답
+    @Schema(name = "ShipmentCompleteResponse")
     public record CompleteResponse(
             Long shipmentId,
             Long orderId,
@@ -63,12 +68,14 @@ public class ShipmentDto {
     }
 
     // 수주가 존재하지만 배송은 아직 등록되지 않은 경우도 구분한다.
+    @Schema(name = "ShipmentOrderResponse")
     public record OrderResponse(ShipmentTrackingDto shipment) {
         public static OrderResponse from(Shipment shipment, String orderStatus) {
             return new OrderResponse(shipment == null ? null : ShipmentTrackingDto.from(shipment, orderStatus));
         }
     }
 
+    @Schema(name = "ShipmentCreateRequest")
     public record CreateRequest(
             Long orderId,
             String carrierCode,
@@ -76,6 +83,7 @@ public class ShipmentDto {
     ) {
     }
 
+    @Schema(name = "ShipmentResponse")
     public record Response(
             Long id,
             Long orderId,
