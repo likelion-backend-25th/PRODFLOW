@@ -1,7 +1,7 @@
 info:
   name: 생산라인 상태변경
   type: http
-  seq: 4
+  seq: 1
 
 http:
   method: PATCH

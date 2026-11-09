@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -142,6 +143,108 @@ class ProductionStatisticsServiceTest {
     }
 
     @Test
+    @DisplayName("2026년 2월은 일요일 시작 4주차까지 반환한다")
+    void february2026HasFourSundayWeeks() {
+        List<DashboardDto.WeeklyProductionResponse> weeks =
+                productionStatisticsService.getWeeklyProduction(2026, 2);
+
+        assertThat(weeks).extracting(DashboardDto.WeeklyProductionResponse::week)
+                .containsExactly(1, 2, 3, 4);
+        assertThat(weeks).extracting(DashboardDto.WeeklyProductionResponse::startDate)
+                .containsExactly(
+                        LocalDate.of(2026, 2, 1),
+                        LocalDate.of(2026, 2, 8),
+                        LocalDate.of(2026, 2, 15),
+                        LocalDate.of(2026, 2, 22)
+                );
+        assertThat(weeks).extracting(DashboardDto.WeeklyProductionResponse::endDate)
+                .containsExactly(
+                        LocalDate.of(2026, 2, 7),
+                        LocalDate.of(2026, 2, 14),
+                        LocalDate.of(2026, 2, 21),
+                        LocalDate.of(2026, 2, 28)
+                );
+        assertThat(weeks).allSatisfy(week -> {
+            assertThat(week.plannedQuantity()).isZero();
+            assertThat(week.completedQuantity()).isZero();
+        });
+    }
+
+    @Test
+    @DisplayName("2026년 11월과 12월, 2027년 2월은 일요일 시작 5주차까지 반환한다")
+    void fiveWeekMonthsStopAtFifthSundayWeek() {
+        assertSundayWeeks(2026, 11, List.of(
+                new LocalDate[]{LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 7)},
+                new LocalDate[]{LocalDate.of(2026, 11, 8), LocalDate.of(2026, 11, 14)},
+                new LocalDate[]{LocalDate.of(2026, 11, 15), LocalDate.of(2026, 11, 21)},
+                new LocalDate[]{LocalDate.of(2026, 11, 22), LocalDate.of(2026, 11, 28)},
+                new LocalDate[]{LocalDate.of(2026, 11, 29), LocalDate.of(2026, 11, 30)}
+        ));
+        assertSundayWeeks(2026, 12, List.of(
+                new LocalDate[]{LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 5)},
+                new LocalDate[]{LocalDate.of(2026, 12, 6), LocalDate.of(2026, 12, 12)},
+                new LocalDate[]{LocalDate.of(2026, 12, 13), LocalDate.of(2026, 12, 19)},
+                new LocalDate[]{LocalDate.of(2026, 12, 20), LocalDate.of(2026, 12, 26)},
+                new LocalDate[]{LocalDate.of(2026, 12, 27), LocalDate.of(2026, 12, 31)}
+        ));
+        assertSundayWeeks(2027, 2, List.of(
+                new LocalDate[]{LocalDate.of(2027, 2, 1), LocalDate.of(2027, 2, 6)},
+                new LocalDate[]{LocalDate.of(2027, 2, 7), LocalDate.of(2027, 2, 13)},
+                new LocalDate[]{LocalDate.of(2027, 2, 14), LocalDate.of(2027, 2, 20)},
+                new LocalDate[]{LocalDate.of(2027, 2, 21), LocalDate.of(2027, 2, 27)},
+                new LocalDate[]{LocalDate.of(2027, 2, 28), LocalDate.of(2027, 2, 28)}
+        ));
+    }
+
+    @Test
+    @DisplayName("2027년 1월은 일요일 시작 6주차까지 반환한다")
+    void january2027HasSixSundayWeeks() {
+        assertSundayWeeks(2027, 1, List.of(
+                new LocalDate[]{LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 2)},
+                new LocalDate[]{LocalDate.of(2027, 1, 3), LocalDate.of(2027, 1, 9)},
+                new LocalDate[]{LocalDate.of(2027, 1, 10), LocalDate.of(2027, 1, 16)},
+                new LocalDate[]{LocalDate.of(2027, 1, 17), LocalDate.of(2027, 1, 23)},
+                new LocalDate[]{LocalDate.of(2027, 1, 24), LocalDate.of(2027, 1, 30)},
+                new LocalDate[]{LocalDate.of(2027, 1, 31), LocalDate.of(2027, 1, 31)}
+        ));
+    }
+
+    @Test
+    @DisplayName("월을 넘나드는 계획량은 해당 월의 일요일 시작 주차에만 합산된다")
+    void plannedQuantityFollowsSundayWeekInsideMonth() {
+        List<DashboardDto.WeeklyProductionResponse> novemberBefore =
+                productionStatisticsService.getWeeklyProduction(2026, 11);
+        OrderProduct product = orderProductRepository.findById(1L).orElseThrow();
+        Line line = lineRepository.findById(1L).orElseThrow();
+        User user = userRepository.findById(4L).orElseThrow();
+        CommonCode prepare = commonCodeRepository.findById(16L).orElseThrow();
+
+        savePlan("WI-WEEK-SAT", product, line, user, prepare, LocalDate.of(2026, 11, 7), 37);
+        savePlan("WI-WEEK-MON", product, line, user, prepare, LocalDate.of(2026, 11, 30), 41);
+        savePlan("WI-WEEK-JAN", product, line, user, prepare, LocalDate.of(2027, 1, 1), 53);
+
+        List<DashboardDto.WeeklyProductionResponse> november =
+                productionStatisticsService.getWeeklyProduction(2026, 11);
+        List<DashboardDto.WeeklyProductionResponse> december =
+                productionStatisticsService.getWeeklyProduction(2026, 12);
+        List<DashboardDto.WeeklyProductionResponse> january =
+                productionStatisticsService.getWeeklyProduction(2027, 1);
+
+        assertThat(november).extracting(DashboardDto.WeeklyProductionResponse::week)
+                .containsExactly(1, 2, 3, 4, 5);
+        assertThat(planned(november, 1)).isEqualTo(planned(novemberBefore, 1) + 37);
+        assertThat(planned(november, 2)).isEqualTo(planned(novemberBefore, 2));
+        assertThat(planned(november, 5)).isEqualTo(planned(novemberBefore, 5) + 41);
+        assertThat(december).hasSize(5);
+        assertThat(december).allSatisfy(week -> assertThat(week.plannedQuantity()).isZero());
+        assertThat(january).extracting(DashboardDto.WeeklyProductionResponse::week)
+                .containsExactly(1, 2, 3, 4, 5, 6);
+        assertThat(planned(january, 1)).isEqualTo(53);
+        assertThat(january).filteredOn(week -> week.week() > 1)
+                .allSatisfy(week -> assertThat(week.plannedQuantity()).isZero());
+    }
+
+    @Test
     @DisplayName("주차별 생산량 통계 조회 시 잘못된 월 입력")
     void getWeeklyProductionWithInvalidMonth() {
 
@@ -208,5 +311,51 @@ class ProductionStatisticsServiceTest {
 
         assertThat(response.plannedQuantity()).isEqualTo(before.plannedQuantity());
         assertThat(response.completedQuantity()).isEqualTo(before.completedQuantity());
+    }
+
+    private void assertSundayWeeks(int year, int month, List<LocalDate[]> ranges) {
+        List<DashboardDto.WeeklyProductionResponse> weeks =
+                productionStatisticsService.getWeeklyProduction(year, month);
+
+        assertThat(weeks).extracting(DashboardDto.WeeklyProductionResponse::week)
+                .containsExactlyElementsOf(
+                        IntStream.rangeClosed(1, ranges.size()).boxed().toList()
+                );
+        assertThat(weeks).extracting(DashboardDto.WeeklyProductionResponse::startDate)
+                .containsExactly(ranges.stream().map(range -> range[0]).toArray(LocalDate[]::new));
+        assertThat(weeks).extracting(DashboardDto.WeeklyProductionResponse::endDate)
+                .containsExactly(ranges.stream().map(range -> range[1]).toArray(LocalDate[]::new));
+    }
+
+    private void savePlan(
+            String workNo,
+            OrderProduct product,
+            Line line,
+            User user,
+            CommonCode status,
+            LocalDate planDate,
+            int quantity
+    ) {
+        WorkOrder workOrder = new WorkOrder(
+                workNo,
+                product,
+                line,
+                user,
+                quantity,
+                planDate,
+                planDate,
+                "일요일 시작 주차"
+        );
+        workOrder.changeStatus(status);
+        workOrderRepository.save(workOrder);
+        productionPlanRepository.save(new ProductionPlan(workOrder, planDate, quantity));
+    }
+
+    private long planned(List<DashboardDto.WeeklyProductionResponse> weeks, int week) {
+        return weeks.stream()
+                .filter(item -> item.week() == week)
+                .mapToLong(DashboardDto.WeeklyProductionResponse::plannedQuantity)
+                .findFirst()
+                .orElseThrow();
     }
 }

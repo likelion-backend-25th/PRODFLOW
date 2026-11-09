@@ -7,6 +7,7 @@ import net.likelion.bebc25.prodflow.order_notification.entity.OrderNotification;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import net.likelion.bebc25.prodflow.order_notification.dto.OrderDueNotificationResponse;
 import net.likelion.bebc25.prodflow.order_notification.dto.OrderNotificationDto;
 import net.likelion.bebc25.prodflow.order_notification.enums.OrderNotificationType;
 import net.likelion.bebc25.prodflow.order_notification.repository.OrderNotificationRepository;
@@ -257,5 +258,83 @@ class OrderNotificationServiceTest {
         // then
         assertThat(notifications).isEmpty();
         assertThat(orderNotificationService.getUnreadCount(userId)).isZero();
+    }
+
+    @Test
+    @DisplayName("선택한 납기 임박 수주는 담당 직원에게만 알림을 만든다")
+    void createDueNotificationImminent() {
+        OrderDueNotificationResponse created =
+                orderNotificationService.createDueNotification(6L, TODAY);
+
+        assertThat(created.created()).isTrue();
+        assertThat(created.notificationType()).isEqualTo(OrderNotificationType.DELIVERY_IMMINENT);
+        assertThat(orderNotificationService.getNotifications(1L))
+                .extracting(OrderNotificationDto::orderNo)
+                .contains("PF-20261030-6");
+        assertThat(orderNotificationService.getNotifications(3L))
+                .extracting(OrderNotificationDto::orderNo)
+                .doesNotContain("PF-20261030-6");
+    }
+
+    @Test
+    @DisplayName("선택한 납기 지연 수주는 지연 알림을 만든다")
+    void createDueNotificationDelayed() {
+        OrderDueNotificationResponse created =
+                orderNotificationService.createDueNotification(3L, TODAY);
+
+        assertThat(created.created()).isTrue();
+        assertThat(created.notificationType()).isEqualTo(OrderNotificationType.DELIVERY_DELAYED);
+        assertThat(orderNotificationService.getNotifications(3L))
+                .filteredOn(item -> "PF-20261027-3".equals(item.orderNo()))
+                .extracting(OrderNotificationDto::message)
+                .contains("PF-20261027-3 납기 2026-11-06가 지났습니다.");
+    }
+
+    @Test
+    @DisplayName("같은 수주와 유형의 알림이 있으면 다시 만들지 않는다")
+    void createDueNotificationDoesNotDuplicate() {
+        orderNotificationService.createDueNotification(6L, TODAY);
+        long once = orderNotificationRepository.count();
+
+        OrderDueNotificationResponse again =
+                orderNotificationService.createDueNotification(6L, TODAY);
+
+        assertThat(again.created()).isFalse();
+        assertThat(again.notificationType()).isEqualTo(OrderNotificationType.DELIVERY_IMMINENT);
+        assertThat(orderNotificationRepository.count()).isEqualTo(once);
+    }
+
+    @Test
+    @DisplayName("자동 생성된 알림이 있으면 전송 완료로 조회된다")
+    void sentListIncludesAutomaticNotification() {
+        orderNotificationService.createDueNotifications(TODAY);
+
+        assertThat(orderNotificationService.listSentDueNotifications())
+                .anySatisfy(item -> {
+                    assertThat(item.orderId()).isEqualTo(3L);
+                    assertThat(item.notificationType()).isEqualTo(OrderNotificationType.DELIVERY_DELAYED);
+                })
+                .anySatisfy(item -> {
+                    assertThat(item.orderId()).isEqualTo(9L);
+                    assertThat(item.notificationType()).isEqualTo(OrderNotificationType.DELIVERY_IMMINENT);
+                });
+    }
+
+    @Test
+    @DisplayName("없는 수주와 납기 위험이 아닌 수주는 알림을 만들지 않는다")
+    void createDueNotificationRejectsInvalidOrder() {
+        assertThatThrownBy(() -> orderNotificationService.createDueNotification(99999L, TODAY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("수주를 찾을 수 없습니다.");
+        assertThatThrownBy(() -> orderNotificationService.createDueNotification(11L, TODAY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("납기 위험 수주가 아니어서 알림을 보내지 않습니다.");
+        assertThatThrownBy(() -> orderNotificationService.createDueNotification(7L, TODAY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("납기 위험 수주가 아니어서 알림을 보내지 않습니다.");
+        assertThatThrownBy(() -> orderNotificationService.createDueNotification(1L, TODAY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("납기 위험 수주가 아니어서 알림을 보내지 않습니다.");
+        assertThat(orderNotificationRepository.count()).isZero();
     }
 }
