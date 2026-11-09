@@ -1,51 +1,22 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
-import jakarta.persistence.EntityManager;
-import jakarta.validation.ConstraintViolationException;
-import jakarta.validation.Validator;
 import net.likelion.bebc25.prodflow.client.entity.Client;
-import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
-import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
-import net.likelion.bebc25.prodflow.common.domain.Address;
-import net.likelion.bebc25.prodflow.commoncode.entity.CodeGroup;
-import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
-import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.line.entity.Line;
-import net.likelion.bebc25.prodflow.product.entity.Product;
-import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationRescheduleDto;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationItemDto;
-import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
-import net.likelion.bebc25.prodflow.quotation.repository.QuotationItemRepository;
-import net.likelion.bebc25.prodflow.quotation.repository.QuotationRepository;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationService;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfService;
 import net.likelion.bebc25.prodflow.quotation.controller.QuotationController;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationRescheduleService;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationRescheduleDto;
 import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
+import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -301,7 +272,7 @@ class QuotationDocumentIntegrationTest extends QuotationIntegrationTestSupport {
         }).when(storageClient).upload(org.mockito.ArgumentMatchers.eq(key), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyMap());
         org.mockito.Mockito.when(storageClient.createPresignedGetUrl(
-                org.mockito.ArgumentMatchers.eq(key), org.mockito.ArgumentMatchers.any()))
+                        org.mockito.ArgumentMatchers.eq(key), org.mockito.ArgumentMatchers.any()))
                 .thenReturn("https://example.com/preview.pdf");
         var preview = pdfStorageService.prepare(draft.id());
         assertThat(preview.quotationId()).isEqualTo(draft.id());
@@ -368,7 +339,7 @@ class QuotationDocumentIntegrationTest extends QuotationIntegrationTestSupport {
     void urlSigningFailureKeepsKeyNullEvenAfterUpload() {
         var draft = service.create(request(List.of(item(100, 1000L))), userId);
         org.mockito.Mockito.when(storageClient.createPresignedGetUrl(
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenThrow(new RuntimeException("URL 서명 실패"));
         assertThatThrownBy(() -> pdfStorageService.prepare(draft.id()))
                 .isInstanceOf(net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException.class);
@@ -393,18 +364,55 @@ class QuotationDocumentIntegrationTest extends QuotationIntegrationTestSupport {
         org.mockito.Mockito.verifyNoInteractions(storageClient);
     }
 
+
     @Test
     void supplierContactKeepsCreatedByAfterWriterNameChanges() throws Exception {
-        var created = service.create(request(List.of(item(100, 1000L))), userId);
-        assertThat(created.createdBy()).isEqualTo("서도윤");
+        // 견적 생성 당시 작성자 정보
+        var created = service.create(
+                request(List.of(item(100, 1000L))),
+                userId
+        );
+
+        String originalCreatedBy = created.createdBy();
+
+        assertThat(originalCreatedBy)
+                .isEqualTo("writer@example.com");
+
+        // 견적 생성 후 사용자 이름 변경
         tx().executeWithoutResult(status ->
-                ReflectionTestUtils.setField(em.find(User.class, userId), "name", "변경된 이름"));
+                ReflectionTestUtils.setField(
+                        em.find(User.class, userId),
+                        "name",
+                        "변경된 이름"
+                )
+        );
+
+        // 실제 사용자 이름이 변경되었는지 확인
+        String changedUserName = tx().execute(status ->
+                em.find(User.class, userId).getName()
+        );
+
+        assertThat(changedUserName)
+                .isEqualTo("변경된 이름");
+
+        // 견적 작성자 정보는 생성 당시 값 유지
         var detail = service.getQuotationById(created.id());
-        assertThat(detail.userName()).isEqualTo("변경된 이름");
-        assertThat(detail.createdBy()).isEqualTo("서도윤");
-        try (var reader = new org.openpdf.text.pdf.PdfReader(pdfService.generate(detail))) {
-            assertThat(new org.openpdf.text.pdf.parser.PdfTextExtractor(reader).getTextFromPage(1))
-                    .contains("담당자: 서도윤").doesNotContain("변경된 이름");
+
+        assertThat(detail.createdBy())
+                .isEqualTo(originalCreatedBy);
+
+        // PDF에도 생성 당시 작성자 정보 표시
+        try (var reader = new org.openpdf.text.pdf.PdfReader(
+                pdfService.generate(detail)
+        )) {
+            String pdfText =
+                    new org.openpdf.text.pdf.parser.PdfTextExtractor(reader)
+                            .getTextFromPage(1);
+
+            assertThat(pdfText)
+                    .contains("담당자: " + originalCreatedBy)
+                    .doesNotContain("변경된 이름");
         }
     }
+
 }
