@@ -2,7 +2,9 @@ package net.likelion.bebc25.prodflow.order_notification.service;
 
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.order_notification.dto.OrderDueNotificationResponse;
 import net.likelion.bebc25.prodflow.order_notification.dto.OrderNotificationDto;
+import net.likelion.bebc25.prodflow.order_notification.dto.SentOrderNotificationResponse;
 import net.likelion.bebc25.prodflow.order_notification.entity.OrderNotification;
 import net.likelion.bebc25.prodflow.order_notification.enums.OrderNotificationType;
 import net.likelion.bebc25.prodflow.order_notification.repository.OrderNotificationRepository;
@@ -70,6 +72,41 @@ public class OrderNotificationService {
             created++;
         }
         return created;
+    }
+
+    public List<SentOrderNotificationResponse> listSentDueNotifications() {
+        return orderNotificationRepository.findSentDueNotifications(List.of(
+                OrderNotificationType.DELIVERY_DELAYED,
+                OrderNotificationType.DELIVERY_IMMINENT
+        ));
+    }
+
+    // 테이블에서 고른 수주만 알린다. 위험 기준과 중복 방지는 전체 생성과 같다.
+    @Transactional
+    public OrderDueNotificationResponse createDueNotification(Long orderId, LocalDate today) {
+        CustomerOrder loaded = orderNotificationRepository.findOrderForNotification(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("수주를 찾을 수 없습니다."));
+        if (loaded.getUser() == null) {
+            throw new IllegalArgumentException("담당 직원이 없습니다.");
+        }
+
+        LocalDate riskDate = today.plusDays(IMMINENT_DAYS);
+        CustomerOrder order = orderNotificationRepository
+                .findDueNotificationCandidate(orderId, riskDate)
+                .orElseThrow(() -> new IllegalArgumentException("납기 위험 수주가 아니어서 알림을 보내지 않습니다."));
+
+        OrderNotificationType type = resolveType(order, today);
+        if (orderNotificationRepository.existsByCustomerOrder_IdAndNotificationType(order.getId(), type)) {
+            return new OrderDueNotificationResponse(order.getId(), type, false);
+        }
+
+        orderNotificationRepository.save(new OrderNotification(
+                order,
+                order.getUser(),
+                type,
+                message(order, today, type)
+        ));
+        return new OrderDueNotificationResponse(order.getId(), type, true);
     }
 
     private OrderNotificationType resolveType(CustomerOrder order, LocalDate today) {

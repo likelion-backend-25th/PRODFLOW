@@ -124,15 +124,15 @@ public class LineNotificationService {
         switch (status) {
             case AVAILABLE -> {
                 notificationType = LineNotificationType.AVAILABLE;
-                message = line.getLineName() + " 라인이 가동 가능 상태로 변경되었습니다.";
+                message = statusChangedMessage(line.getLineName(), "가동 가능");
             }
             case INSPECTION -> {
                 notificationType = LineNotificationType.MAINTENANCE;
-                message = line.getLineName() + " 라인이 점검 상태로 변경되었습니다.";
+                message = statusChangedMessage(line.getLineName(), "점검");
             }
             case BROKEN -> {
                 notificationType = LineNotificationType.BROKEN;
-                message = line.getLineName() + " 라인이 고장 상태로 변경되었습니다.";
+                message = statusChangedMessage(line.getLineName(), "고장");
             }
             default -> {
                 return;
@@ -140,6 +140,11 @@ public class LineNotificationService {
         }
 
         notificationProductionManagers(lineId, notificationType, message);
+    }
+
+    // 이름에 이미 라인이 들어 있으므로 뒤에 라인을 다시 붙이지 않는다.
+    private String statusChangedMessage(String lineName, String statusLabel) {
+        return lineName + "이 " + statusLabel + " 상태로 변경되었습니다.";
     }
 
 }

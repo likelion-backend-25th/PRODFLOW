@@ -1,6 +1,8 @@
 package net.likelion.bebc25.prodflow.lineNotification;
 
+import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
+import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.line_notification.dto.LineNotificationDto;
 import net.likelion.bebc25.prodflow.line_notification.entity.LineNotification;
 import net.likelion.bebc25.prodflow.line_notification.enums.LineNotificationType;
@@ -26,6 +28,9 @@ class LineNotificationServiceTest {
 
     @Autowired
     private LineNotificationRepository lineNotificationRepository;
+
+    @Autowired
+    private LineRepository lineRepository;
 
     @Test
     @DisplayName("사용자의 알림 목록을 조회한다")
@@ -147,7 +152,7 @@ class LineNotificationServiceTest {
                     .isEqualTo(LineNotificationType.BROKEN);
 
             assertThat(latestNotification.getMessage())
-                    .contains("고장 상태로 변경되었습니다.");
+                    .isEqualTo(statusMessage(lineId, "고장"));
         }
     }
 
@@ -179,7 +184,7 @@ class LineNotificationServiceTest {
                 .isEqualTo(LineNotificationType.AVAILABLE);
 
         assertThat(latestNotification.getMessage())
-                .contains("가동 가능 상태로 변경되었습니다.");
+                .isEqualTo(statusMessage(lineId, "가동 가능"));
     }
 
     @Test
@@ -210,7 +215,7 @@ class LineNotificationServiceTest {
                 .isEqualTo(LineNotificationType.MAINTENANCE);
 
         assertThat(latestNotification.getMessage())
-                .contains("점검 상태로 변경되었습니다.");
+                .isEqualTo(statusMessage(lineId, "점검"));
     }
 
     @Test
@@ -269,6 +274,22 @@ class LineNotificationServiceTest {
     }
 
     @Test
+    @DisplayName("상태 알림 문구는 저장된 라인 이름을 한 번만 쓴다")
+    void statusMessageUsesStoredLineNameOnce() {
+        Line line = lineRepository.save(new Line("야간라인", 100));
+
+        lineNotificationService.notifyLineStatusChanged(line.getId(), LineStatus.INSPECTION);
+
+        LineNotification latestNotification = lineNotificationRepository
+                .findByTarget_IdOrderByCreatedAtDesc(4L)
+                .get(0);
+
+        assertThat(latestNotification.getNotificationType()).isEqualTo(LineNotificationType.MAINTENANCE);
+        assertThat(latestNotification.getMessage()).isEqualTo("야간라인이 점검 상태로 변경되었습니다.");
+        assertThat(latestNotification.getMessage()).doesNotContain("라인 라인");
+    }
+
+    @Test
     @DisplayName("없는 생산라인의 상태 알림은 만들지 않는다")
     void notifyLineStatusChangedWhenLineMissing() {
         assertThatThrownBy(() ->
@@ -276,5 +297,10 @@ class LineNotificationServiceTest {
         )
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("생산라인을 찾을 수 없습니다.");
+    }
+
+    private String statusMessage(Long lineId, String statusLabel) {
+        String lineName = lineRepository.findById(lineId).orElseThrow().getLineName();
+        return lineName + "이 " + statusLabel + " 상태로 변경되었습니다.";
     }
 }

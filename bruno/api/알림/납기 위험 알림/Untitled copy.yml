@@ -1,11 +1,11 @@
 info:
-  name: 생산라인 알림 특정 알림 처리
+  name: Untitled copy
   type: http
-  seq: 3
+  seq: 2
 
 http:
-  method: PATCH
-  url: "{{baseUrl}}/api/v1/notifications/1/read"
+  method: GET
+  url: "{{baseUrl}}/api/v1/order-notifications"
   auth: inherit
 
 settings:
