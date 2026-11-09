@@ -19,7 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class ProductDrawingService {
 
@@ -30,6 +30,7 @@ public class ProductDrawingService {
     private final StorageClient storageClient;
 
 
+    @Transactional
     public Response upload(Long productId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("업로드할 파일이 없습니다.");
@@ -66,7 +67,6 @@ public class ProductDrawingService {
         return Response.from(saved);
     }
 
-    @Transactional(readOnly = true)
     public List<Response> getCurrentFiles(Long productId) {
 
         if (!productRepository.existsById(productId)) {
@@ -78,7 +78,6 @@ public class ProductDrawingService {
     }
 
 
-    @Transactional(readOnly = true)
     public List<Response> getList(Long productId) {
         if (!productRepository.existsById(productId)) {
             throw new EntityNotFoundException("품목을 찾을 수 없습니다: id=" + productId);
