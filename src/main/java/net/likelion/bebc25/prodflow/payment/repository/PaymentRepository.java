@@ -36,7 +36,7 @@ public interface PaymentRepository extends
             String portonePaymentId
     );
 
-    // 수주 상세에 표시할 결제 목록 조회 (팀원 코드 유지)
+    // 수주 상세에 표시할 결제 목록 조회
     List<Payment> findByOrder_IdOrderByIdAsc(Long orderId);
 
     // 검색 + 페이징 시 수주와 거래처 함께 조회
@@ -47,7 +47,7 @@ public interface PaymentRepository extends
             Pageable pageable
     );
 
-    // 상세 조회 시 수주와 거래처 함께 조회
+    // 결제 상세 조회 시 수주와 거래처 함께 조회
     @Override
     @EntityGraph(attributePaths = {
             "order",
