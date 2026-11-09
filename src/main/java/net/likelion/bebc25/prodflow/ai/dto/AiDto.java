@@ -58,7 +58,7 @@ public class AiDto {
 
     // 대화방 제목 변경 요청
     public record TitleUpdateRequest(
-            @NotBlank(message = "제목을  입력해주세요.")
+            @NotBlank(message = "제목을 입력해주세요.")
             @Size(max = 20, message = "제목은 20자 이하여야 합니다.")
             String title
     ) {
