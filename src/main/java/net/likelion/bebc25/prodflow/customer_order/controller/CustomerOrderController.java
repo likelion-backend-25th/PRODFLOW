@@ -19,7 +19,9 @@ import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderService;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -158,5 +160,41 @@ public class CustomerOrderController {
         return ResponseEntity.ok().contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename("수주목록.csv", StandardCharsets.UTF_8).build().toString()).body(csv);
+    }
+
+    @Operation(
+            summary = "거래처 수주 이력 조회",
+            description = "특정 거래처의 수주 이력을 페이지네이션하여 조회한다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/clients/{id}")
+    public ResponseEntity<Page<CustomerOrderDto.ClientDetailResponse>> findByClientId(
+            @Parameter(description = "거래처 ID", example = "1")
+            @PathVariable("id") Long clientId,
+            @PageableDefault(
+                    page = 0,
+                    size = 4,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable
+    ) {
+        return ResponseEntity.ok(customerOrderService.findByClientId(clientId, pageable));
+    }
+
+    @Operation(
+            summary = "거래처의 가장 최근 수주 조회",
+            description = "특정 거래처의 가장 최근에 수주한 내역을 조회한다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/clients/{id}/recent")
+    public ResponseEntity<CustomerOrderDto.ClientDetailResponse> getRecentByClientId(
+            @Parameter(description = "거래처 ID", example = "1")
+            @PathVariable("id") Long clientId
+    ) {
+        return ResponseEntity.ok(customerOrderService.getRecentByClientId(clientId));
     }
 }
