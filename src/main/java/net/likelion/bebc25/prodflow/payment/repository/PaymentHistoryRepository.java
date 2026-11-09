@@ -17,7 +17,7 @@ public interface PaymentHistoryRepository
 
     // 여러 결제건의 입금내역 일괄 조회
     List<PaymentHistory> findByPayment_IdIn(
-            Collection<Long> paymentIds
+            Collection<Long> paymentIds);
 
     boolean existsByPayment_Id(Long paymentId);
     // 선택한 수주 결제에 연결된 입금 내역 조회
