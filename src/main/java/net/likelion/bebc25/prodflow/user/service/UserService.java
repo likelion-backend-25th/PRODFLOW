@@ -6,6 +6,7 @@ import net.likelion.bebc25.prodflow.auth.repository.RefreshTokenRepository;
 import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.user.dto.UserDto;
 import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
@@ -14,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Locale;
 
 @Service
@@ -195,6 +197,10 @@ public class UserService {
                 active,
                 inactive
         );
+    }
+
+    public List<User> findByOrderManager() {
+        return userRepository.findByRole(UserRole.ORDER_MANAGER);
     }
 
     // 삭제된 직원 검증

@@ -2,12 +2,15 @@ package net.likelion.bebc25.prodflow.user.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.user.dto.UserDto;
+import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.service.UserService;
 import org.springframework.data.domain.Pageable;
@@ -15,9 +18,18 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.List;
 
 @Tag(name = "직원 관리", description = "직원 계정 등록·조회·수정 및 본인 정보 조회 API")
 @RestController
@@ -114,5 +126,18 @@ public class UserController {
             @PathVariable Long id
     ) {
         return ResponseEntity.ok(userService.softDeleteUser(id));
+    }
+
+    // 수주 관리자 리스트 조회
+    @Operation(
+            summary = "수주 관리자 리스트 조회",
+            description = "ORDER_MANAGER 권한을 갖고 있는 User들을 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/order")
+    public ResponseEntity<List<User>> findByOrderManager() {
+        return ResponseEntity.ok(userService.findByOrderManager());
     }
 }

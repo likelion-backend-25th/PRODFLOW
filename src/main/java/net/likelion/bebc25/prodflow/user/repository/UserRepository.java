@@ -1,6 +1,7 @@
 package net.likelion.bebc25.prodflow.user.repository;
 
 import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -40,4 +42,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // 상단 통계에서 상태별 직원 수 집계
     long countByStatus(UserStatus status);
 
+    List<User> findByRole(UserRole role);
 }
