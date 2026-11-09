@@ -1,5 +1,9 @@
 package net.likelion.bebc25.prodflow.dashboard;
 
+import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
+import java.util.Map;
+
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
 import net.likelion.bebc25.prodflow.dashboard.service.DeliveryRiskService;
@@ -23,6 +27,20 @@ class DeliveryRiskServiceTest {
     @Autowired
     private DeliveryRiskService deliveryRiskService;
 
+    @Autowired
+    private EntityManager em;
+
+    @BeforeEach
+    void setUpRiskDates() {
+        // 임박·지연·미입금·다품목 조건을 시드의 절대 날짜와 독립적으로 구성한다.
+        Map<Long, Integer> offsets = Map.of(1L, 1, 9L, 2, 10L, 3, 12L, -1);
+        offsets.forEach((id, offset) -> em.createQuery(
+                        "update CustomerOrder o set o.requestedDueDate = :date where o.id = :id")
+                .setParameter("date", FixedDashboardClock.TODAY.plusDays(offset))
+                .setParameter("id", id).executeUpdate());
+        em.clear();
+    }
+
     @Test
     @DisplayName("납기 위험 수주 목록을 조회한다")
     void getDeliveryRisks() {
@@ -40,7 +58,7 @@ class DeliveryRiskServiceTest {
     @DisplayName("납기 임박 수주가 조회된다")
     void getUrgentDeliveryRisk() {
         // given
-        String orderNo = "PF-2026-009";
+        String orderNo = "PF-20261106-9";
 
         // when
         DashboardDto.DeliveryRiskStatisticsResponse response =
@@ -51,7 +69,7 @@ class DeliveryRiskServiceTest {
                 .anySatisfy(item -> {
                     assertThat(item.orderNo()).isEqualTo(orderNo);
                     assertThat(item.riskType()).isEqualTo("URGENT");
-                    assertThat(item.requestedDueDate()).isEqualTo(LocalDate.of(2026, 11, 6));
+                    assertThat(item.requestedDueDate()).isEqualTo(FixedDashboardClock.TODAY.plusDays(2));
                 });
     }
 
@@ -59,7 +77,7 @@ class DeliveryRiskServiceTest {
     @DisplayName("납기일이 지난 수주는 지연 상태로 조회된다")
     void getDelayedDeliveryRisk() {
         // given
-        String orderNo = "PF-2026-012";
+        String orderNo = "PF-20261027-12";
 
         // when
         DashboardDto.DeliveryRiskStatisticsResponse response =
@@ -133,20 +151,14 @@ class DeliveryRiskServiceTest {
     @Test
     @DisplayName("납기 위험 수주의 결제 상태는 수주 결제 상태와 같다")
     void getDeliveryRiskPaidStatus() {
-        // given
-        String orderNo = "PF-2026-009";
-
-        // when
         DashboardDto.DeliveryRiskStatisticsResponse response =
                 deliveryRiskService.getDeliveryRisks();
 
-        // then
         assertThat(response.items())
-                .anySatisfy(item -> {
-                    if (item.orderNo().equals(orderNo)) {
-                        assertThat(item.paymentStatus()).isEqualTo(OrderPaymentStatus.UNPAID);
-                        assertThat(item.paidAmount()).isZero();
-                    }
+                .filteredOn(item -> item.orderId().equals(9L))
+                .singleElement().satisfies(item -> {
+                    assertThat(item.paymentStatus()).isEqualTo(OrderPaymentStatus.UNPAID);
+                    assertThat(item.paidAmount()).isZero();
                 });
     }
 
@@ -157,13 +169,11 @@ class DeliveryRiskServiceTest {
                 deliveryRiskService.getDeliveryRisks();
 
         assertThat(response.items())
-                .anySatisfy(item -> {
-                    if ("PF-2026-001".equals(item.orderNo())) {
-                        assertThat(item.productName()).isEqualTo(
-                                "디자인 A 투명 케이스, 디자인 B 맥세이프 케이스, 디자인 C 카드수납 케이스"
-                        );
-                        assertThat(item.quantity()).isEqualTo(6000);
-                    }
+                .filteredOn(item -> item.orderId().equals(1L))
+                .singleElement().satisfies(item -> {
+                    assertThat(item.productName()).isEqualTo(
+                            "아이폰 16 맥세이프 클리어 케이스, 아이폰 16 프로 맥세이프 범퍼 케이스, 갤럭시 S25 카드수납 슬라이드 케이스");
+                    assertThat(item.quantity()).isEqualTo(6000);
                 });
     }
 
@@ -175,7 +185,7 @@ class DeliveryRiskServiceTest {
 
         assertThat(response.items())
                 .extracting(DashboardDto.DeliveryRiskStatisticsItemResponse::orderNo)
-                .contains("PF-2026-006", "PF-2026-010")
-                .doesNotContain("PF-2026-007", "PF-2026-011");
+                .contains("PF-20261030-6", "PF-20261108-10")
+                .doesNotContain("PF-20260925-7", "PF-20261030-11");
     }
 }

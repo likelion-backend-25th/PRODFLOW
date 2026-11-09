@@ -7,25 +7,19 @@ import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
-import net.likelion.bebc25.prodflow.work_order.repsitory.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.ProductionPlanRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// CI 에러 임시 해결 (@Sql 해당 부분 제거할 때 @Sql import 도 같이 삭제)
-@SpringBootTest(properties = {
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.sql.init.mode=never"
-})
-@Sql("/data.sql")
+@SpringBootTest
 @Transactional
 class ProductionPlanRepositoryTest {
 
@@ -40,9 +34,11 @@ class ProductionPlanRepositoryTest {
 
     Line line;
     Long prepareWorkOrderId;
+    long existingProductPlanQuantity;
 
     @BeforeEach
     void setUp() {
+        existingProductPlanQuantity = productionPlanRepository.sumQuantityByOrderProductId(15L);
         line = saveLine("계획-조회");
         User user = em.find(User.class, 4L);
         OrderProduct activeProduct = em.find(OrderProduct.class, 15L);
@@ -85,7 +81,8 @@ class ProductionPlanRepositoryTest {
         assertThat(productionPlanRepository.findByWorkOrder_Id(prepareWorkOrderId))
                 .extracting(ProductionPlan::getPlanDate, ProductionPlan::getQuantity)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple(DAY, 100));
-        assertThat(productionPlanRepository.sumQuantityByOrderProductId(15L)).isEqualTo(190);
+        assertThat(productionPlanRepository.sumQuantityByOrderProductId(15L))
+                .isEqualTo(existingProductPlanQuantity + 190);
         assertThat(productionPlanRepository.sumQuantityByOrderProductId(13L)).isEqualTo(50);
     }
 

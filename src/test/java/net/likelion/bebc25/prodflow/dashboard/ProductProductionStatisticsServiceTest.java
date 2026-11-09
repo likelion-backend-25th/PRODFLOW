@@ -38,23 +38,23 @@ class ProductProductionStatisticsServiceTest {
         // then
         assertNotNull(response);
 
-        assertEquals(7500L, response.totalCompletedQuantity());
+        assertEquals(3500L, response.totalCompletedQuantity());
         assertEquals(3, response.items().size());
 
-        assertEquals(1L, response.items().getFirst().productId());
-        assertEquals("디자인 A 투명 케이스", response.items().getFirst().productName());
-        assertEquals(4000L, response.items().get(0).completedQuantity());
-        assertEquals(53.3, response.items().get(0).productionShare(), 0.0001);
+        assertEquals(3L, response.items().get(0).productId());
+        assertEquals("갤럭시 S25 카드수납 슬라이드 케이스", response.items().get(0).productName());
+        assertEquals(1500L, response.items().get(0).completedQuantity());
+        assertEquals(42.9, response.items().get(0).productionShare(), 0.0001);
 
-        assertEquals(2L, response.items().get(1).productId());
-        assertEquals("디자인 B 맥세이프 케이스", response.items().get(1).productName());
-        assertEquals(2000L, response.items().get(1).completedQuantity());
-        assertEquals(26.7, response.items().get(1).productionShare(), 0.0001);
+        assertEquals(4L, response.items().get(1).productId());
+        assertEquals("갤럭시 S25 울트라 소프트 실리콘 케이스", response.items().get(1).productName());
+        assertEquals(1000L, response.items().get(1).completedQuantity());
+        assertEquals(28.6, response.items().get(1).productionShare(), 0.0001);
 
-        assertEquals(3L, response.items().get(2).productId());
-        assertEquals("디자인 C 카드수납 케이스", response.items().get(2).productName());
-        assertEquals(1500L, response.items().get(2).completedQuantity());
-        assertEquals(20.0, response.items().get(2).productionShare(), 0.0001);
+        assertEquals(5L, response.items().get(2).productId());
+        assertEquals("아이폰 15 사피아노 가죽 케이스", response.items().get(2).productName());
+        assertEquals(1000L, response.items().get(2).completedQuantity());
+        assertEquals(28.6, response.items().get(2).productionShare(), 0.0001);
     }
 
     // 생산 완료 데이터가 없는 월 조회
@@ -113,7 +113,7 @@ class ProductProductionStatisticsServiceTest {
         assertEquals(response.totalCompletedQuantity(), itemQuantitySum);
     }
 
-    // 생산 비중 합계 확인
+    // 항목별 소수점 첫째 자리 반올림에 따른 합계 오차 범위를 확인한다.
     @Test
     void getProductProductionShare_productionSharesSumTo100Percent() {
         // given
@@ -128,7 +128,9 @@ class ProductProductionStatisticsServiceTest {
                 .mapToDouble(DashboardDto.ProductProductionShareItemResponse::productionShare)
                 .sum();
 
-        assertEquals(100.0, totalShare, 0.0001);
+        // 항목 하나의 반올림 오차는 최대 0.05%p다.
+        double roundingTolerance = response.items().size() * 0.05 + 0.0001;
+        assertEquals(100.0, totalShare, roundingTolerance);
     }
 
 }

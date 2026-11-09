@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface PaymentRepository extends
         JpaRepository<Payment, Long>,
@@ -27,6 +28,10 @@ public interface PaymentRepository extends
             Long orderId,
             PaymentType paymentType
     );
+    // 수주 상세에 표시할 결제 목록 조회
+    List<Payment> findByOrder_IdOrderByIdAsc(Long orderId);
+
+    boolean existsByOrder_IdAndPaymentType(Long orderId, PaymentType paymentType);
 
     Optional<Payment> findByPortonePaymentId(
             String portonePaymentId

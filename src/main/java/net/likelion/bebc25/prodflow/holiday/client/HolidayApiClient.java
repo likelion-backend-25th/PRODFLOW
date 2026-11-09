@@ -105,7 +105,8 @@ public class HolidayApiClient {
         } catch (RestClientException e) {
             // 원본 예외에 인증키가 담긴 요청 URI가 포함될 수 있어 전달하지 않는다.
             throw new ExternalApiException("공휴일 API 통신에 실패했습니다.");
-        } catch (ParserConfigurationException | SAXException | IOException | IllegalArgumentException | DateTimeException e) {
+        } catch (ParserConfigurationException | SAXException | IOException
+                 | IllegalArgumentException | DateTimeException e) {
             throw new ExternalApiException("공휴일 API 응답 형식이 올바르지 않습니다.");
         }
     }

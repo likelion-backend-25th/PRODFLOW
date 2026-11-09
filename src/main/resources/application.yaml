@@ -93,6 +93,8 @@ shipment:
     refresh-enabled: ${SHIPMENT_TRACKING_REFRESH_ENABLED:true}
     # 이전 실행 종료 후 대기 시간(ms). 기본 10분
     refresh-interval-ms: ${SHIPMENT_TRACKING_REFRESH_INTERVAL_MS:600000}
+    # 주기 조회로 수주 완료할 때 상태 이력에 남길 직원 id (시드 admin=1)
+    system-user-id: ${SHIPMENT_TRACKING_SYSTEM_USER_ID:1}
 
 jwt:
   secret: ${JWT_SECRET}

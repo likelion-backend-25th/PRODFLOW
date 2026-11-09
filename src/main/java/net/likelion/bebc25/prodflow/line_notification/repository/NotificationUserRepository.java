@@ -5,9 +5,10 @@ import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface NotificationUserRepository extends JpaRepository<User, Long> {
 
-    List<User> findByRoleAndStatus(UserRole userRole, UserStatus userStatus);
+    List<User> findByRoleInAndStatus(Collection<UserRole> roles, UserStatus status);
 }

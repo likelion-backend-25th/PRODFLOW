@@ -36,12 +36,16 @@
 
 ```java
 // 올바른 제어문 작성 예시
-if (isExpired) {
-    throw new CourseEnrollmentExpiredException("수강 기간이 만료되었습니다.");
+if(isExpired){
+        throw new
+
+CourseEnrollmentExpiredException("수강 기간이 만료되었습니다.");
 }
 
 // 부적절한 작성 예시 (중괄호 누락)
-if (isExpired) throw new CourseEnrollmentExpiredException("수강 기간이 만료되었습니다.");
+        if(isExpired)throw new
+
+CourseEnrollmentExpiredException("수강 기간이 만료되었습니다.");
 ```
 
 ### 2.2 임포트(Import) 규칙
@@ -60,7 +64,8 @@ if (isExpired) throw new CourseEnrollmentExpiredException("수강 기간이 만�
 - 코드 자체로 설명: 불필요한 사족 주석을 배제하고 메서드명과 변수명만으로 의도를 이해할 수 있도록 작성함.
 - 클래스 어노테이션 배치:
     - 클래스 선언 바로 위에 배치하며, 가독성을 위해 한 줄에 하나의 어노테이션 선언을 원칙으로 함.
-    - 배치 순서: `@Slf4j` -> 컴포넌트 어노테이션(`@RestController`, `@Service`, `@Repository`) -> 트랜잭션/보안 어노테이션(`@Transactional`, `@Secured`) -> 롬복(`@RequiredArgsConstructor`).
+    - 배치 순서: `@Slf4j` -> 컴포넌트 어노테이션(`@RestController`, `@Service`, `@Repository`) -> 트랜잭션/보안 어노테이션(`@Transactional`,
+      `@Secured`) -> 롬복(`@RequiredArgsConstructor`).
 
 ---
 
@@ -68,7 +73,7 @@ if (isExpired) throw new CourseEnrollmentExpiredException("수강 기간이 만�
 
 ### 3.1 패키지 명명 규칙
 
-- 소문자 알파벳 단어를 결합하여 계층 구조로 구성하며 언더스코어나 대문자를 사용하지 않음.
+- 소문자 알파벳 단어를 결합하여 계층 구조로 구성함.
 - 도메인 주도 설계(DDD) 관점의 도메인 중심 패키지 구조를 적용함.
     - 패키지 루트: `net.likelion.bebc25.prodflow`
     - 공통 모듈: `net.likelion.bebc25.prodflow.common`

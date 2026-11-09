@@ -70,7 +70,7 @@ class LineNotificationServiceTest {
     void markAsRead() {
         // given
         Long notificationId = 1L;
-        Long userId = 4L;
+        Long userId = 6L;
 
         // when
         LineNotificationDto result =
@@ -247,19 +247,25 @@ class LineNotificationServiceTest {
     }
 
     @Test
-    @DisplayName("비활성 생산 관리자와 다른 역할에는 라인 알림을 만들지 않는다")
-    void notifyLineStatusChangedSkipsInactiveAndOtherRoles() {
-        long beforeInactive =
-                lineNotificationRepository.countByTarget_IdAndReadAtIsNull(8L);
-        long beforeOrderManager =
-                lineNotificationRepository.countByTarget_IdAndReadAtIsNull(2L);
+    @DisplayName("라인 상태 알림은 활성 최고관리자, 수주 관리자, 생산 관리자에게만 만든다")
+    void notifyLineStatusChangedReachesStatusRolesOnly() {
+        long beforeAdmin = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(1L);
+        long beforeOrderManager2 = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(2L);
+        long beforeOrderManager = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(3L);
+        long beforeProductionManager = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(4L);
+        long beforeInquiry = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(7L);
+        long beforeInactive = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(8L);
+        long beforeDeleted = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(9L);
 
         lineNotificationService.notifyLineStatusChanged(1L, LineStatus.BROKEN);
 
-        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(8L))
-                .isEqualTo(beforeInactive);
-        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(2L))
-                .isEqualTo(beforeOrderManager);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(1L)).isEqualTo(beforeAdmin + 1);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(2L)).isEqualTo(beforeOrderManager2 + 1);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(3L)).isEqualTo(beforeOrderManager + 1);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(4L)).isEqualTo(beforeProductionManager + 1);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(7L)).isEqualTo(beforeInquiry);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(8L)).isEqualTo(beforeInactive);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(9L)).isEqualTo(beforeDeleted);
     }
 
     @Test

@@ -1,5 +1,7 @@
 package net.likelion.bebc25.prodflow.dashboard;
 
+import jakarta.persistence.EntityManager;
+
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
 import net.likelion.bebc25.prodflow.dashboard.service.DeliveryPerformanceService;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +23,9 @@ class DeliveryPerformanceServiceTest {
 
     @Autowired
     private DeliveryPerformanceService deliveryPerformanceService;
+
+    @Autowired
+    private EntityManager em;
 
     @Test
     @DisplayName("조회 시작일이 null이면 예외가 발생한다")
@@ -105,11 +110,14 @@ class DeliveryPerformanceServiceTest {
     @Test
     @DisplayName("배송 완료일이 요청 납기일 이전이면 정시 배송이다")
     void onTimeDeliveryUsesDeliveredDate() {
+        LocalDate dueDate = FixedDashboardClock.TODAY.minusDays(1);
+        em.createQuery("update CustomerOrder o set o.requestedDueDate = :date where o.id = 7")
+                .setParameter("date", dueDate).executeUpdate();
+        em.createQuery("update Shipment s set s.deliveredAt = :date where s.orderId = 7")
+                .setParameter("date", dueDate.atTime(16, 0)).executeUpdate();
+
         DashboardDto.DeliveryPerformanceResponse response =
-                deliveryPerformanceService.getDeliveryPerformance(
-                        LocalDate.of(2026, 9, 26),
-                        LocalDate.of(2026, 9, 26)
-                );
+                deliveryPerformanceService.getDeliveryPerformance(dueDate, dueDate);
 
         assertThat(response.totalOrderCount()).isEqualTo(1);
         assertThat(response.onTimeOrderCount()).isEqualTo(1);
@@ -119,11 +127,13 @@ class DeliveryPerformanceServiceTest {
     @Test
     @DisplayName("배송 완료 시각이 없으면 지연 배송이다")
     void missingDeliveryIsLate() {
+        LocalDate dueDate = FixedDashboardClock.TODAY.minusDays(2);
+        // 운송장 자체가 없는 생산중 수주와, 운송장은 있지만 배송중인 수주를 함께 검증한다.
+        em.createQuery("update CustomerOrder o set o.requestedDueDate = :date where o.id in (2, 6)")
+                .setParameter("date", dueDate).executeUpdate();
+
         DashboardDto.DeliveryPerformanceResponse response =
-                deliveryPerformanceService.getDeliveryPerformance(
-                        LocalDate.of(2026, 10, 28),
-                        LocalDate.of(2026, 10, 28)
-                );
+                deliveryPerformanceService.getDeliveryPerformance(dueDate, dueDate);
 
         assertThat(response.totalOrderCount()).isEqualTo(2);
         assertThat(response.onTimeOrderCount()).isZero();
@@ -133,16 +143,15 @@ class DeliveryPerformanceServiceTest {
     @Test
     @DisplayName("오늘 이후 납기와 취소 수주는 분모에 포함되지 않는다")
     void futureAndCancelledOrdersAreExcluded() {
+        LocalDate futureDate = FixedDashboardClock.TODAY.plusDays(1);
+        LocalDate cancelledDate = LocalDate.of(2026, 1, 20);
+        em.createQuery("update CustomerOrder o set o.requestedDueDate = :date where o.id = 11")
+                .setParameter("date", cancelledDate).executeUpdate();
+
         DashboardDto.DeliveryPerformanceResponse future =
-                deliveryPerformanceService.getDeliveryPerformance(
-                        LocalDate.of(2026, 11, 6),
-                        LocalDate.of(2026, 11, 7)
-                );
+                deliveryPerformanceService.getDeliveryPerformance(futureDate, futureDate.plusDays(1));
         DashboardDto.DeliveryPerformanceResponse cancelled =
-                deliveryPerformanceService.getDeliveryPerformance(
-                        LocalDate.of(2026, 10, 18),
-                        LocalDate.of(2026, 10, 18)
-                );
+                deliveryPerformanceService.getDeliveryPerformance(cancelledDate, cancelledDate);
 
         assertThat(future.totalOrderCount()).isZero();
         assertThat(cancelled.totalOrderCount()).isZero();

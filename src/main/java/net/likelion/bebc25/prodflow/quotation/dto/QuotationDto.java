@@ -63,13 +63,28 @@ public class QuotationDto {
     }
 
     public record ClientRequest(
-            @NotBlank @Size(max = 255) String company,
-            @NotBlank(message = "거래처 담당자명을 입력해주세요.") @Size(max = 50) String employee,
-            @NotBlank @Email @Size(max = 100) String email,
-            @NotBlank @Pattern(regexp = "[0-9+() -]{8,50}") String phone,
-            @NotBlank @Size(max = 10) String zipcode,
-            @NotBlank @Size(max = 100) String roadAddress,
-            @NotBlank @Size(max = 100) String detailAddress
+            @NotBlank(message = "거래처명을 입력해주세요.")
+            @Size(max = 255, message = "거래처명은 255자 이하여야 합니다.")
+            String company,
+            @NotBlank(message = "거래처 담당자명을 입력해주세요.")
+            @Size(max = 50, message = "거래처 담당자명은 50자 이하여야 합니다.")
+            String employee,
+            @NotBlank(message = "이메일을 입력해주세요.")
+            @Email(message = "이메일 형식이 올바르지 않습니다.")
+            @Size(max = 100, message = "이메일은 100자 이하여야 합니다.")
+            String email,
+            @NotBlank(message = "연락처를 입력해주세요.")
+            @Pattern(regexp = "[0-9+() -]{8,50}", message = "연락처는 숫자와 +, 괄호, 공백, -로 8~50자여야 합니다.")
+            String phone,
+            @NotBlank(message = "우편번호를 입력해주세요.")
+            @Size(max = 10, message = "우편번호는 10자 이하여야 합니다.")
+            String zipcode,
+            @NotBlank(message = "도로명 주소를 입력해주세요.")
+            @Size(max = 100, message = "도로명 주소는 100자 이하여야 합니다.")
+            String roadAddress,
+            @NotBlank(message = "상세 주소를 입력해주세요.")
+            @Size(max = 100, message = "상세 주소는 100자 이하여야 합니다.")
+            String detailAddress
     ) {
         // 거래처 주소 변환
         public Address toAddress() {

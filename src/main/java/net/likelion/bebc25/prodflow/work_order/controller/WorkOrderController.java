@@ -6,10 +6,15 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.common.dto.StatusHistoryDto;
+import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
+import net.likelion.bebc25.prodflow.common.service.StatusHistoryService;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
-import net.likelion.bebc25.prodflow.work_order.serivce.WorkOrderService;
+import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderHistoryDto;
+import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,11 +34,12 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("api/v1/work-orders")
+@RequestMapping("/api/v1/work-orders")
 @RequiredArgsConstructor
 public class WorkOrderController {
 
     private final WorkOrderService workOrderService;
+    private final StatusHistoryService statusHistoryService;
 
     // 계약금 확인 전이므로 수주 흐름 대신 이 API로 등록을 시험한다.
     @Operation(
@@ -49,7 +55,7 @@ public class WorkOrderController {
     @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
     @PostMapping
     public ResponseEntity<List<WorkOrderDto.Response>> create(
-            @RequestBody WorkOrderDto.CreateRequest request,
+            @Valid @RequestBody WorkOrderDto.CreateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         List<WorkOrderDto.Response> responses = workOrderService.create(request, userDetails.getUserId());
@@ -61,7 +67,8 @@ public class WorkOrderController {
 
     @Operation(
             summary = "작업지시 페이징 조회",
-            description = "로그인한 사용자가 작업지시를 조회한다. 완료 예정일이 빠른 순이고, 같은 날이면 최근 등록이 앞이다. 한 페이지는 5건이다."
+            description = "로그인한 사용자가 작업지시를 조회한다. orderId를 지정하면 해당 수주의 작업지시만 조회하며 다른 검색 조건과 AND로 적용한다. "
+                    + "완료 예정일이 빠른 순이고, 같은 날이면 최근 등록이 앞이다. 한 페이지 기본값은 5건이다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -69,8 +76,10 @@ public class WorkOrderController {
             content = @Content(schema = @Schema(implementation = WorkOrderDto.PageResponse.class))
     )
     @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "404", description = "orderId에 해당하는 수주를 찾을 수 없음")
     @GetMapping
     public ResponseEntity<Page<WorkOrderDto.PageResponse>> getPage(
+            @RequestParam(required = false) Long orderId, // 수주 ID
             @RequestParam(required = false) String keyword, // 수주번호, 품목명, 거래처명, 담당자명
             @RequestParam(required = false) LocalDate from, // 지시일 시작
             @RequestParam(required = false) LocalDate to, // 지시일 종료
@@ -83,7 +92,7 @@ public class WorkOrderController {
     ) {
         // 정렬이 없는 페이지다. 순서는 레포지토리 메서드가 정한다.
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(workOrderService.findAll(lineId, status, from, to, keyword, pageable));
+        return ResponseEntity.ok(workOrderService.findAll(orderId, lineId, status, from, to, keyword, pageable));
     }
 
 
@@ -106,7 +115,7 @@ public class WorkOrderController {
         return ResponseEntity.ok(workOrderService.getDetail(workOrderId));
     }
 
-    
+
     @Operation(
             summary = "작업지시서 수정",
             description = "작업지시서의 배정 생산 라인과 담당자를 변경한다. 라인 또는 담당자 중 변경할 항목만 전달할 수 있으며, 두 항목 모두 변경할 수도 있다."
@@ -123,7 +132,7 @@ public class WorkOrderController {
     @PatchMapping("/{workOrderId}")
     public ResponseEntity<WorkOrderDto.DetailResponse> update(
             @PathVariable Long workOrderId,
-            @RequestBody WorkOrderDto.UpdatedRequest request,
+            @Valid @RequestBody WorkOrderDto.UpdatedRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(
@@ -148,11 +157,47 @@ public class WorkOrderController {
     public ResponseEntity<WorkOrderDto.DetailResponse> changeStatus(
             @Parameter(description = "작업지시 ID", example = "1")
             @PathVariable Long workOrderId,
-            @RequestBody WorkOrderDto.UpdateStatusRequest request,
+            @Valid @RequestBody WorkOrderDto.UpdateStatusRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(
                 workOrderService.changeStatus(workOrderId, request, userDetails.getUserId())
+        );
+    }
+
+    // 작업지시서 상태 변경 이력 조회
+    @Operation(
+            summary = "작업지시서 상태 변경 이력 조회",
+            description = "로그인한 사용자가 특정 작업지시서의 상태 변경 이력을 변경 일시 기준 최신순으로 조회한다."
+    )
+    @ApiResponse(responseCode = "200", description = "조회 성공 (이력이 없는 경우 빈 배열 반환)")
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @GetMapping("/{workOrderId}/status-history")
+    public List<StatusHistoryDto.Response> getStatusHistories(
+            @PathVariable Long workOrderId
+    ) {
+        // 해당 작업지시서의 상태 변경 이력 조회
+        return statusHistoryService.getStatusHistories(
+                HistoryEntityType.WORK_ORDER,
+                workOrderId
+        );
+    }
+
+    // 작업지시서 라인 및 담당자 변경 이력 조회
+    @Operation(
+            summary = "작업지시서 변경 이력 조회",
+            description = "로그인한 사용자가 특정 작업지시서의 라인 및 담당자 변경 이력을 최근 5개까지 최신순으로 조회한다."
+    )
+    @ApiResponse(responseCode = "200", description = "조회 성공 (이력이 없는 경우 빈 배열 반환)")
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @GetMapping("/{workOrderId}/history")
+    public ResponseEntity<List<WorkOrderHistoryDto.Response>> getWorkOrderHistories(
+            @Parameter(description = "작업지시서 ID", example = "16")
+            @PathVariable Long workOrderId
+    ) {
+        // 해당 작업지시서의 최근 변경 이력 5개 조회
+        return ResponseEntity.ok(
+                workOrderService.getWorkOrderHistories(workOrderId)
         );
     }
 }

@@ -3,7 +3,9 @@ package net.likelion.bebc25.prodflow.shipment.repository;
 import net.likelion.bebc25.prodflow.shipment.entity.Shipment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,6 +13,12 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
 
     Optional<Shipment> findByOrderId(Long orderId);
 
+    @Query("""
+            SELECT s FROM Shipment s
+            JOIN FETCH s.carrier
+            WHERE s.orderId IN :orderIds
+            """)
+    List<Shipment> findByOrderIdIn(@Param("orderIds") Collection<Long> orderIds);
     boolean existsByOrderId(Long orderId);
 
     boolean existsByCarrier_CodeAndTrackingNumber(String carrierCode, String trackingNumber);
