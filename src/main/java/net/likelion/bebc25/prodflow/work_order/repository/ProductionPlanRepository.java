@@ -7,8 +7,11 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Collection;
 
 public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, Long> {
+    // 지정한 작업지시들의 날짜별 생산계획을 상태·날짜 제한 없이 모두 조회한다.
+    List<ProductionPlan> findByWorkOrder_IdIn(Collection<Long> workOrderIds);
 
     // 그 라인, 그 날짜의 계획 수량 합. 취소된 수주와 포장 이후 작업은 자리를 차지하지 않는다.
     @Query("""

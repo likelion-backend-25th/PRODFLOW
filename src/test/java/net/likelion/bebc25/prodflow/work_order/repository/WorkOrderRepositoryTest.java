@@ -54,7 +54,7 @@ class WorkOrderRepositoryTest {
         LocalDate today = LocalDate.now();
 
         assertThat(workOrderRepository.search(
-                        line.getId(), "PREPARE", today, today, "PF-2026-013", PageRequest.of(0, 5))
+                        line.getId(), "PREPARE", today, today, "PF-20261103-13", PageRequest.of(0, 5))
                 .getContent())
                 .extracting(WorkOrder::getWorkNo)
                 .containsExactly("WO-REPO-PREPARE");
@@ -64,12 +64,12 @@ class WorkOrderRepositoryTest {
                 .isEmpty();
 
         assertThat(workOrderRepository.searchPage(
-                        line.getId(), "PREPARE", today, today, "PF-2026-013", PageRequest.of(0, 5))
+                        line.getId(), "PREPARE", today, today, "PF-20261103-13", PageRequest.of(0, 5))
                 .getContent())
                 .singleElement()
                 .satisfies(row -> {
                     assertThat(row.workNo()).isEqualTo("WO-REPO-PREPARE");
-                    assertThat(row.orderNo()).isEqualTo("PF-2026-013");
+                    assertThat(row.orderNo()).isEqualTo("PF-20261103-13");
                     assertThat(row.lineName()).isEqualTo("저장소-라인");
                     assertThat(row.assignedName()).isEqualTo("김태호");
                     assertThat(row.status()).isEqualTo("PREPARE");

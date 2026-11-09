@@ -1,4 +1,6 @@
-package net.likelion.bebc25.prodflow.quotation;
+package net.likelion.bebc25.prodflow.quotation.controller;
+
+import net.likelion.bebc25.prodflow.quotation.support.QuotationTestFixtures;
 
 import java.util.NoSuchElementException;
 
@@ -66,7 +68,7 @@ class QuotationStatusControllerTest {
 
     @Test
     void approvalUsesAuthenticatedOperatorAndReturnsChangedDetail() throws Exception {
-        var detail = QuotationPdfServiceTest.draft();
+        var detail = QuotationTestFixtures.draft();
         when(detail.status()).thenReturn(QuotationStatus.APPROVED);
         when(service.approve(123L, 7L)).thenReturn(detail);
         mvc.perform(patch("/api/v1/quotations/123/approve"))
@@ -86,7 +88,7 @@ class QuotationStatusControllerTest {
 
     @Test
     void rejectionUsesAuthenticatedOperatorAndReturnsChangedDetail() throws Exception {
-        var detail = QuotationPdfServiceTest.draft();
+        var detail = QuotationTestFixtures.draft();
         when(detail.status()).thenReturn(QuotationStatus.REJECTED);
         when(service.reject(123L, 7L)).thenReturn(detail);
         mvc.perform(patch("/api/v1/quotations/123/reject"))
@@ -98,7 +100,7 @@ class QuotationStatusControllerTest {
 
     @Test
     void cancellationUsesAuthenticatedOperatorAndReturnsChangedDetail() throws Exception {
-        var detail = QuotationPdfServiceTest.draft();
+        var detail = QuotationTestFixtures.draft();
         when(detail.status()).thenReturn(QuotationStatus.CANCELLED);
         when(service.cancel(123L, 7L)).thenReturn(detail);
         mvc.perform(patch("/api/v1/quotations/123/cancel"))

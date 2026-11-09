@@ -8,13 +8,16 @@ import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
 import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
+import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductRepository;
 import net.likelion.bebc25.prodflow.holiday.entity.Holiday;
 import net.likelion.bebc25.prodflow.holiday.repository.HolidayRepository;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.line.repository.LineRepository;
+import net.likelion.bebc25.prodflow.quotation.repository.QuotationScheduleRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
@@ -30,16 +33,21 @@ import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderHistoryReposi
 import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Year;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -62,6 +70,7 @@ public class WorkOrderService {
 
     private final WorkOrderRepository workOrderRepository;
     private final OrderProductRepository orderProductRepository;
+    private final CustomerOrderRepository customerOrderRepository;
     private final LineRepository lineRepository;
     private final UserRepository userRepository;
     private final CommonCodeRepository commonCodeRepository;
@@ -70,6 +79,259 @@ public class WorkOrderService {
     private final StatusHistoryRepository statusHistoryRepository;
     private final WorkOrderHistoryRepository workOrderHistoryRepository;
     private final ProductionPlanRescheduleService productionPlanRescheduleService;
+    private final QuotationScheduleRepository quotationScheduleRepository;
+
+    // 계약금 확인 시 등록 순서로 미시작 물량을 재배치한다. 생산 이력이 있는 작업은 수정하지 않는다.
+    @Transactional
+    public List<WorkOrderDto.Response> createForConfirmedOrder(CustomerOrder order, User actor) {
+        if (!"CONFIRMED".equals(order.getStatusCode().getCode())
+                || workOrderRepository.existsByOrderProduct_CustomerOrder_Id(order.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "생산대기 상태이며 작업지시가 없는 수주만 배정할 수 있습니다.");
+        }
+        List<Line> lines = lineRepository.findAllForUpdate().stream()
+                .filter(line -> line.getStatus() == LineStatus.AVAILABLE || line.getStatus() == LineStatus.OPERATING)
+                .toList();
+        if (lines.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "가동 가능한 생산라인이 없습니다.");
+        }
+        CommonCode prepare = commonCodeRepository.findByCodeGroup_GroupCodeAndCodeAndStatus(
+                        "WORK_ORDER_STATUS", "PREPARE", CodeStatus.ACTIVE)
+                .orElseThrow(() -> new IllegalStateException("준비 상태 코드를 찾을 수 없습니다."));
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        List<CustomerOrder> orders = quotationScheduleRepository.findActiveOrders();
+        List<Long> orderIds = orders.stream().map(CustomerOrder::getId).toList();
+        List<WorkOrder> existingWorks = workOrderRepository.findByOrderIds(orderIds);
+        Set<Long> fixedIds = new HashSet<>(workOrderRepository.findFixedWorkOrderIds(orderIds));
+        Map<Long, List<WorkOrder>> movableByItem = new HashMap<>();
+        Map<Long, Integer> fixedQuantity = new HashMap<>();
+        Map<Long, List<WorkOrder>> fixedByOrder = new HashMap<>();
+        List<Long> movableIds = new ArrayList<>();
+        for (WorkOrder work : existingWorks) {
+            if (fixedIds.contains(work.getId())) {
+                fixedQuantity.merge(work.getOrderProduct().getId(), work.getQuantity(), Integer::sum);
+                fixedByOrder.computeIfAbsent(work.getOrderProduct().getCustomerOrder().getId(), key -> new ArrayList<>()).add(work);
+            } else {
+                movableByItem.computeIfAbsent(work.getOrderProduct().getId(), key -> new ArrayList<>()).add(work);
+                movableIds.add(work.getId());
+            }
+        }
+        if (!movableIds.isEmpty()) {
+            productionPlanRepository.deleteAll(productionPlanRepository.findByWorkOrder_IdIn(movableIds));
+            productionPlanRepository.flush();
+        }
+
+        Map<Long, Map<LocalDate, Integer>> reserved = new HashMap<>();
+        List<DepositAssignment> assignments = new ArrayList<>();
+        for (CustomerOrder current : orders) {
+            LocalDate first = null;
+            LocalDate last = null;
+            for (WorkOrder fixed : fixedByOrder.getOrDefault(current.getId(), List.of())) {
+                first = first == null || fixed.getPlannedStartDate().isBefore(first) ? fixed.getPlannedStartDate() : first;
+                last = last == null || fixed.getPlannedEndDate().isAfter(last) ? fixed.getPlannedEndDate() : last;
+            }
+            List<OrderProduct> items = orderProductRepository.findAllByCustomerOrderId(current.getId());
+            if (items.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "생산할 수주 품목이 없습니다: " + current.getOrderNo());
+            }
+            for (OrderProduct item : items) {
+                int remaining = item.getQuantity() - fixedQuantity.getOrDefault(item.getId(), 0);
+                if (remaining < 0) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "시작된 작업 수량이 수주 품목 수량보다 많습니다.");
+                }
+                if (remaining == 0) {
+                    continue;
+                }
+                Map<Line, List<DayPlan>> allocations = allocateDepositItem(item, remaining, lines, today, reserved);
+                for (List<DayPlan> days : allocations.values()) {
+                    first = first == null || days.getFirst().planDate().isBefore(first) ? days.getFirst().planDate() : first;
+                    last = last == null || days.getLast().planDate().isAfter(last) ? days.getLast().planDate() : last;
+                }
+                // 미입금 수주도 생산 자리는 확보하되 실제 작업지시는 만들지 않는다.
+                if (!"WAITING".equals(current.getStatusCode().getCode())) {
+                    assignments.add(new DepositAssignment(item, allocations));
+                }
+            }
+            if (first != null && last != null) {
+                LocalDate dueDate = deliveryDateAfterProduction(last);
+                if (dueDate.isBefore(current.getEstimatedDueDate())) {
+                    dueDate = current.getEstimatedDueDate();
+                }
+                current.changeSchedule(dueDate, first, last);
+            }
+        }
+
+        List<WorkOrder> targetJobs = new ArrayList<>();
+        for (DepositAssignment assignment : assignments) {
+            OrderProduct item = assignment.item();
+            List<WorkOrder> previous = movableByItem.computeIfAbsent(item.getId(), key -> new ArrayList<>());
+            for (Map.Entry<Line, List<DayPlan>> entry : assignment.allocations().entrySet()) {
+                List<DayPlan> days = entry.getValue();
+                WorkOrder work = previous.stream().filter(candidate -> candidate.getLine().getId().equals(entry.getKey().getId()))
+                        .findFirst().orElse(previous.isEmpty() ? null : previous.getFirst());
+                int quantity = days.stream().mapToInt(DayPlan::quantity).sum();
+                if (work == null) {
+                    work = new WorkOrder(nextDepositWorkNo(today), item, entry.getKey(), null, quantity,
+                            days.getFirst().planDate(), days.getLast().planDate(), "계약금 확인 후 작업 배정");
+                    work.changeStatus(prepare);
+                    work.setCreatedBy(item.getCustomerOrder().getUser().getName());
+                    workOrderRepository.save(work);
+                    statusHistoryRepository.save(new StatusHistory(HistoryEntityType.WORK_ORDER, work.getId(), "NONE", "PREPARE", actor));
+                } else {
+                    previous.remove(work);
+                    Line oldLine = work.getLine();
+                    User oldUser = work.getUser();
+                    work.changeLine(entry.getKey());
+                    if (!isActiveProductionManager(oldUser)) {
+                        work.changeUser(null);
+                    }
+                    if (!oldLine.getId().equals(work.getLine().getId()) || oldUser != work.getUser()) {
+                        workOrderHistoryRepository.save(new WorkOrderHistory(work, oldLine, work.getLine(),
+                                oldUser, work.getUser(), actor, "수주 등록 순서에 따른 준비 작업 재배치"));
+                    }
+                    work.changeQuantity(quantity);
+                    work.changePlannedDates(days.getFirst().planDate(), days.getLast().planDate());
+                }
+                work.setUpdatedBy(actor.getName());
+                for (DayPlan day : days) {
+                    ProductionPlan plan = new ProductionPlan(work, day.planDate(), day.quantity());
+                    plan.setCreatedBy(actor.getName());
+                    plan.setUpdatedBy(actor.getName());
+                    productionPlanRepository.save(plan);
+                }
+                if (item.getCustomerOrder().getId().equals(order.getId())) {
+                    targetJobs.add(work);
+                }
+            }
+        }
+        // 여러 준비 작업이 한 라인으로 통합되면 배정 이력을 보관한 후 남는 행을 제거한다.
+        for (List<WorkOrder> leftovers : movableByItem.values()) {
+            for (WorkOrder unused : leftovers) {
+                for (WorkOrderHistory history : workOrderHistoryRepository.findByWorkOrder_Id(unused.getId())) {
+                    history.archiveWorkOrder();
+                }
+                workOrderHistoryRepository.flush();
+                workOrderRepository.delete(unused);
+            }
+        }
+        workOrderRepository.flush();
+        assignUnassignedPrepare(actor, today.plusDays(1));
+        return targetJobs.stream().map(work -> new WorkOrderDto.Response(
+                work.getId(), work.getWorkNo(), work.getNote(), plansOf(work))).toList();
+    }
+
+    // 날짜별로 빈 생산량이 큰 라인부터 채우고, 같은 품목·라인은 한 작업지시로 묶는다.
+    private Map<Line, List<DayPlan>> allocateDepositItem(OrderProduct item, int quantityToAllocate, List<Line> lines, LocalDate today,
+                                                         Map<Long, Map<LocalDate, Integer>> reserved) {
+        CustomerOrder order = item.getCustomerOrder();
+        LocalDate start = order.getPlannedStartDate();
+        if (start.isBefore(order.getDepositDueDate())) {
+            start = order.getDepositDueDate();
+        }
+        if (start.isBefore(today)) {
+            start = today;
+        }
+        LocalDate end = LocalDate.of(today.getYear() + 1, 12, 31);
+        Set<LocalDate> holidays = new HashSet<>();
+        if (!start.isAfter(end)) {
+            for (Holiday holiday : holidayRepository.findByHolidayDateBetweenOrderByHolidayDateAsc(start, end)) {
+                holidays.add(holiday.getHolidayDate());
+            }
+        }
+        Map<Line, List<DayPlan>> allocations = new LinkedHashMap<>();
+        int remaining = quantityToAllocate;
+        for (LocalDate date = start; !date.isAfter(end) && remaining > 0; date = date.plusDays(1)) {
+            if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY || holidays.contains(date)) {
+                continue;
+            }
+            LocalDate planDate = date;
+            List<Line> available = new ArrayList<>(lines);
+            available.sort(Comparator.<Line>comparingLong(line -> depositSpace(line, planDate, reserved)).reversed()
+                    .thenComparing(Line::getId));
+            for (Line line : available) {
+                long space = depositSpace(line, date, reserved);
+                int quantity = (int) Math.min(remaining, Math.max(0, space));
+                if (quantity == 0) {
+                    continue;
+                }
+                allocations.computeIfAbsent(line, key -> new ArrayList<>()).add(new DayPlan(date, quantity));
+                reserved.computeIfAbsent(line.getId(), key -> new HashMap<>()).merge(date, quantity, Integer::sum);
+                remaining -= quantity;
+                if (remaining == 0) {
+                    break;
+                }
+            }
+        }
+        if (remaining > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "수주 " + order.getOrderNo() + "의 생산 기간에 배정할 용량이 부족합니다. 생산 일정을 먼저 조정해주세요.");
+        }
+        return allocations;
+    }
+
+    private long depositSpace(Line line, LocalDate date, Map<Long, Map<LocalDate, Integer>> reserved) {
+        return line.getProductionCapacity() - productionPlanRepository.sumQuantityByLineAndDate(line.getId(), date)
+                - reserved.getOrDefault(line.getId(), Map.of()).getOrDefault(date, 0);
+    }
+
+    // 출근 여부와 현재 생산 여부는 제외하지 않는다. 다음 날 장수, 이름, ID 순으로 고른다.
+    private User chooseDepositAssignee(LocalDate nextDate) {
+        User chosen = null;
+        long least = Long.MAX_VALUE;
+        for (User user : userRepository.findAll()) {
+            if (!isActiveProductionManager(user)) {
+                continue;
+            }
+            long load = workOrderRepository.countPlannedWorkByUserAndDate(user.getId(), nextDate);
+            if (chosen == null || load < least || (load == least && user.getName().compareTo(chosen.getName()) < 0)
+                    || (load == least && user.getName().equals(chosen.getName()) && user.getId() < chosen.getId())) {
+                chosen = user;
+                least = load;
+            }
+        }
+        return chosen;
+    }
+
+    private boolean isActiveProductionManager(User user) {
+        return user != null && user.getRole() == UserRole.PRODUCTION_MANAGER && user.getStatus() == UserStatus.ACTIVE;
+    }
+
+    private void assignUnassignedPrepare(User actor, LocalDate nextDate) {
+        for (WorkOrder work : workOrderRepository.findUnassignedPrepareOrderByDueDate()) {
+            User assignee = chooseDepositAssignee(nextDate);
+            if (assignee == null) {
+                break;
+            }
+            work.changeUser(assignee);
+            work.setUpdatedBy(actor.getName());
+            workOrderHistoryRepository.save(new WorkOrderHistory(work, work.getLine(), work.getLine(),
+                    null, assignee, actor, "미배정 준비 작업 자동 담당자 배정"));
+        }
+    }
+
+    private String nextDepositWorkNo(LocalDate today) {
+        long next = workOrderRepository.count() + 1;
+        String workNo;
+        do {
+            workNo = "WO-" + today.getYear() + "-" + String.format("%03d", next++);
+        } while (workOrderRepository.existsByWorkNo(workNo));
+        return workNo;
+    }
+
+    private LocalDate deliveryDateAfterProduction(LocalDate completedDate) {
+        Set<LocalDate> holidays = new HashSet<>();
+        for (Holiday holiday : holidayRepository.findByHolidayDateBetweenOrderByHolidayDateAsc(completedDate, completedDate.plusDays(30))) {
+            holidays.add(holiday.getHolidayDate());
+        }
+        LocalDate date = completedDate;
+        int days = 0;
+        while (days < 3) {
+            date = date.plusDays(1);
+            if (date.getDayOfWeek() != DayOfWeek.SATURDAY && date.getDayOfWeek() != DayOfWeek.SUNDAY && !holidays.contains(date)) {
+                days++;
+            }
+        }
+        return date;
+    }
 
     // 한 라인이 부족하면 다른 라인에 장을 더 만든다. 장마다 지시번호가 1 증가한다.
     @Transactional
@@ -252,17 +514,28 @@ public class WorkOrderService {
             String keyword,
             Pageable pageable
     ) {
-        // 각 요소가 null, 빈칸이 아닌경우 공백 제거하여 저장
+        return findAll(null, lineId, status, from, to, keyword, pageable);
+    }
+
+    // 수주 필터와 기존 검색 조건을 함께 적용한다.
+    public Page<WorkOrderDto.PageResponse> findAll(
+            Long orderId, Long lineId, String status,
+            LocalDate from, LocalDate to, String keyword, Pageable pageable) {
+        if (orderId != null && !customerOrderRepository.existsById(orderId)) {
+            throw new NoSuchElementException("수주를 찾을 수 없습니다.");
+        }
+
         String code = status == null || status.isBlank() ? null : status.trim();
         String word = keyword == null || keyword.isBlank() ? null : keyword.trim();
-        boolean hasCondition = lineId != null || code != null || from != null || to != null || word != null;
-        // 검색 조건이 전부 공백 상태인 경우
+
+        boolean hasCondition = orderId != null || lineId != null
+                || code != null || from != null || to != null || word != null;
+
         if (!hasCondition) {
-            // 완료 예정일이 빠른 순이다. 같은 날이면 id가 큰 최근 등록이 앞이다.
             return workOrderRepository.findPage(pageable);
         }
-        // 조건별 검색이다. 응답 컬럼은 조회 쿼리에서 이미 채운다.
-        return workOrderRepository.searchPage(lineId, status, from, to, keyword, pageable);
+
+        return workOrderRepository.searchPage(orderId, lineId, code, from, to, word, pageable);
     }
 
     // 작업지시서 상세 조회
@@ -391,7 +664,7 @@ public class WorkOrderService {
         WorkOrder workOrder = workOrderRepository.findById(workOrderId)
                 .orElseThrow(() -> new NoSuchElementException("해당 작업을 찾을 수 없습니다."));
         // 최고 관리자이거나, 이 작업에 배정된 생산 현장 관리자만 상태를 바꾼다.
-        boolean isAssignee = workOrder.getUser().getId().equals(user.getId());
+        boolean isAssignee = workOrder.getUser() != null && workOrder.getUser().getId().equals(user.getId());
         boolean canChangeStatus = user.getRole() == UserRole.SUPER_ADMIN
                 || (user.getRole() == UserRole.PRODUCTION_MANAGER && isAssignee);
         if (!canChangeStatus) {
@@ -465,6 +738,9 @@ public class WorkOrderService {
 
     // 생산 시작. 라인은 가동 중이 되고 수주는 생산중이 된다.
     private void startProduction(WorkOrder workOrder, User user) {
+        if (workOrder.getUser() == null) {
+            throw new IllegalArgumentException("담당자를 배정한 후 생산을 시작해주세요.");
+        }
         if (workOrder.getPlannedStartDate().isAfter(LocalDate.now())) {
             throw new IllegalArgumentException("생산 시작 예정일 전에는 시작할 수 없습니다.");
         }
@@ -496,7 +772,7 @@ public class WorkOrderService {
         if ("CANCELLED".equals(orderStatus(workOrder))) {
             return;
         }
-        changeOrder(workOrder, "PRODUCTION_READY");
+        changeOrder(workOrder, "CONFIRMED");
     }
 
     // 수주 진행 상태는 ORDER_STATUS 그룹의 코드다.
@@ -556,5 +832,8 @@ public class WorkOrderService {
 
     // 저장 전 하루 계획. 날짜와 수량을 한 건으로 둔다.
     private record DayPlan(LocalDate planDate, int quantity) {
+    }
+
+    private record DepositAssignment(OrderProduct item, Map<Line, List<DayPlan>> allocations) {
     }
 }

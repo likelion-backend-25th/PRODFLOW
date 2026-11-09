@@ -62,6 +62,13 @@ public class ShipmentDto {
     ) {
     }
 
+    // 수주가 존재하지만 배송은 아직 등록되지 않은 경우도 구분한다.
+    public record OrderResponse(ShipmentTrackingDto shipment) {
+        public static OrderResponse from(Shipment shipment, String orderStatus) {
+            return new OrderResponse(shipment == null ? null : ShipmentTrackingDto.from(shipment, orderStatus));
+        }
+    }
+
     public record CreateRequest(
             Long orderId,
             String carrierCode,

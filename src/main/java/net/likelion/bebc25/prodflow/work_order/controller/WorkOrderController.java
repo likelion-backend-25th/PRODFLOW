@@ -67,7 +67,8 @@ public class WorkOrderController {
 
     @Operation(
             summary = "작업지시 페이징 조회",
-            description = "로그인한 사용자가 작업지시를 조회한다. 완료 예정일이 빠른 순이고, 같은 날이면 최근 등록이 앞이다. 한 페이지는 5건이다."
+            description = "로그인한 사용자가 작업지시를 조회한다. orderId를 지정하면 해당 수주의 작업지시만 조회하며 다른 검색 조건과 AND로 적용한다. "
+                    + "완료 예정일이 빠른 순이고, 같은 날이면 최근 등록이 앞이다. 한 페이지 기본값은 5건이다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -75,8 +76,10 @@ public class WorkOrderController {
             content = @Content(schema = @Schema(implementation = WorkOrderDto.PageResponse.class))
     )
     @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "404", description = "orderId에 해당하는 수주를 찾을 수 없음")
     @GetMapping
     public ResponseEntity<Page<WorkOrderDto.PageResponse>> getPage(
+            @RequestParam(required = false) Long orderId, // 수주 ID
             @RequestParam(required = false) String keyword, // 수주번호, 품목명, 거래처명, 담당자명
             @RequestParam(required = false) LocalDate from, // 지시일 시작
             @RequestParam(required = false) LocalDate to, // 지시일 종료
@@ -89,7 +92,7 @@ public class WorkOrderController {
     ) {
         // 정렬이 없는 페이지다. 순서는 레포지토리 메서드가 정한다.
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(workOrderService.findAll(lineId, status, from, to, keyword, pageable));
+        return ResponseEntity.ok(workOrderService.findAll(orderId, lineId, status, from, to, keyword, pageable));
     }
 
 

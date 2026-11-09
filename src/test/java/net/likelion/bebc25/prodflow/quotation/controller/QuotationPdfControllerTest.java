@@ -1,4 +1,6 @@
-package net.likelion.bebc25.prodflow.quotation;
+package net.likelion.bebc25.prodflow.quotation.controller;
+
+import net.likelion.bebc25.prodflow.quotation.support.QuotationTestFixtures;
 
 import net.likelion.bebc25.prodflow.global.exception.GlobalExceptionHandler;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
@@ -35,7 +37,7 @@ class QuotationPdfControllerTest {
 
     @Test
     void draftSaveEndpointsReturnDetailWithoutPreparingPdf() throws Exception {
-        var draft = QuotationPdfServiceTest.draft();
+        var draft = QuotationTestFixtures.draft();
         var principal = mock(CustomUserDetails.class);
         when(principal.getUserId()).thenReturn(7L);
         when(quotations.create(any(), eq(7L))).thenReturn(draft);
@@ -77,7 +79,7 @@ class QuotationPdfControllerTest {
 
     @Test
     void createReturnsPreviewJsonAndSavedDraftLocation() {
-        var draft = QuotationPdfServiceTest.draft();
+        var draft = QuotationTestFixtures.draft();
         var principal = mock(CustomUserDetails.class);
         when(principal.getUserId()).thenReturn(7L);
         when(pdfs.create(any(), eq(7L))).thenReturn(preview());
@@ -203,7 +205,7 @@ class QuotationPdfControllerTest {
 
     @Test
     void updateReturnsPdfForSameQuotationAndPassesIdAndEditor() {
-        var draft = QuotationPdfServiceTest.draft();
+        var draft = QuotationTestFixtures.draft();
         var principal = mock(CustomUserDetails.class);
         when(principal.getUserId()).thenReturn(7L);
         var request = request();
@@ -232,7 +234,7 @@ class QuotationPdfControllerTest {
 
     @Test
     void postPdfAcceptsExistingClientWithoutNameAndRejectsBlankNewClientEmployee() throws Exception {
-        var draft = QuotationPdfServiceTest.draft();
+        var draft = QuotationTestFixtures.draft();
         var principal = mock(CustomUserDetails.class);
         when(principal.getUserId()).thenReturn(7L);
         when(pdfs.create(any(), eq(7L))).thenReturn(preview());
@@ -272,7 +274,7 @@ class QuotationPdfControllerTest {
 
     @Test
     void detailResponseUsesRenamedClientFields() throws Exception {
-        var draft = QuotationPdfServiceTest.draft();
+        var draft = QuotationTestFixtures.draft();
         when(draft.clientAddress()).thenReturn("서울 테스트로 1");
         when(quotations.getQuotationById(123L)).thenReturn(draft);
         var mvc = MockMvcBuilders.standaloneSetup(controller)

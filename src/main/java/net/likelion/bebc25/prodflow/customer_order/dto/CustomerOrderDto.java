@@ -11,14 +11,39 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
 import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
 import net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class CustomerOrderDto {
+    // 수주 상태 변경 이력 응답
+    public record HistoryResponse(
+            Long id,
+            String fromStatus,
+            String toStatus,
+            Long userId,
+            String userName,
+            String note,
+            LocalDateTime createdAt
+    ) {
+        // 처리자 이름은 현재 직원 이름이 아닌 이력에 저장된 이름을 사용한다.
+        public static HistoryResponse from(StatusHistory history) {
+            return new HistoryResponse(
+                    history.getId(),
+                    history.getFromStatus(),
+                    history.getToStatus(),
+                    history.getUser() == null ? null : history.getUser().getId(),
+                    history.getUserName(),
+                    history.getNote(),
+                    history.getCreatedAt());
+        }
+    }
+
     // 수주 등록 요청
     public record CreateRequest(
             @Schema(description = "수주 등록 기준 승인 견적 ID", example = "17")

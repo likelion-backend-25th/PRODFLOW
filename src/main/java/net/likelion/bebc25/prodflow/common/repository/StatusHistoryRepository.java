@@ -23,4 +23,7 @@ public interface StatusHistoryRepository extends JpaRepository<StatusHistory, Lo
     List<StatusHistory> findByEntityOrderByCreatedAtDesc(
             HistoryEntityType entity
     );
+
+    // 같은 ID의 다른 도메인 이력을 제외하고 최근 처리 순으로 조회한다.
+    List<StatusHistory> findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(HistoryEntityType entity, Long entityId);
 }

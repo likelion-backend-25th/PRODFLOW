@@ -1,4 +1,4 @@
-package net.likelion.bebc25.prodflow.quotation;
+package net.likelion.bebc25.prodflow.quotation.controller;
 
 import net.likelion.bebc25.prodflow.quotation.schedule.QuotationSchedulePreviewResult;
 import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleResult;

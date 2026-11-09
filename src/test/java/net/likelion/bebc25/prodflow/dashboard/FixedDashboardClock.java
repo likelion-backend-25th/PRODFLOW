@@ -8,11 +8,11 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
-// 테스트 실행 날짜를 2026년 11월 4일로 고정해 항상 동일한 조건으로 테스트한다.
+// 테스트 실행 날짜를 2026년 11월 9일로 고정해 항상 동일한 조건으로 테스트한다.
 @TestConfiguration
 public class FixedDashboardClock {
 
-    public static final LocalDate TODAY = LocalDate.of(2026, 11, 4);
+    public static final LocalDate TODAY = LocalDate.of(2026, 11, 9);
 
     @Bean
     @Primary
