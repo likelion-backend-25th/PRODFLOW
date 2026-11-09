@@ -98,7 +98,7 @@ public class CustomerOrderService {
 
         for (OrderProduct item : items) {
             long itemSupplyAmount = order.isVatIncluded() ? BigDecimal.valueOf(item.lineAmount())
-                    .divide(new BigDecimal("1.1"), 0, RoundingMode.HALF_UP).longValueExact()
+                                                            .divide(new BigDecimal("1.1"), 0, RoundingMode.HALF_UP).longValueExact()
                     : item.getUnitPrice() * item.getQuantity();
             supplyAmount += itemSupplyAmount;
 
@@ -348,5 +348,29 @@ public class CustomerOrderService {
         }
         return "%" + keyword.trim().toLowerCase(java.util.Locale.ROOT)
                 .replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+    }
+
+    public CustomerOrderDto.ClientDetailResponse getRecentByClientId(Long clientId) {
+        CustomerOrder order = orderRepository.findFirstByClient_IdOrderByCreatedAtDesc(clientId)
+                .orElseThrow(()
+                        -> new IllegalArgumentException("해당 거래처 ID의 수주 내역을 찾을 수 없습니다. id = " + clientId));
+        List<OrderProduct> orderProductList = orderProductRepository.findAllByCustomerOrderId(order.getId());
+        String productName = orderProductList.size() > 1
+                ? orderProductList.getFirst().getProductName() + " 외 " + (orderProductList.size() - 1)
+                : orderProductList.getFirst().getProductName();
+        return CustomerOrderDto.ClientDetailResponse.from(order, productName);
+    }
+
+    public Page<CustomerOrderDto.ClientDetailResponse> findByClientId(Long clientId, Pageable pageable) {
+        Page<CustomerOrder> customerOrders = orderRepository.findAllByClient_Id(clientId, pageable);
+
+        return customerOrders.map(order -> {
+            List<OrderProduct> orderProductList = orderProductRepository.findAllByCustomerOrderId(order.getId());
+            String productName = orderProductList.size() > 1
+                    ? orderProductList.getFirst().getProductName() + " 외 " + (orderProductList.size() - 1)
+                    : orderProductList.getFirst().getProductName();
+
+            return CustomerOrderDto.ClientDetailResponse.from(order, productName);
+        });
     }
 }

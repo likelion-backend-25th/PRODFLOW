@@ -168,4 +168,7 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     // 거래처의 최근 수주 조회
     Optional<CustomerOrder> findFirstByClient_IdOrderByCreatedAtDesc(Long clientId);
+
+    // 거래처의 수주 이력 조회
+    Page<CustomerOrder> findAllByClient_Id(Long clientId, Pageable pageable);
 }

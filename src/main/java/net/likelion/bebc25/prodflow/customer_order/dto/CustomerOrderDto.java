@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.customer_order.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
@@ -10,8 +11,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
-import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
 import net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
@@ -110,6 +111,16 @@ public class CustomerOrderDto {
                     order.getStatusCode().getCode(),
                     order.getConfirmationStatus(),
                     order.getPaymentStatus());
+        }
+    }
+
+    public record ClientDetailResponse(
+            @JsonProperty
+            CustomerOrder customerOrder,
+            String productName
+    ) {
+        public static ClientDetailResponse from(CustomerOrder customerOrder, String productName) {
+            return new ClientDetailResponse(customerOrder, productName);
         }
     }
 }
