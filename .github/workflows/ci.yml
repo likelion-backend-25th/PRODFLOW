@@ -34,6 +34,9 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
 
+      - name: Gradle 설정
+        uses: gradle/actions/setup-gradle@v6
+
       - name: Gradle 실행 권한 부여
         run: chmod +x gradlew
 
