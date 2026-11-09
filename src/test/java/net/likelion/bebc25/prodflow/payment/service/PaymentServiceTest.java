@@ -198,7 +198,7 @@ class PaymentServiceTest {
 
     private Payment savePayment(PaymentType type, long amount) {
         return paymentRepository.save(Payment.builder().order(order).paymentType(type).amount(amount)
-                .portonePaymentId("PAYMENT-QUERY-" + type).createdBy("test").build());
+                .portonePaymentId("PAYMENT-QUERY-" + type).build());
     }
 
     private VirtualAccount saveAccount(Payment payment, String accountNumber) {

@@ -3,8 +3,8 @@ package net.likelion.bebc25.prodflow.payment.service;
 import jakarta.persistence.EntityManager;
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.common.domain.Address;
-import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
+import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
@@ -12,6 +12,8 @@ import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
+import net.likelion.bebc25.prodflow.line.entity.Line;
+import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
@@ -29,15 +31,13 @@ import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
-import net.likelion.bebc25.prodflow.line.entity.Line;
-import net.likelion.bebc25.prodflow.line.enums.LineStatus;
-import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
-import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
-import net.likelion.bebc25.prodflow.work_order.entity.WorkOrderHistory;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
-import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
-import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderHistoryRepository;
+import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
+import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
+import net.likelion.bebc25.prodflow.work_order.entity.WorkOrderHistory;
 import net.likelion.bebc25.prodflow.work_order.repository.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderHistoryRepository;
+import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -69,16 +69,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:manual-deposit-${random.uuid};MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=USER,LINE")
 @Transactional
 class ManualDepositServiceTest {
-    @Autowired private EntityManager em;
-    @Autowired private PaymentService paymentService;
-    @Autowired private PaymentRepository paymentRepository;
-    @Autowired private PaymentHistoryRepository paymentHistoryRepository;
-    @Autowired private VirtualAccountRepository virtualAccountRepository;
-    @Autowired private ProductionPlanRepository productionPlanRepository;
-    @Autowired private StatusHistoryRepository statusHistoryRepository;
-    @Autowired private WorkOrderService workOrderService;
-    @Autowired private WorkOrderHistoryRepository workOrderHistoryRepository;
-    @Autowired private PlatformTransactionManager transactionManager;
+    @Autowired
+    private EntityManager em;
+    @Autowired
+    private PaymentService paymentService;
+    @Autowired
+    private PaymentRepository paymentRepository;
+    @Autowired
+    private PaymentHistoryRepository paymentHistoryRepository;
+    @Autowired
+    private VirtualAccountRepository virtualAccountRepository;
+    @Autowired
+    private ProductionPlanRepository productionPlanRepository;
+    @Autowired
+    private StatusHistoryRepository statusHistoryRepository;
+    @Autowired
+    private WorkOrderService workOrderService;
+    @Autowired
+    private WorkOrderHistoryRepository workOrderHistoryRepository;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private Long orderId;
     private Long quotationId;
@@ -92,17 +102,14 @@ class ManualDepositServiceTest {
     @BeforeEach
     void setUp() {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            actor = User.builder().name("현금 처리 직원").email("cash-actor@test.com")
-                    .password("1234").phone("010-1111-2222").role(UserRole.ORDER_MANAGER).build();
+            actor = User.builder().name("현금 처리 직원").email("cash-actor@test.com").password("1234").phone("010-1111-2222").role(UserRole.ORDER_MANAGER).build();
             actor.changePassword("changed");
             em.persist(actor);
             actorId = actor.getId();
-            User manager = User.builder().name("현금 생산 담당자").email("cash-manager@test.com")
-                    .password("1234").phone("010-2222-3333").role(UserRole.PRODUCTION_MANAGER).build();
+            User manager = User.builder().name("현금 생산 담당자").email("cash-manager@test.com").password("1234").phone("010-2222-3333").role(UserRole.PRODUCTION_MANAGER).build();
             em.persist(manager);
             managerId = manager.getId();
-            Client client = new Client("현금 테스트 거래처", "담당자", "cash@test.com", "02-1234-5678",
-                    new Address("12345", "서울 테스트로", "1층"), actor);
+            Client client = new Client("현금 테스트 거래처", "담당자", "cash@test.com", "02-1234-5678", new Address("12345", "서울 테스트로", "1층"), actor);
             em.persist(client);
             clientId = client.getId();
             start = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(14);
@@ -110,14 +117,10 @@ class ManualDepositServiceTest {
                 start = start.plusDays(1);
             }
             LocalDate end = start.plusDays(4);
-            Quotation quotation = new Quotation("QT-CASH-TEST", client, client.getEmployee(), actor,
-                    end.plusDays(7), end.plusDays(7), start, end, end, true, QuotationStatus.APPROVED, 10001L);
+            Quotation quotation = new Quotation("QT-CASH-TEST", client, client.getEmployee(), actor, end.plusDays(7), end.plusDays(7), start, end, end, true, QuotationStatus.APPROVED, 10001L);
             em.persist(quotation);
             quotationId = quotation.getId();
-            CustomerOrder order = new CustomerOrder("PF-CASH-TEST", quotation, client, client.getEmployee(),
-                    client.getEmail(), client.getPhone(), "회사 주소", actor, end.plusDays(7), end.plusDays(7), start, end,
-                    LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(3), "배송 주소", "수신자", "010-3333-4444",
-                    NotifyChannel.EMAIL, null, em.find(CommonCode.class, 6L), true, 10001L);
+            CustomerOrder order = new CustomerOrder("PF-CASH-TEST", quotation, client, client.getEmployee(), client.getEmail(), client.getPhone(), "회사 주소", actor, end.plusDays(7), end.plusDays(7), start, end, LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(3), "배송 주소", "수신자", "010-3333-4444", NotifyChannel.EMAIL, null, em.find(CommonCode.class, 6L), true, 10001L);
             em.persist(order);
             orderId = order.getId();
             Product first = Product.create("CASH-001", "현금 품목 A", em.find(CommonCode.class, 1L), "설명", 100L);
@@ -137,20 +140,14 @@ class ManualDepositServiceTest {
         SecurityContextHolder.clearContext();
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-                em.createQuery("delete from WorkOrderHistory h where h.changedBy.id = :actorId")
-                        .setParameter("actorId", actorId).executeUpdate();
-                em.createQuery("delete from net.likelion.bebc25.prodflow.common.entity.StatusHistory h where h.user.id = :actorId")
-                        .setParameter("actorId", actorId).executeUpdate();
-                em.createQuery("update WorkOrder w set w.user = null where w.user.id = :managerId")
-                        .setParameter("managerId", managerId).executeUpdate();
-                List<Long> jobs = em.createQuery("select w.id from WorkOrder w where w.orderProduct.customerOrder.id = :id", Long.class)
-                        .setParameter("id", orderId).getResultList();
+                em.createQuery("delete from WorkOrderHistory h where h.changedBy.id = :actorId").setParameter("actorId", actorId).executeUpdate();
+                em.createQuery("delete from net.likelion.bebc25.prodflow.common.entity.StatusHistory h where h.user.id = :actorId").setParameter("actorId", actorId).executeUpdate();
+                em.createQuery("update WorkOrder w set w.user = null where w.user.id = :managerId").setParameter("managerId", managerId).executeUpdate();
+                List<Long> jobs = em.createQuery("select w.id from WorkOrder w where w.orderProduct.customerOrder.id = :id", Long.class).setParameter("id", orderId).getResultList();
                 for (Long job : jobs) {
-                    em.createQuery("delete from net.likelion.bebc25.prodflow.common.entity.StatusHistory h where h.entity = :entity and h.entityId = :id")
-                            .setParameter("entity", HistoryEntityType.WORK_ORDER).setParameter("id", job).executeUpdate();
+                    em.createQuery("delete from net.likelion.bebc25.prodflow.common.entity.StatusHistory h where h.entity = :entity and h.entityId = :id").setParameter("entity", HistoryEntityType.WORK_ORDER).setParameter("id", job).executeUpdate();
                 }
-                em.createQuery("delete from net.likelion.bebc25.prodflow.common.entity.StatusHistory h where h.entity = :entity and h.entityId = :id")
-                        .setParameter("entity", HistoryEntityType.ORDER).setParameter("id", orderId).executeUpdate();
+                em.createQuery("delete from net.likelion.bebc25.prodflow.common.entity.StatusHistory h where h.entity = :entity and h.entityId = :id").setParameter("entity", HistoryEntityType.ORDER).setParameter("id", orderId).executeUpdate();
                 em.createQuery("delete from ProductionPlan p where p.workOrder.orderProduct.customerOrder.id = :id").setParameter("id", orderId).executeUpdate();
                 em.createQuery("delete from WorkOrder w where w.orderProduct.customerOrder.id = :id").setParameter("id", orderId).executeUpdate();
                 em.createQuery("delete from PaymentHistory h where h.payment.order.id = :id").setParameter("id", orderId).executeUpdate();
@@ -170,8 +167,7 @@ class ManualDepositServiceTest {
     @DisplayName("현금 계약금과 상태 이력·작업지시·날짜별 계획을 함께 저장한다")
     void recordManualDeposit() {
         LocalDateTime receivedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(1);
-        PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(
-                new PaymentDto.ManualDepositRequest(orderId, 5000L, receivedAt), actorId);
+        PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(orderId, 5000L, receivedAt), actorId);
         em.flush();
         em.clear();
 
@@ -188,20 +184,18 @@ class ManualDepositServiceTest {
         assertThat(histories).hasSize(1);
         assertThat(histories.getFirst().getVirtualAccount()).isNull();
         assertThat(virtualAccountRepository.findLatestByOrderId(orderId)).isEmpty();
-        assertThat(statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(HistoryEntityType.ORDER, orderId))
-                .singleElement().satisfies(history -> {
-                    assertThat(history.getFromStatus()).isEqualTo("WAITING");
-                    assertThat(history.getToStatus()).isEqualTo("CONFIRMED");
-                    assertThat(history.getUserName()).isEqualTo("현금 처리 직원");
-                    assertThat(history.getNote()).contains("5000");
-                });
+        assertThat(statusHistoryRepository.findByEntityAndEntityIdOrderByCreatedAtDescIdDesc(HistoryEntityType.ORDER, orderId)).singleElement().satisfies(history -> {
+            assertThat(history.getFromStatus()).isEqualTo("WAITING");
+            assertThat(history.getToStatus()).isEqualTo("CONFIRMED");
+            assertThat(history.getUserName()).isEqualTo("현금 처리 직원");
+            assertThat(history.getNote()).contains("5000");
+        });
         long quantity = 0;
         for (Long id : response.workOrderIds()) {
             WorkOrder job = em.find(WorkOrder.class, id);
             assertThat(job.getCommonCode().getCode()).isEqualTo("PREPARE");
             assertThat(job.getPlannedStartDate()).isAfterOrEqualTo(start);
-            assertThat(productionPlanRepository.findByWorkOrder_Id(id).stream().mapToInt(p -> p.getQuantity()).sum())
-                    .isEqualTo(job.getQuantity());
+            assertThat(productionPlanRepository.findByWorkOrder_Id(id).stream().mapToInt(p -> p.getQuantity()).sum()).isEqualTo(job.getQuantity());
             quantity += job.getQuantity();
         }
         assertThat(quantity).isEqualTo(101);
@@ -210,11 +204,9 @@ class ManualDepositServiceTest {
     @Test
     @DisplayName("기존 계약금과 가상계좌가 있어도 현금 처리하며 가상계좌 상태는 변경하지 않는다")
     void reuseExistingPaymentWithoutAccountOperations() {
-        Payment payment = paymentRepository.save(Payment.builder().order(em.find(CustomerOrder.class, orderId))
-                .paymentType(PaymentType.DEPOSIT).amount(5000L).portonePaymentId("EXISTING-CASH").createdBy("test").build());
+        Payment payment = paymentRepository.save(Payment.builder().order(em.find(CustomerOrder.class, orderId)).paymentType(PaymentType.DEPOSIT).amount(5000L).portonePaymentId("EXISTING-CASH").build());
         payment.waitForDeposit();
-        VirtualAccount account = virtualAccountRepository.save(VirtualAccount.builder().payment(payment).bankCode("004")
-                .accountNumber("EXISTING-ACCOUNT").accountName("기존 계좌").expiresAt(LocalDateTime.now().plusDays(30)).build());
+        VirtualAccount account = virtualAccountRepository.save(VirtualAccount.builder().payment(payment).bankCode("004").accountNumber("EXISTING-ACCOUNT").accountName("기존 계좌").expiresAt(LocalDateTime.now().plusDays(30)).build());
 
         PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(request(), actorId);
 
@@ -226,11 +218,8 @@ class ManualDepositServiceTest {
     @Test
     @DisplayName("계약금과 다른 금액·미래 입금일시는 거부한다")
     void rejectInvalidAmountOrTime() {
-        assertThatThrownBy(() -> paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(orderId, 4999L, null), actorId))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("계약금 예정액");
-        assertThatThrownBy(() -> paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(
-                orderId, 5000L, LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1)), actorId))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("미래");
+        assertThatThrownBy(() -> paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(orderId, 4999L, null), actorId)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("계약금 예정액");
+        assertThatThrownBy(() -> paymentService.recordManualDeposit(new PaymentDto.ManualDepositRequest(orderId, 5000L, LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1)), actorId)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("미래");
         assertThat(paymentRepository.findByOrder_IdOrderByIdAsc(orderId)).isEmpty();
     }
 
@@ -238,11 +227,9 @@ class ManualDepositServiceTest {
     @DisplayName("취소 수주와 비활성 처리 직원은 입금을 반영하지 않는다")
     void rejectCancelledOrderOrInactiveActor() {
         em.find(CustomerOrder.class, orderId).changeProgress(em.find(CommonCode.class, 15L));
-        assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId))
-                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId)).isInstanceOf(ResponseStatusException.class);
         actor.deactivate();
-        assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId))
-                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId)).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
@@ -250,8 +237,7 @@ class ManualDepositServiceTest {
     void rejectDuplicateDeposit() {
         paymentService.recordManualDeposit(request(), actorId);
         long count = paymentRepository.count();
-        assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId))
-                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId)).isInstanceOf(ResponseStatusException.class);
         assertThat(paymentRepository.count()).isEqualTo(count);
         assertThat(paymentHistoryRepository.findByPayment_Order_Id(orderId)).hasSize(1);
     }
@@ -261,15 +247,10 @@ class ManualDepositServiceTest {
     void reserveEarlierWaitingOrder() {
         CustomerOrder target = em.find(CustomerOrder.class, orderId);
         List<Line> lines = em.createQuery("select l from Line l", Line.class).getResultList();
-        int capacity = lines.stream().filter(line -> line.getStatus() == LineStatus.AVAILABLE || line.getStatus() == LineStatus.OPERATING)
-                .mapToInt(Line::getProductionCapacity).sum();
-        Quotation quotation = new Quotation("QT-CASH-EARLIER", target.getClient(), "담당자", actor,
-                start.plusDays(7), start.plusDays(7), start, start, start.plusDays(7), true, QuotationStatus.APPROVED, (long) capacity);
+        int capacity = lines.stream().filter(line -> line.getStatus() == LineStatus.AVAILABLE || line.getStatus() == LineStatus.OPERATING).mapToInt(Line::getProductionCapacity).sum();
+        Quotation quotation = new Quotation("QT-CASH-EARLIER", target.getClient(), "담당자", actor, start.plusDays(7), start.plusDays(7), start, start, start.plusDays(7), true, QuotationStatus.APPROVED, (long) capacity);
         em.persist(quotation);
-        CustomerOrder earlier = new CustomerOrder("PF-CASH-EARLIER", quotation, target.getClient(), "담당자",
-                "earlier@test.com", "02-1111-2222", "주소", actor, start.plusDays(7), start.plusDays(7), start, start,
-                start, "배송지", "수신자", "010-3333-4444", NotifyChannel.EMAIL, null,
-                em.find(CommonCode.class, 6L), true, (long) capacity);
+        CustomerOrder earlier = new CustomerOrder("PF-CASH-EARLIER", quotation, target.getClient(), "담당자", "earlier@test.com", "02-1111-2222", "주소", actor, start.plusDays(7), start.plusDays(7), start, start, start, "배송지", "수신자", "010-3333-4444", NotifyChannel.EMAIL, null, em.find(CommonCode.class, 6L), true, (long) capacity);
         earlier.setCreatedAt(target.getCreatedAt().minusDays(1));
         em.persist(earlier);
         Product product = em.find(Product.class, productIds.getFirst());
@@ -278,18 +259,15 @@ class ManualDepositServiceTest {
 
         PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(request(), actorId);
 
-        assertThat(response.workOrderIds()).allSatisfy(id ->
-                assertThat(em.find(WorkOrder.class, id).getPlannedStartDate()).isAfter(start));
-        assertThat(em.createQuery("select count(w) from WorkOrder w where w.orderProduct.customerOrder.id = :id", Long.class)
-                .setParameter("id", earlier.getId()).getSingleResult()).isZero();
+        assertThat(response.workOrderIds()).allSatisfy(id -> assertThat(em.find(WorkOrder.class, id).getPlannedStartDate()).isAfter(start));
+        assertThat(em.createQuery("select count(w) from WorkOrder w where w.orderProduct.customerOrder.id = :id", Long.class).setParameter("id", earlier.getId()).getSingleResult()).isZero();
         assertThat(earlier.getStatusCode().getCode()).isEqualTo("WAITING");
     }
 
     @Test
     @DisplayName("같은 품목·라인의 여러 날을 한 장으로 묶고 날짜별 용량을 넘지 않는다")
     void groupMultipleDaysWithoutDoubleCountingReservedQuantity() {
-        em.createQuery("update CustomerOrder o set o.statusCode = :completed where o.id <> :id")
-                .setParameter("completed", em.find(CommonCode.class, 12L)).setParameter("id", orderId).executeUpdate();
+        em.createQuery("update CustomerOrder o set o.statusCode = :completed where o.id <> :id").setParameter("completed", em.find(CommonCode.class, 12L)).setParameter("id", orderId).executeUpdate();
         for (Line line : em.createQuery("select l from Line l", Line.class).getResultList()) {
             line.changeStatus(LineStatus.BROKEN);
         }
@@ -303,8 +281,7 @@ class ManualDepositServiceTest {
         assertThat(first.getPlannedStartDate()).isBefore(first.getPlannedEndDate());
         assertThat(productionPlanRepository.findByWorkOrder_Id(first.getId())).hasSize(2);
         for (Long id : response.workOrderIds()) {
-            productionPlanRepository.findByWorkOrder_Id(id).forEach(plan ->
-                    assertThat(productionPlanRepository.sumQuantityByLineAndDate(line.getId(), plan.getPlanDate())).isLessThanOrEqualTo(70));
+            productionPlanRepository.findByWorkOrder_Id(id).forEach(plan -> assertThat(productionPlanRepository.sumQuantityByLineAndDate(line.getId(), plan.getPlanDate())).isLessThanOrEqualTo(70));
         }
     }
 
@@ -314,20 +291,24 @@ class ManualDepositServiceTest {
         actor.update(actor.getName(), actor.getEmail(), actor.getPhone(), UserRole.INQUIRY_MANAGER, UserStatus.ACTIVE);
         authenticate();
 
-        assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId))
-                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId)).isInstanceOf(AccessDeniedException.class);
         assertThat(paymentRepository.findByOrder_IdOrderByIdAsc(orderId)).isEmpty();
     }
 
     @Test
     @DisplayName("수주가 대기여도 이미 입금완료된 계약금은 다시 처리하지 않는다")
     void rejectPreviouslyPaidPayment() {
-        Payment payment = paymentRepository.save(Payment.builder().order(em.find(CustomerOrder.class, orderId))
-                .paymentType(PaymentType.DEPOSIT).amount(5000L).portonePaymentId("ALREADY-PAID").createdBy("test").build());
+        Payment payment = paymentRepository.save(
+                Payment.builder()
+                        .order(em.find(CustomerOrder.class, orderId))
+                        .paymentType(PaymentType.DEPOSIT)
+                        .amount(5000L)
+                        .portonePaymentId("ALREADY-PAID")
+                        .build()
+        );
         payment.paidManually();
 
-        assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId))
-                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("이미 처리");
+        assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId)).isInstanceOf(ResponseStatusException.class).hasMessageContaining("이미 처리");
         assertThat(paymentHistoryRepository.findByPayment_Order_Id(orderId)).isEmpty();
     }
 
@@ -353,8 +334,7 @@ class ManualDepositServiceTest {
         User manager = em.find(User.class, managerId);
         manager.activate();
         Long workId = response.workOrderIds().getFirst();
-        WorkOrderDto.DetailResponse updated = workOrderService.update(workId,
-                new WorkOrderDto.UpdatedRequest(null, managerId), actorId);
+        WorkOrderDto.DetailResponse updated = workOrderService.update(workId, new WorkOrderDto.UpdatedRequest(null, managerId), actorId);
         assertThat(updated.assignedId()).isEqualTo(managerId);
         assertThat(workOrderHistoryRepository.findByWorkOrder_Id(workId)).anySatisfy(history -> {
             assertThat(history.getPreviousUser()).isNull();
@@ -376,10 +356,8 @@ class ManualDepositServiceTest {
         assertThat(moved).isNotNull();
         assertThat(moved.getPlannedStartDate()).isAfter(start);
         assertThat(moved.getQuantity()).isEqualTo(100);
-        assertThat(productionPlanRepository.findByWorkOrder_Id(laterId).stream().mapToInt(ProductionPlan::getQuantity).sum())
-                .isEqualTo(100);
-        assertThat(response.workOrderIds()).allSatisfy(id ->
-                assertThat(em.find(WorkOrder.class, id).getPlannedStartDate()).isBeforeOrEqualTo(moved.getPlannedStartDate()));
+        assertThat(productionPlanRepository.findByWorkOrder_Id(laterId).stream().mapToInt(ProductionPlan::getQuantity).sum()).isEqualTo(100);
+        assertThat(response.workOrderIds()).allSatisfy(id -> assertThat(em.find(WorkOrder.class, id).getPlannedStartDate()).isBeforeOrEqualTo(moved.getPlannedStartDate()));
     }
 
     @Test
@@ -397,8 +375,7 @@ class ManualDepositServiceTest {
         assertThat(fixed.getPlannedStartDate()).isEqualTo(start);
         assertThat(fixed.getPlannedEndDate()).isEqualTo(start);
         assertThat(productionPlanRepository.findByWorkOrder_Id(fixed.getId()).getFirst().getId()).isEqualTo(planId);
-        assertThat(response.workOrderIds()).allSatisfy(id ->
-                assertThat(em.find(WorkOrder.class, id).getPlannedStartDate()).isAfter(start));
+        assertThat(response.workOrderIds()).allSatisfy(id -> assertThat(em.find(WorkOrder.class, id).getPlannedStartDate()).isAfter(start));
     }
 
     @Test
@@ -432,8 +409,7 @@ class ManualDepositServiceTest {
         em.persist(new ProductionPlan(first, start, 50));
         Line otherLine = new Line("통합 전 라인", 50);
         em.persist(otherLine);
-        WorkOrder extra = new WorkOrder("WO-MERGE-EXTRA", first.getOrderProduct(), otherLine, manager,
-                50, start, start, "통합 전 작업");
+        WorkOrder extra = new WorkOrder("WO-MERGE-EXTRA", first.getOrderProduct(), otherLine, manager, 50, start, start, "통합 전 작업");
         extra.changeStatus(em.find(CommonCode.class, 16L));
         em.persist(extra);
         em.persist(new ProductionPlan(extra, start, 50));
@@ -466,8 +442,7 @@ class ManualDepositServiceTest {
         }
         User first = em.find(User.class, managerId);
         first.update("가담당자", first.getEmail(), first.getPhone(), UserRole.PRODUCTION_MANAGER, UserStatus.ACTIVE);
-        User second = User.builder().name("나담당자").email("next-day@test.com").phone("010-1234-5678")
-                .password("1234").role(UserRole.PRODUCTION_MANAGER).build();
+        User second = User.builder().name("나담당자").email("next-day@test.com").phone("010-1234-5678").password("1234").role(UserRole.PRODUCTION_MANAGER).build();
         em.persist(second);
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         otherWork("BUSY", 200, line, first, today.minusDays(2), "PRODUCE");
@@ -475,8 +450,7 @@ class ManualDepositServiceTest {
 
         PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(request(), actorId);
 
-        assertThat(response.workOrderIds()).allSatisfy(id ->
-                assertThat(em.find(WorkOrder.class, id).getUser().getId()).isEqualTo(first.getId()));
+        assertThat(response.workOrderIds()).allSatisfy(id -> assertThat(em.find(WorkOrder.class, id).getUser().getId()).isEqualTo(first.getId()));
     }
 
     @Test
@@ -490,19 +464,16 @@ class ManualDepositServiceTest {
         }
         User last = em.find(User.class, managerId);
         last.update("하담당자", last.getEmail(), last.getPhone(), UserRole.PRODUCTION_MANAGER, UserStatus.ACTIVE);
-        User first = User.builder().name("가담당자").email("first-name@test.com").phone("010-1234-5678")
-                .password("1234").role(UserRole.PRODUCTION_MANAGER).build();
+        User first = User.builder().name("가담당자").email("first-name@test.com").phone("010-1234-5678").password("1234").role(UserRole.PRODUCTION_MANAGER).build();
         em.persist(first);
 
         PaymentDto.ManualDepositResponse response = paymentService.recordManualDeposit(request(), actorId);
 
-        assertThat(response.workOrderIds()).allSatisfy(id ->
-                assertThat(em.find(WorkOrder.class, id).getUser().getId()).isEqualTo(first.getId()));
+        assertThat(response.workOrderIds()).allSatisfy(id -> assertThat(em.find(WorkOrder.class, id).getUser().getId()).isEqualTo(first.getId()));
     }
 
     private Line isolatedLine(int capacity) {
-        em.createQuery("update CustomerOrder o set o.statusCode = :completed where o.id <> :id")
-                .setParameter("completed", em.find(CommonCode.class, 12L)).setParameter("id", orderId).executeUpdate();
+        em.createQuery("update CustomerOrder o set o.statusCode = :completed where o.id <> :id").setParameter("completed", em.find(CommonCode.class, 12L)).setParameter("id", orderId).executeUpdate();
         for (Line line : em.createQuery("select l from Line l", Line.class).getResultList()) {
             line.changeStatus(LineStatus.BROKEN);
         }
@@ -513,13 +484,9 @@ class ManualDepositServiceTest {
 
     private WorkOrder otherWork(String suffix, int quantity, Line line, User user, LocalDate date, String status) {
         CustomerOrder target = em.find(CustomerOrder.class, orderId);
-        Quotation quotation = new Quotation("QT-" + suffix, target.getClient(), "담당자", actor,
-                date.plusDays(7), date.plusDays(7), date, date, date.plusDays(14), true, QuotationStatus.APPROVED, (long) quantity);
+        Quotation quotation = new Quotation("QT-" + suffix, target.getClient(), "담당자", actor, date.plusDays(7), date.plusDays(7), date, date, date.plusDays(14), true, QuotationStatus.APPROVED, (long) quantity);
         em.persist(quotation);
-        CustomerOrder other = new CustomerOrder("PF-" + suffix, quotation, target.getClient(), "담당자", "other@test.com",
-                "02-1111-2222", "주소", actor, date.plusDays(7), date.plusDays(7), date, date,
-                date, "배송지", "수신자", "010-3333-4444", NotifyChannel.EMAIL, null,
-                em.find(CommonCode.class, "PRODUCE".equals(status) ? 8L : 7L), true, (long) quantity);
+        CustomerOrder other = new CustomerOrder("PF-" + suffix, quotation, target.getClient(), "담당자", "other@test.com", "02-1111-2222", "주소", actor, date.plusDays(7), date.plusDays(7), date, date, date, "배송지", "수신자", "010-3333-4444", NotifyChannel.EMAIL, null, em.find(CommonCode.class, "PRODUCE".equals(status) ? 8L : 7L), true, (long) quantity);
         other.setCreatedAt(target.getCreatedAt().plusMinutes(1));
         em.persist(other);
         OrderProduct item = new OrderProduct(other, em.find(Product.class, productIds.getFirst()), "다른 수주 품목", quantity, 1L);
@@ -545,8 +512,7 @@ class ManualDepositServiceTest {
             }
         });
         try {
-            assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId))
-                    .isInstanceOf(ResponseStatusException.class).hasMessageContaining("가동 가능한");
+            assertThatThrownBy(() -> paymentService.recordManualDeposit(request(), actorId)).isInstanceOf(ResponseStatusException.class).hasMessageContaining("가동 가능한");
         } finally {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
                 for (java.util.Map.Entry<Long, LineStatus> entry : statuses.entrySet()) {
@@ -590,8 +556,7 @@ class ManualDepositServiceTest {
             java.util.concurrent.Future<Integer> second = executor.submit(task);
             assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
             startSignal.countDown();
-            assertThat(List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS)))
-                    .containsExactlyInAnyOrder(200, 409);
+            assertThat(List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS))).containsExactlyInAnyOrder(200, 409);
         }
         assertThat(paymentRepository.findByOrder_IdOrderByIdAsc(orderId)).hasSize(1);
         assertThat(paymentHistoryRepository.findByPayment_Order_Id(orderId)).hasSize(1);
@@ -603,7 +568,6 @@ class ManualDepositServiceTest {
 
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(actor);
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
     }
 }
