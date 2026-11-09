@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.mail.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.MailPreparationException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.core.io.ByteArrayResource;
@@ -39,7 +40,7 @@ public class MailService {
             helper.setText(content);
             helper.addAttachment(filename, new ByteArrayResource(pdf), "application/pdf");
         } catch (MessagingException ex) {
-            throw new IllegalStateException("PDF 첨부 이메일을 구성하지 못했습니다.", ex);
+            throw new MailPreparationException("PDF 첨부 이메일을 구성하지 못했습니다.", ex);
         }
         mailSender.send(message);
     }

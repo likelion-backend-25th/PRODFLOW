@@ -1,5 +1,8 @@
 package net.likelion.bebc25.prodflow.line.dto;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
 
@@ -11,20 +14,26 @@ public class LineDto {
 
     // 라인 등록
     public record CreateRequest(
+            @NotBlank(message = "라인 이름은 공백 허용 안함")
             String lineName,
+            @Min(value = 1, message = "하루 생산량은 1 이상")
             int productionCapacity
     ) {
     }
 
     // 하루 생산량 수정. 수량이 바뀔 때 reason을 line_capacity_log에 남긴다.
+    // 이름만 바꿀 때는 사유가 없어도 된다.
     public record UpdateRequest(
+            @NotBlank(message = "라인 이름은 공백 허용 안함")
             String lineName,
+            @Min(value = 1, message = "하루 생산량은 1 이상")
             int productionCapacity,
             String reason
     ) {
     }
 
     public record UpdateStatusRequest(
+            @NotNull(message = "라인 상태를 입력해주세요.")
             LineStatus status
     ) {
     }

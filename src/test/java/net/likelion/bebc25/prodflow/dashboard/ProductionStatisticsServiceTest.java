@@ -7,13 +7,13 @@ import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductReposi
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
 import net.likelion.bebc25.prodflow.dashboard.service.ProductionStatisticsService;
 import net.likelion.bebc25.prodflow.line.entity.Line;
-import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.entity.ProductionPlan;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
-import net.likelion.bebc25.prodflow.work_order.repsitory.ProductionPlanRepository;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.ProductionPlanRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -156,14 +156,14 @@ class ProductionStatisticsServiceTest {
     @Test
     @DisplayName("시작일과 종료일이 같으면 해당 날짜만 조회한다")
     void dailyProductionOnBoundaryDate() {
-        LocalDate date = LocalDate.of(2026, 10, 8);
+        LocalDate date = LocalDate.of(2026, 11, 6);
 
         List<DashboardDto.ProductionResponse> response =
                 productionStatisticsService.getDailyProduction(date, date);
 
         assertThat(response).hasSize(1);
         assertThat(response.getFirst().date()).isEqualTo(date);
-        assertThat(response.getFirst().plannedQuantity()).isEqualTo(1000);
+        assertThat(response.getFirst().plannedQuantity()).isEqualTo(2000);
         assertThat(response.getFirst().completedQuantity()).isEqualTo(0);
     }
 
@@ -180,6 +180,8 @@ class ProductionStatisticsServiceTest {
     @Test
     @DisplayName("취소 수주의 생산 계획은 집계하지 않는다")
     void cancelledOrderPlanIsExcluded() {
+        DashboardDto.MonthlyProductionResponse before =
+                productionStatisticsService.getMonthlyProduction(2026, 10);
         OrderProduct cancelledProduct = orderProductRepository.findById(13L).orElseThrow();
         Line line = lineRepository.findById(1L).orElseThrow();
         User user = userRepository.findById(4L).orElseThrow();
@@ -204,7 +206,7 @@ class ProductionStatisticsServiceTest {
         DashboardDto.MonthlyProductionResponse response =
                 productionStatisticsService.getMonthlyProduction(2026, 10);
 
-        assertThat(response.plannedQuantity()).isEqualTo(17000);
-        assertThat(response.completedQuantity()).isEqualTo(7500);
+        assertThat(response.plannedQuantity()).isEqualTo(before.plannedQuantity());
+        assertThat(response.completedQuantity()).isEqualTo(before.completedQuantity());
     }
 }

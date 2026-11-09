@@ -42,8 +42,8 @@ public class WorkOrder extends BaseTimeEntity {
     @JoinColumn(name = "line_id", nullable = false)
     private Line line;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
     private User user;
 
     // 작업지시서 하나에 담당 품목은 1개

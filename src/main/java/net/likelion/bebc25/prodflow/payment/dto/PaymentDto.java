@@ -1,6 +1,8 @@
 package net.likelion.bebc25.prodflow.payment.dto;
 
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.payment.entity.Payment;
+import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentMethod;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
@@ -9,10 +11,92 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 
 public final class PaymentDto {
 
     private PaymentDto() {
+    }
+
+    // 현금으로 받은 계약금 확인. 입금일시 생략 시 한국 시간의 처리 시각을 사용한다.
+    public record ManualDepositRequest(
+            @NotNull @Positive Long orderId,
+            @NotNull @Positive Long amount,
+            LocalDateTime receivedAt
+    ) {
+    }
+
+    public record ManualDepositResponse(
+            Long paymentId,
+            Long orderId,
+            long amount,
+            PaymentMethod paymentMethod,
+            LocalDateTime receivedAt,
+            String orderStatus,
+            ConfirmationStatus confirmationStatus,
+            OrderPaymentStatus paymentStatus,
+            List<Long> workOrderIds
+    ) {
+        public static ManualDepositResponse from(Payment payment, PaymentHistory history,
+                                                 CustomerOrder order, List<Long> workOrderIds) {
+            return new ManualDepositResponse(payment.getId(), order.getId(), payment.getAmount(),
+                    payment.getPaymentMethod(), history.getReceivedAt(), order.getStatusCode().getCode(),
+                    order.getConfirmationStatus(), order.getPaymentStatus(), workOrderIds);
+        }
+    }
+
+    // 수주 상세의 입금 요약과 결제 목록
+    public record OrderResponse(
+            Long orderId,
+            Long totalAmount,
+            long depositAmount,
+            long paidAmount,
+            long balanceAmount,
+            List<OrderPaymentResponse> payments
+    ) {
+        public static OrderResponse from(
+                CustomerOrder order,
+                long depositAmount,
+                long paidAmount,
+
+                List<OrderPaymentResponse> payments
+        ) {
+            return new OrderResponse(
+                    order.getId(),
+                    order.getTotalAmount(),
+                    depositAmount,
+                    paidAmount,
+                    Math.max(0, order.getTotalAmount() - paidAmount),
+                    payments);
+        }
+    }
+
+    // 결제별 입금 내역과 최신 발급 계좌. 아직 생성되지 않은 정보는 null이다.
+    public record OrderPaymentResponse(
+            Long paymentId,
+            PaymentType paymentType,
+            Long amount,
+            PaymentStatus status,
+            PaymentMethod paymentMethod,
+            LocalDateTime createdAt,
+            VirtualAccountDto.Response virtualAccount,
+            PaymentHistoryDto.Response paymentHistory
+    ) {
+        public static OrderPaymentResponse from(Payment payment, VirtualAccount account, PaymentHistory history) {
+            return new OrderPaymentResponse(
+                    payment.getId(),
+                    payment.getPaymentType(),
+                    payment.getAmount(),
+                    payment.getStatus(),
+                    payment.getPaymentMethod(),
+                    payment.getCreatedAt(),
+                    account == null ? null : VirtualAccountDto.Response.from(account),
+                    history == null ? null : PaymentHistoryDto.Response.from(history));
+        }
     }
 
     // 수주 등록/출고 처리 시 내부적으로 발급한 결제건 + 가상계좌 결과

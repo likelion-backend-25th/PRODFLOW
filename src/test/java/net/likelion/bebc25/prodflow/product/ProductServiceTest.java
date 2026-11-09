@@ -48,7 +48,7 @@ class ProductServiceTest {
         Response detail = productService.getDetail(1L);
 
         assertThat(detail.modelCode()).isEqualTo("PF-CS-A100");
-        assertThat(detail.productName()).isEqualTo("디자인 A 투명 케이스");
+        assertThat(detail.productName()).isEqualTo("아이폰 16 맥세이프 클리어 케이스");
         assertThat(detail.deviceName()).isEqualTo("iPhone 16");
         assertThat(detail.currentPrice()).isEqualTo(10000L);
         assertThat(detail.status()).isEqualTo(ProductStatus.AVAILABLE);
@@ -64,7 +64,7 @@ class ProductServiceTest {
         List<Response> all = productService.productSearch(null, null);
         assertThat(all).hasSize(5);
 
-        List<Response> byName = productService.productSearch("디자인 A", null);
+        List<Response> byName = productService.productSearch("클리어", null);
         assertThat(byName).hasSize(1);
         assertThat(byName.getFirst().modelCode()).isEqualTo("PF-CS-A100");
         List<Response> byKeyword = productService.productSearch("맥세이프", null);

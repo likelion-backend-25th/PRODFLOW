@@ -1,5 +1,7 @@
 package net.likelion.bebc25.prodflow.dashboard;
 
+import jakarta.persistence.EntityManager;
+import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
 import net.likelion.bebc25.prodflow.dashboard.service.OrderStatisticsService;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +23,9 @@ class OrderStatisticsServiceTest {
     @Autowired
     private OrderStatisticsService orderStatisticsService;
 
+    @Autowired
+    private EntityManager em;
+
     @Test
     @DisplayName("전체 수주 건수와 10월 수주 건수를 조회한다")
     void getOrderStatistics() {
@@ -31,11 +36,11 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2026, 10, 31)
                 );
 
-        // ORDER_STATUS 이면서 취소가 아닌 수주 11건. PACK_DONE으로 연결된 수주는 제외
-        assertThat(response.totalOrderCount()).isEqualTo(11);
+        // ORDER_STATUS에 속한 수주 13건 중 취소 1건을 제외한다.
+        assertThat(response.totalOrderCount()).isEqualTo(12);
 
-        // 10월에 등록된 수주 8건
-        assertThat(response.periodOrderCount()).isEqualTo(8);
+        // 10월 등록 수주 8건 중 취소 1건을 제외한다.
+        assertThat(response.periodOrderCount()).isEqualTo(7);
     }
 
     @Test
@@ -90,7 +95,7 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2026, 10, 20)
                 );
 
-        assertThat(response.totalOrderCount()).isEqualTo(11);
+        assertThat(response.totalOrderCount()).isEqualTo(12);
 
         assertThat(response.periodOrderCount()).isGreaterThanOrEqualTo(0);
     }
@@ -105,7 +110,7 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2030, 1, 31)
                 );
 
-        assertThat(response.totalOrderCount()).isEqualTo(11);
+        assertThat(response.totalOrderCount()).isEqualTo(12);
 
         assertThat(response.periodOrderCount()).isZero();
     }
@@ -125,7 +130,7 @@ class OrderStatisticsServiceTest {
                 .extracting(DashboardDto.OrderStatusStatisticsResponse::statusCode)
                 .containsExactlyInAnyOrder(
                         "WAITING",
-                        "PRODUCTION_READY",
+                        "CONFIRMED",
                         "IN_PRODUCTION",
                         "PACKING",
                         "READY_TO_SHIP",
@@ -202,6 +207,12 @@ class OrderStatisticsServiceTest {
     @DisplayName("주문이 없는 상태는 통계 결과에 포함되지 않는다")
     void getOrderStatusStatistics_noneOrderStatus() {
 
+        // 생산대기 수주가 실제로 있는 시드에서 해당 상태의 수주만 비운다.
+        CommonCode waiting = em.find(CommonCode.class, 6L);
+        em.createQuery("update CustomerOrder o set o.statusCode = :waiting where o.statusCode.code = 'CONFIRMED'")
+                .setParameter("waiting", waiting).executeUpdate();
+        em.clear();
+
         // when
         List<DashboardDto.OrderStatusStatisticsResponse> result =
                 orderStatisticsService.getOrderStatusStatistics();
@@ -225,10 +236,10 @@ class OrderStatisticsServiceTest {
                 .containsExactlyInAnyOrder(
                         "CANCELLED",
                         "COMPLETED",
+                        "CONFIRMED",
                         "IN_PRODUCTION",
                         "ON_HOLD",
                         "PACKING",
-                        "PRODUCTION_READY",
                         "READY_TO_SHIP",
                         "SHIPPING",
                         "WAITING"

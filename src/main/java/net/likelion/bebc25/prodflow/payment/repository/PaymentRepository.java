@@ -12,25 +12,32 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface PaymentRepository extends
         JpaRepository<Payment, Long>,
         JpaSpecificationExecutor<Payment> {
-    
+
+    // 수주 ID와 결제 유형으로 결제 존재 여부 확인
     boolean existsByOrder_IdAndPaymentType(
             Long orderId,
             PaymentType paymentType
     );
 
+    // 수주 ID와 결제 유형으로 결제 조회
     Optional<Payment> findByOrder_IdAndPaymentType(
             Long orderId,
             PaymentType paymentType
     );
 
+    // PortOne 결제 ID로 조회
     Optional<Payment> findByPortonePaymentId(
             String portonePaymentId
     );
+
+    // 수주 상세에 표시할 결제 목록 조회 (팀원 코드 유지)
+    List<Payment> findByOrder_IdOrderByIdAsc(Long orderId);
 
     // 검색 + 페이징 시 수주와 거래처 함께 조회
     @Override
@@ -42,7 +49,11 @@ public interface PaymentRepository extends
 
     // 상세 조회 시 수주와 거래처 함께 조회
     @Override
-    @EntityGraph(attributePaths = {"order", "order.client", "order.statusCode"})
+    @EntityGraph(attributePaths = {
+            "order",
+            "order.client",
+            "order.statusCode"
+    })
     Optional<Payment> findById(Long id);
 
     // 취소되지 않은 전체 수주 금액

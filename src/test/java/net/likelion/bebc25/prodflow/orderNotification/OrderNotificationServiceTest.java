@@ -1,5 +1,12 @@
 package net.likelion.bebc25.prodflow.orderNotification;
 
+import jakarta.persistence.EntityManager;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.order_notification.entity.OrderNotification;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.test.util.ReflectionTestUtils;
+
 import net.likelion.bebc25.prodflow.order_notification.dto.OrderNotificationDto;
 import net.likelion.bebc25.prodflow.order_notification.enums.OrderNotificationType;
 import net.likelion.bebc25.prodflow.order_notification.repository.OrderNotificationRepository;
@@ -20,13 +27,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional
 class OrderNotificationServiceTest {
 
-    private static final LocalDate TODAY = LocalDate.of(2026, 11, 4);
+    private static final LocalDate TODAY = LocalDate.of(2026, 11, 9);
 
     @Autowired
     private OrderNotificationService orderNotificationService;
 
     @Autowired
     private OrderNotificationRepository orderNotificationRepository;
+
+    @Autowired
+    private EntityManager em;
+
+    @BeforeEach
+    void setUpNotifications() {
+        // 시드 알림의 수신자·건수·생성일이 생성/읽음 처리 검증에 영향을 주지 않게 한다.
+        orderNotificationRepository.deleteAllInBatch();
+        em.createQuery("update CustomerOrder o set o.requestedDueDate = :date where o.id = 9")
+                .setParameter("date", TODAY.plusDays(2)).executeUpdate();
+        em.clear();
+    }
 
     @Test
     @DisplayName("납기 3일 이내 수주는 담당 직원에게 임박 알림을 만든다")
@@ -38,9 +57,9 @@ class OrderNotificationServiceTest {
                 OrderNotificationType.DELIVERY_IMMINENT
         )).isTrue();
 
-        OrderNotificationDto created = orderNotificationService.getNotifications(2L)
+        OrderNotificationDto created = orderNotificationService.getNotifications(3L)
                 .stream()
-                .filter(item -> "PF-2026-009".equals(item.orderNo()))
+                .filter(item -> "PF-20261106-9".equals(item.orderNo()))
                 .findFirst()
                 .orElseThrow();
 
@@ -51,7 +70,7 @@ class OrderNotificationServiceTest {
 
         assertThat(orderNotificationService.getNotifications(1L))
                 .extracting(OrderNotificationDto::orderNo)
-                .doesNotContain("PF-2026-009");
+                .doesNotContain("PF-20261106-9");
     }
 
     @Test
@@ -60,7 +79,7 @@ class OrderNotificationServiceTest {
         orderNotificationService.createDueNotifications(TODAY);
 
         assertThat(orderNotificationRepository.existsByCustomerOrder_IdAndNotificationType(
-                1L,
+                3L,
                 OrderNotificationType.DELIVERY_DELAYED
         )).isTrue();
     }
@@ -96,6 +115,7 @@ class OrderNotificationServiceTest {
 
         orderNotificationService.createDueNotifications(TODAY);
         long once = orderNotificationRepository.count();
+        long unreadOnce = orderNotificationRepository.countByTarget_IdAndReadAtIsNull(3L);
         orderNotificationService.createDueNotifications(TODAY);
 
         assertThat(orderNotificationRepository.count()).isEqualTo(once);
@@ -104,7 +124,8 @@ class OrderNotificationServiceTest {
                 OrderNotificationType.DELIVERY_DELAYED
         )).isTrue();
         assertThat(orderNotificationRepository.countByTarget_IdAndReadAtIsNull(3L))
-                .isEqualTo(before);
+                .isEqualTo(unreadOnce);
+        assertThat(unreadOnce).isGreaterThan(before);
     }
 
     @Test
@@ -112,22 +133,22 @@ class OrderNotificationServiceTest {
     void markAsReadOnlyOwner() {
         orderNotificationService.createDueNotifications(TODAY);
 
-        OrderNotificationDto created = orderNotificationService.getNotifications(2L)
+        OrderNotificationDto created = orderNotificationService.getNotifications(3L)
                 .stream()
-                .filter(item -> "PF-2026-009".equals(item.orderNo()))
+                .filter(item -> "PF-20261106-9".equals(item.orderNo()))
                 .findFirst()
                 .orElseThrow();
 
         OrderNotificationDto read = orderNotificationService.markAsRead(
                 created.notification(),
-                2L
+                3L
         );
 
         assertThat(read.isRead()).isTrue();
         assertThat(read.readAt()).isNotNull();
 
         assertThatThrownBy(() ->
-                orderNotificationService.markAsRead(created.notification(), 3L)
+                orderNotificationService.markAsRead(created.notification(), 1L)
         )
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("알림을 찾을 수 없습니다.");
@@ -146,12 +167,12 @@ class OrderNotificationServiceTest {
     void unreadCountMatchesRepository() {
         orderNotificationService.createDueNotifications(TODAY);
 
-        long expected = orderNotificationRepository.countByTarget_IdAndReadAtIsNull(2L);
+        long expected = orderNotificationRepository.countByTarget_IdAndReadAtIsNull(3L);
 
-        assertThat(orderNotificationService.getUnreadCount(2L)).isEqualTo(expected);
-        assertThat(orderNotificationService.getNotifications(2L)).hasSize(
+        assertThat(orderNotificationService.getUnreadCount(3L)).isEqualTo(expected);
+        assertThat(orderNotificationService.getNotifications(3L)).hasSize(
                 (int) orderNotificationRepository
-                        .findByTarget_IdOrderByCreatedAtDesc(2L)
+                        .findByTarget_IdOrderByCreatedAtDesc(3L)
                         .size()
         );
     }
@@ -160,20 +181,20 @@ class OrderNotificationServiceTest {
     @DisplayName("납기 알림은 담당 직원에게만 가고 생산 관리자에게는 가지 않는다")
     void notifiesAssigneeOnly() {
         // given
-        LocalDate today = LocalDate.of(2026, 11, 4);
+        LocalDate today = LocalDate.of(2026, 11, 9);
 
         // when
         orderNotificationService.createDueNotifications(today);
 
         // then
-        assertThat(orderNotificationService.getNotifications(2L))
+        assertThat(orderNotificationService.getNotifications(3L))
                 .extracting(OrderNotificationDto::orderNo)
-                .contains("PF-2026-009");
+                .contains("PF-20261106-9");
 
         for (Long managerId : List.of(4L, 5L, 6L, 8L)) {
             assertThat(orderNotificationService.getNotifications(managerId))
                     .extracting(OrderNotificationDto::orderNo)
-                    .doesNotContain("PF-2026-009");
+                    .doesNotContain("PF-20261106-9");
         }
     }
 
@@ -181,8 +202,8 @@ class OrderNotificationServiceTest {
     @DisplayName("임박 알림이 있는 수주는 납기가 지나면 지연 알림을 따로 만든다")
     void createsDelayedNotificationAfterImminent() {
         // given
-        LocalDate imminentDay = LocalDate.of(2026, 11, 4);
-        LocalDate delayedDay = LocalDate.of(2026, 11, 7);
+        LocalDate imminentDay = TODAY;
+        LocalDate delayedDay = TODAY.plusDays(3);
 
         // when
         orderNotificationService.createDueNotifications(imminentDay);
@@ -202,17 +223,22 @@ class OrderNotificationServiceTest {
     @Test
     @DisplayName("담당 수주의 납기 알림 목록을 최신순으로 조회한다")
     void getNotifications() {
-        // given
-        Long userId = 3L;
+        User recipient = em.find(User.class, 3L);
+        OrderNotification earlier = new OrderNotification(
+                em.find(CustomerOrder.class, 3L), recipient,
+                OrderNotificationType.DELIVERY_DELAYED, "이전 지연 알림");
+        OrderNotification later = new OrderNotification(
+                em.find(CustomerOrder.class, 9L), recipient,
+                OrderNotificationType.DELIVERY_IMMINENT, "최근 임박 알림");
+        ReflectionTestUtils.setField(earlier, "createdAt", TODAY.atTime(8, 0));
+        ReflectionTestUtils.setField(later, "createdAt", TODAY.atTime(9, 0));
+        orderNotificationRepository.saveAll(List.of(earlier, later));
 
-        // when
-        List<OrderNotificationDto> notifications =
-                orderNotificationService.getNotifications(userId);
+        List<OrderNotificationDto> notifications = orderNotificationService.getNotifications(3L);
 
-        // then
         assertThat(notifications)
                 .extracting(OrderNotificationDto::orderNo)
-                .containsExactly("PF-2026-004", "PF-2026-012");
+                .containsExactly("PF-20261106-9", "PF-20261027-3");
         assertThat(notifications)
                 .extracting(OrderNotificationDto::createdAt)
                 .isSortedAccordingTo(java.util.Comparator.reverseOrder());

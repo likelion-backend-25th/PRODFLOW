@@ -19,4 +19,10 @@ public interface PaymentHistoryRepository
     List<PaymentHistory> findByPayment_IdIn(
             Collection<Long> paymentIds
     );
+
+    // 결제건에 입금내역이 존재하는지 확인
+    boolean existsByPayment_Id(Long paymentId);
+
+    // 선택한 수주 결제에 연결된 입금내역 조회
+    List<PaymentHistory> findByPayment_Order_Id(Long orderId);
 }
