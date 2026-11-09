@@ -21,6 +21,5 @@ public interface PaymentHistoryRepository
 
     boolean existsByPayment_Id(Long paymentId);
     // 선택한 수주 결제에 연결된 입금 내역 조회
-    List<PaymentHistory> findByPayment_Order_Id(Long orderId);
-    );    
+    List<PaymentHistory> findByPayment_Order_Id(Long orderId);    
 }
