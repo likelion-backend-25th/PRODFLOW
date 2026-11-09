@@ -1,20 +1,11 @@
 package net.likelion.bebc25.prodflow.payment.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.payment.enums.Bank;
 import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
 
@@ -24,33 +15,35 @@ import java.time.OffsetDateTime;
 @Entity
 @Table
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class VirtualAccount {
+public class VirtualAccount extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 결제 정보
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-            name = "payment_id",
-            nullable = false)
+    @JoinColumn(name = "payment_id", nullable = false)
     private Payment payment;
 
-    @Column(
-            nullable = false)
+    // 은행 정보
+    @Column(nullable = false)
     private Bank bank;
 
-    @Column(
-            nullable = false)
+    // 가상계좌 번호
+    @Column(nullable = false)
     private String accountNumber;
 
+    // 가상계좌 상태
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private VirtualAccountStatus status = VirtualAccountStatus.ACTIVE;
 
+    // 예금주
     @Column(name = "account_name")
     private String accountName;
 
+    // 가상계좌 만료 일시
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
 
@@ -80,7 +73,7 @@ public class VirtualAccount {
         this.status = VirtualAccountStatus.CANCELLED;
     }
 
-    // 현재 입금 가능한 계좌인지 확인
+    // 가상계좌가 ACTIVE 상태인지 확인
     public boolean isActive() {
         return this.status == VirtualAccountStatus.ACTIVE;
     }
@@ -90,10 +83,12 @@ public class VirtualAccount {
         return OffsetDateTime.now().isAfter(expiresAt);
     }
 
+    // 가상계좌 번호 변경
     public void updateAccountNumber(String accountNumber) {
         this.accountNumber = accountNumber;
     }
 
+    // 가상계좌 만료 일시 변경
     public void updateExpiresAt(OffsetDateTime expiresAt) {
         this.expiresAt = expiresAt;
     }

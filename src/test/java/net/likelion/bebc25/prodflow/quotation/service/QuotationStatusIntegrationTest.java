@@ -1,49 +1,17 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
-import jakarta.persistence.EntityManager;
-import jakarta.validation.ConstraintViolationException;
-import jakarta.validation.Validator;
-import net.likelion.bebc25.prodflow.client.entity.Client;
-import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
-import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
-import net.likelion.bebc25.prodflow.common.domain.Address;
-import net.likelion.bebc25.prodflow.commoncode.entity.CodeGroup;
-import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
-import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
-import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
-import net.likelion.bebc25.prodflow.line.entity.Line;
-import net.likelion.bebc25.prodflow.product.entity.Product;
-import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationRescheduleDto;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationItemDto;
-import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
-import net.likelion.bebc25.prodflow.quotation.repository.QuotationItemRepository;
-import net.likelion.bebc25.prodflow.quotation.repository.QuotationRepository;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationService;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfService;
-import net.likelion.bebc25.prodflow.quotation.controller.QuotationController;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationRescheduleService;
 import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
+import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -255,7 +223,7 @@ class QuotationStatusIntegrationTest extends QuotationIntegrationTestSupport {
         assertThat(quotationRepository.findById(pastSent).orElseThrow().getStatus()).isEqualTo(QuotationStatus.EXPIRED);
         assertThat(quotationRepository.findById(todaySent).orElseThrow().getStatus()).isEqualTo(QuotationStatus.SENT);
         assertThat(quotationRepository.findById(pastApproved).orElseThrow().getStatus()).isEqualTo(QuotationStatus.APPROVED);
-        assertThat(quotationRepository.findById(pastSent).orElseThrow().getUpdatedBy()).isEqualTo("서도윤");
+        assertThat(quotationRepository.findById(pastSent).orElseThrow().getUpdatedBy()).isEqualTo("writer@example.com");
         org.mockito.Mockito.verifyNoInteractions(storageClient, mailService);
     }
 

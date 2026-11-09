@@ -22,36 +22,158 @@
 -- 계획 수량은 품목·작업·날짜별로 일치하고, 주말/등록 휴일 생산 및 라인 일일 1,000개 초과는 없다.
 -- 공휴일 시드는 기존 성탄절 1행만 유지했다. 운영 시 공공데이터 수집으로 공식 공휴일을 추가한다.
 
--- 직원 및 로그인
-INSERT INTO `user` (id, password, name, email, phone, role, status, last_login_at, created_at, updated_at, deleted_at,
+-- 초기 직원 데이터
+-- BaseTimeEntity 감사 필드 적용
+-- created_by, updated_by는 초기 데이터이므로 SYSTEM으로 설정
+
+INSERT INTO `user` (id,
+                    password,
+                    name,
+                    email,
+                    phone,
+                    role,
+                    status,
+                    last_login_at,
+                    created_at,
+                    updated_at,
+                    created_by,
+                    updated_by,
+                    deleted_at,
                     must_change_password)
-VALUES (1, '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa', '서도윤', 'admin@prodflow.local',
-        '010-1000-0001', 'SUPER_ADMIN', 'ACTIVE', '2026-10-26 08:02:00', '2026-01-06 09:00:00', '2026-10-26 08:02:00',
-        NULL, FALSE),
-       (2, '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa', '이서준', 'order.lee@prodflow.local',
-        '010-2000-0002', 'ORDER_MANAGER', 'ACTIVE', '2026-10-26 08:05:00', '2026-01-06 09:00:00', '2026-10-26 08:05:00',
-        NULL, TRUE),
-       (3, '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa', '박하은', 'order.park@prodflow.local',
-        '010-3000-0003', 'ORDER_MANAGER', 'ACTIVE', '2026-10-26 08:06:00', '2026-01-06 09:00:00', '2026-10-26 08:06:00',
-        NULL, FALSE),
-       (4, '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa', '김태호', 'prod.kim@prodflow.local',
-        '010-4000-0004', 'PRODUCTION_MANAGER', 'ACTIVE', '2026-10-26 07:50:00', '2026-01-06 09:00:00',
-        '2026-10-26 07:50:00', NULL, TRUE),
-       (5, '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa', '이재원', 'prod.lee@prodflow.local',
-        '010-5000-0005', 'PRODUCTION_MANAGER', 'ACTIVE', '2026-10-26 07:51:00', '2026-01-06 09:00:00',
-        '2026-10-26 07:51:00', NULL, TRUE),
-       (6, '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa', '박시우', 'prod.park@prodflow.local',
-        '010-6000-0006', 'PRODUCTION_MANAGER', 'ACTIVE', '2026-10-26 07:52:00', '2026-01-06 09:00:00',
-        '2026-10-26 07:52:00', NULL, FALSE),
-       (7, '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa', '최유나', 'inquiry.choi@prodflow.local',
-        '010-7000-0007', 'INQUIRY_MANAGER', 'ACTIVE', '2026-10-26 10:00:00', '2026-01-06 09:00:00',
-        '2026-10-26 10:00:00', NULL, FALSE),
-       (8, '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa', '정민석', 'prod.jung@prodflow.local',
-        '010-8000-0008', 'PRODUCTION_MANAGER', 'INACTIVE', '2026-09-01 17:40:00', '2026-01-06 09:00:00',
-        '2026-09-02 18:00:00', NULL, FALSE),
-       (9, '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa', '한예진', 'former.han@prodflow.local',
-        '010-9000-0009', 'ORDER_MANAGER', 'DELETED', '2026-07-28 15:00:00', '2026-01-06 09:00:00',
-        '2026-08-01 10:00:00', '2026-08-01 10:00:00', FALSE);
+VALUES (1,
+        '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa',
+        '서도윤',
+        'admin@prodflow.local',
+        '010-1000-0001',
+        'SUPER_ADMIN',
+        'ACTIVE',
+        '2026-10-26 08:02:00',
+        '2026-01-06 09:00:00',
+        '2026-10-26 08:02:00',
+        'SYSTEM',
+        'SYSTEM',
+        NULL,
+        FALSE),
+
+       (2,
+        '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa',
+        '이서준',
+        'order.lee@prodflow.local',
+        '010-2000-0002',
+        'ORDER_MANAGER',
+        'ACTIVE',
+        '2026-10-26 08:05:00',
+        '2026-01-06 09:00:00',
+        '2026-10-26 08:05:00',
+        'SYSTEM',
+        'SYSTEM',
+        NULL,
+        TRUE),
+
+       (3,
+        '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa',
+        '박하은',
+        'order.park@prodflow.local',
+        '010-3000-0003',
+        'ORDER_MANAGER',
+        'ACTIVE',
+        '2026-10-26 08:06:00',
+        '2026-01-06 09:00:00',
+        '2026-10-26 08:06:00',
+        'SYSTEM',
+        'SYSTEM',
+        NULL,
+        FALSE),
+
+       (4,
+        '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa',
+        '김태호',
+        'prod.kim@prodflow.local',
+        '010-4000-0004',
+        'PRODUCTION_MANAGER',
+        'ACTIVE',
+        '2026-10-26 07:50:00',
+        '2026-01-06 09:00:00',
+        '2026-10-26 07:50:00',
+        'SYSTEM',
+        'SYSTEM',
+        NULL,
+        TRUE),
+
+       (5,
+        '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa',
+        '이재원',
+        'prod.lee@prodflow.local',
+        '010-5000-0005',
+        'PRODUCTION_MANAGER',
+        'ACTIVE',
+        '2026-10-26 07:51:00',
+        '2026-01-06 09:00:00',
+        '2026-10-26 07:51:00',
+        'SYSTEM',
+        'SYSTEM',
+        NULL,
+        TRUE),
+
+       (6,
+        '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa',
+        '박시우',
+        'prod.park@prodflow.local',
+        '010-6000-0006',
+        'PRODUCTION_MANAGER',
+        'ACTIVE',
+        '2026-10-26 07:52:00',
+        '2026-01-06 09:00:00',
+        '2026-10-26 07:52:00',
+        'SYSTEM',
+        'SYSTEM',
+        NULL,
+        FALSE),
+
+       (7,
+        '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa',
+        '최유나',
+        'inquiry.choi@prodflow.local',
+        '010-7000-0007',
+        'INQUIRY_MANAGER',
+        'ACTIVE',
+        '2026-10-26 10:00:00',
+        '2026-01-06 09:00:00',
+        '2026-10-26 10:00:00',
+        'SYSTEM',
+        'SYSTEM',
+        NULL,
+        FALSE),
+
+       (8,
+        '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa',
+        '정민석',
+        'prod.jung@prodflow.local',
+        '010-8000-0008',
+        'PRODUCTION_MANAGER',
+        'INACTIVE',
+        '2026-09-01 17:40:00',
+        '2026-01-06 09:00:00',
+        '2026-09-02 18:00:00',
+        'SYSTEM',
+        'SYSTEM',
+        NULL,
+        FALSE),
+
+       (9,
+        '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa',
+        '한예진',
+        'former.han@prodflow.local',
+        '010-9000-0009',
+        'ORDER_MANAGER',
+        'DELETED',
+        '2026-07-28 15:00:00',
+        '2026-01-06 09:00:00',
+        '2026-08-01 10:00:00',
+        'SYSTEM',
+        'SYSTEM',
+        '2026-08-01 10:00:00',
+        FALSE);
 
 -- RefreshToken (개발용 해시)
 INSERT INTO refresh_token (id, user_id, token_hash, expires_at, created_at)
@@ -406,52 +528,85 @@ VALUES (1, 1, 1, '2026-11-10', 1000, '2026-11-06 10:00:05', '2026-11-06 10:00:05
        (22, 15, 15, '2026-11-12', 50, '2026-11-06 11:00:05', '2026-11-06 11:00:05', '서도윤', '서도윤');
 
 -- 작업지시 담당/라인 변경
-INSERT INTO work_order_history (id, work_order_id, work_no, previous_line_id, new_line_id, previous_user_id, new_user_id,
+INSERT INTO work_order_history (id, work_order_id, work_no, previous_line_id, new_line_id, previous_user_id,
+                                new_user_id,
                                 changed_by, change_reason, changed_at)
 VALUES (1, 14, 'WO-2026-014', 4, 3, 6, 6, 1, 'D라인 고장 당시 아직 준비 상태인 물량을 C라인으로 이동했습니다. 이동 후 11월 4일 생산을 시작하고 5일 일시정지했습니다.',
         '2026-11-03 11:20:00');
 
 -- 결제
 INSERT INTO payment (id, order_id, payment_method, portone_payment_id, payment_type, amount, status, created_at,
-                     created_by)
-VALUES (1, 1, 'VA', 'PF-2026-001-DEPOSIT', 'DEPOSIT', 29000000, 'PAID', '2026-11-06 09:05:00', '서도윤'),
-       (2, 2, 'VA', 'PF-2026-002-DEPOSIT', 'DEPOSIT', 9000000, 'PAID', '2026-10-30 09:05:00', '박하은'),
-       (3, 3, 'VA', 'PF-2026-003-DEPOSIT', 'DEPOSIT', 8000000, 'PAID', '2026-10-27 09:05:00', '박하은'),
-       (4, 4, 'VA', 'PF-2026-004-DEPOSIT', 'DEPOSIT', 10000000, 'PAID', '2026-10-30 09:05:00', '서도윤'),
-       (5, 5, 'VA', 'PF-2026-005-DEPOSIT', 'DEPOSIT', 9000000, 'PAID', '2026-10-22 09:05:00', '박하은'),
-       (6, 6, 'VA', 'PF-2026-006-DEPOSIT', 'DEPOSIT', 10000000, 'PAID', '2026-10-30 09:05:00', '서도윤'),
-       (7, 7, 'VA', 'PF-2026-007-DEPOSIT', 'DEPOSIT', 5500000, 'PAID', '2026-09-25 09:05:00', '서도윤'),
-       (8, 8, 'VA', 'PF-2026-008-DEPOSIT', 'DEPOSIT', 4500000, 'PAID', '2026-10-22 09:05:00', '박하은'),
-       (9, 9, 'VA', 'PF-2026-009-DEPOSIT', 'DEPOSIT', 2500000, 'WAITING', '2026-11-06 11:05:00', '박하은'),
-       (10, 10, 'VA', 'PF-2026-010-DEPOSIT', 'DEPOSIT', 3200000, 'WAITING', '2026-11-08 10:05:00', '서도윤'),
-       (11, 11, 'VA', 'PF-2026-011-DEPOSIT', 'DEPOSIT', 600000, 'CANCELLED', '2026-10-30 09:05:00', '박하은'),
-       (12, 12, 'VA', 'PF-2026-012-DEPOSIT', 'DEPOSIT', 6750000, 'PAID', '2026-10-27 09:05:00', '서도윤'),
-       (13, 13, 'MD', 'PF-2026-013-DEPOSIT', 'DEPOSIT', 550000, 'PAID', '2026-11-03 09:05:00', '박하은'),
-       (14, 5, 'VA', 'PF-2026-005-BALANCE', 'BALANCE', 9000000, 'WAITING', '2026-10-30 16:45:00', '박하은'),
-       (15, 6, 'VA', 'PF-2026-006-BALANCE', 'BALANCE', 10000000, 'READY', '2026-11-06 14:05:00', '박하은'),
-       (16, 7, 'VA', 'PF-2026-007-BALANCE', 'BALANCE', 5500000, 'PAID', '2026-10-22 16:45:00', '박하은'),
-       (17, 8, 'VA', 'PF-2026-008-BALANCE', 'BALANCE', 4500000, 'WAITING', '2026-11-03 16:05:00', '서도윤');
+                     updated_at, created_by, updated_by)
+VALUES (1, 1, 'VA', 'PF-2026-001-DEPOSIT', 'DEPOSIT', 29000000, 'PAID',
+        '2026-10-20 10:05:00', '2026-10-20 10:05:00', 'seed', 'seed'),
 
--- 가상계좌
--- Bank enum ordinals (KOOKMIN=0, SHINHAN=1, WOORI=2, HANA=3, NONGHYUP=4, IBK=5)
-INSERT INTO virtual_account (id, payment_id, bank, account_number, status, account_name, expires_at)
-VALUES (1, 1, 0, '12345678901001', 'ACTIVE', '한빛케이스(주)', '2026-11-09 23:59:59+09:00'),
-       (2, 2, 1, '12345678901002', 'EXPIRED', '세원모바일(주)', '2026-11-02 23:59:59+09:00'),
-       (3, 3, 2, '12345678901003', 'EXPIRED', '대성액세서리(주)', '2026-10-30 23:59:59+09:00'),
-       (4, 4, 3, '12345678901004', 'EXPIRED', '미래굿즈(주)', '2026-11-02 23:59:59+09:00'),
-       (5, 5, 5, '12345678901005', 'EXPIRED', '한빛케이스(주)', '2026-10-25 23:59:59+09:00'),
-       (6, 6, 4, '12345678901006', 'EXPIRED', '세원모바일(주)', '2026-11-02 23:59:59+09:00'),
-       (7, 7, 0, '12345678901007', 'EXPIRED', '대성액세서리(주)', '2026-09-28 23:59:59+09:00'),
-       (8, 8, 0, '12345678901008', 'EXPIRED', '미래굿즈(주)', '2026-10-25 23:59:59+09:00'),
-       (9, 9, 1, '12345678901009', 'ACTIVE', '한빛케이스(주)', '2026-11-09 23:59:59+09:00'),
-       (10, 10, 2, '12345678901010', 'EXPIRED', '세원모바일(주)', '2026-11-08 23:59:59+09:00'),
-       (11, 11, 3, '12345678901011', 'CANCELLED', '대성액세서리(주)', '2026-11-02 23:59:59+09:00'),
-       (12, 12, 5, '12345678901012', 'EXPIRED', '미래굿즈(주)', '2026-10-30 23:59:59+09:00'),
-       (13, 13, 4, '12345678901013', 'EXPIRED', '세원모바일(주)', '2026-11-06 23:59:59+09:00'),
-       (14, 14, 0, '12345678901014', 'ACTIVE', '한빛케이스(주)', '2026-11-13 23:59:59+09:00'),
-       (15, 10, 0, '12345678901015', 'ACTIVE', '세원모바일(주)', '2026-11-11 23:59:59+09:00'),
-       (16, 16, 1, '12345678901016', 'EXPIRED', '대성액세서리(주)', '2026-11-05 23:59:59+09:00'),
-       (17, 17, 2, '12345678901017', 'ACTIVE', '미래굿즈(주)', '2026-11-17 23:59:59+09:00');
+       (2, 2, 'VA', 'PF-2026-002-DEPOSIT', 'DEPOSIT', 9000000, 'PAID',
+        '2026-10-16 11:10:00', '2026-10-16 11:10:00', 'seed', 'seed'),
+
+       (3, 3, 'VA', 'PF-2026-003-DEPOSIT', 'DEPOSIT', 8000000, 'PAID',
+        '2026-10-13 09:10:00', '2026-10-13 09:10:00', 'seed', 'seed'),
+
+       (4, 4, 'VA', 'PF-2026-004-DEPOSIT', 'DEPOSIT', 10000000, 'PAID',
+        '2026-10-08 15:00:00', '2026-10-08 15:00:00', 'seed', 'seed'),
+
+       (5, 5, 'VA', 'PF-2026-005-DEPOSIT', 'DEPOSIT', 9000000, 'PAID',
+        '2026-10-02 10:00:00', '2026-10-02 10:00:00', 'seed', 'seed'),
+
+       (6, 6, 'VA', 'PF-2026-006-DEPOSIT', 'DEPOSIT', 10000000, 'PAID',
+        '2026-09-29 11:00:00', '2026-09-29 11:00:00', 'seed', 'seed'),
+
+       (7, 7, 'VA', 'PF-2026-007-DEPOSIT', 'DEPOSIT', 5500000, 'PAID',
+        '2026-09-10 10:00:00', '2026-09-10 10:00:00', 'seed', 'seed'),
+
+       (8, 8, 'VA', 'PF-2026-008-DEPOSIT', 'DEPOSIT', 4500000, 'PAID',
+        '2026-09-18 10:00:00', '2026-09-18 10:00:00', 'seed', 'seed'),
+
+       (9, 9, 'VA', 'PF-2026-009-DEPOSIT', 'DEPOSIT', 2500000, 'WAITING',
+        '2026-10-25 14:05:00', '2026-10-25 14:05:00', 'seed', 'seed'),
+
+       (10, 10, 'VA', 'PF-2026-010-DEPOSIT', 'DEPOSIT', 3200000, 'WAITING',
+        '2026-10-10 09:10:00', '2026-10-10 09:10:00', 'seed', 'seed'),
+
+       (11, 11, 'VA', 'PF-2026-011-DEPOSIT', 'DEPOSIT', 600000, 'CANCELLED',
+        '2026-10-05 13:00:00', '2026-10-05 13:00:00', 'seed', 'seed'),
+
+       (12, 12, 'VA', 'PF-2026-012-DEPOSIT', 'DEPOSIT', 6750000, 'PAID',
+        '2026-10-20 11:00:00', '2026-10-20 11:00:00', 'seed', 'seed'),
+
+       (13, 13, 'VA', 'PF-2026-013-DEPOSIT', 'DEPOSIT', 550000, 'PAID',
+        '2026-10-26 10:40:00', '2026-10-26 10:40:00', 'seed', 'seed'),
+
+       (14, 5, 'VA', 'PF-2026-005-BALANCE', 'BALANCE', 9000000, 'WAITING',
+        '2026-10-25 09:00:00', '2026-10-25 09:00:00', 'seed', 'seed'),
+
+       (15, 6, 'VA', 'PF-2026-006-BALANCE', 'BALANCE', 10000000, 'WAITING',
+        '2026-10-22 13:00:00', '2026-10-22 13:00:00', 'seed', 'seed'),
+
+       (16, 7, 'VA', 'PF-2026-007-BALANCE', 'BALANCE', 5500000, 'PAID',
+        '2026-09-24 09:30:00', '2026-09-24 09:30:00', 'seed', 'seed'),
+
+       (17, 8, 'VA', 'PF-2026-008-BALANCE', 'BALANCE', 4500000, 'WAITING',
+        '2026-10-02 15:30:00', '2026-10-02 15:30:00', 'seed', 'seed');
+
+INSERT INTO virtual_account
+(id, payment_id, bank, account_number, status, account_name, expires_at, created_at, updated_at)
+VALUES (1, 1, 0, '12345678901001', 'ACTIVE', '한빛케이스(주)', '2026-11-09 23:59:59+09:00', NOW(), NOW()),
+       (2, 2, 1, '12345678901002', 'EXPIRED', '세원모바일(주)', '2026-11-02 23:59:59+09:00', NOW(), NOW()),
+       (3, 3, 2, '12345678901003', 'EXPIRED', '대성액세서리(주)', '2026-10-30 23:59:59+09:00', NOW(), NOW()),
+       (4, 4, 3, '12345678901004', 'EXPIRED', '미래굿즈(주)', '2026-11-02 23:59:59+09:00', NOW(), NOW()),
+       (5, 5, 5, '12345678901005', 'EXPIRED', '한빛케이스(주)', '2026-10-25 23:59:59+09:00', NOW(), NOW()),
+       (6, 6, 4, '12345678901006', 'EXPIRED', '세원모바일(주)', '2026-11-02 23:59:59+09:00', NOW(), NOW()),
+       (7, 7, 0, '12345678901007', 'EXPIRED', '대성액세서리(주)', '2026-09-28 23:59:59+09:00', NOW(), NOW()),
+       (8, 8, 0, '12345678901008', 'EXPIRED', '미래굿즈(주)', '2026-10-25 23:59:59+09:00', NOW(), NOW()),
+       (9, 9, 1, '12345678901009', 'ACTIVE', '한빛케이스(주)', '2026-11-09 23:59:59+09:00', NOW(), NOW()),
+       (10, 10, 2, '12345678901010', 'EXPIRED', '세원모바일(주)', '2026-11-08 23:59:59+09:00', NOW(), NOW()),
+       (11, 11, 3, '12345678901011', 'CANCELLED', '대성액세서리(주)', '2026-11-02 23:59:59+09:00', NOW(), NOW()),
+       (12, 12, 5, '12345678901012', 'EXPIRED', '미래굿즈(주)', '2026-10-30 23:59:59+09:00', NOW(), NOW()),
+       (13, 13, 4, '12345678901013', 'EXPIRED', '세원모바일(주)', '2026-11-06 23:59:59+09:00', NOW(), NOW()),
+       (14, 14, 0, '12345678901014', 'ACTIVE', '한빛케이스(주)', '2026-11-13 23:59:59+09:00', NOW(), NOW()),
+       (15, 10, 0, '12345678901015', 'ACTIVE', '세원모바일(주)', '2026-11-11 23:59:59+09:00', NOW(), NOW()),
+       (16, 16, 1, '12345678901016', 'EXPIRED', '대성액세서리(주)', '2026-11-05 23:59:59+09:00', NOW(), NOW()),
+       (17, 17, 2, '12345678901017', 'ACTIVE', '미래굿즈(주)', '2026-11-17 23:59:59+09:00', NOW(), NOW());
 
 -- 입금내역
 INSERT INTO payment_history (id, payment_id, virtual_account_id, transaction_id, paid_at, created_at)
@@ -509,7 +664,8 @@ VALUES (1, 1, 1, 'USER', '계약금이 아직 안 들어온 수주를 보여 줘
 
 -- 신규 Entity: 상태 변경 이력 (entity_id는 다형성 대상 ID이므로 DB FK가 아닌 논리 참조)
 INSERT INTO status_history (id, entity, entity_id, from_status, to_status, user_id, user_name, note, created_at)
-VALUES (1, 'ORDER', 1, 'WAITING', 'CONFIRMED', 1, '서도윤', '계약금 29,000,000원 입금 확인 후 작업지시 1~5를 생성했습니다.', '2026-11-06 10:00:00'),
+VALUES (1, 'ORDER', 1, 'WAITING', 'CONFIRMED', 1, '서도윤', '계약금 29,000,000원 입금 확인 후 작업지시 1~5를 생성했습니다.',
+        '2026-11-06 10:00:00'),
        (2, 'ORDER', 11, 'WAITING', 'CANCELLED', 1, '서도윤', '고객 요청으로 미입금 수주와 원본 견적·결제·가상계좌를 취소했습니다.',
         '2026-11-02 10:00:00'),
        (3, 'WORK_ORDER', 6, 'PREPARE', 'PRODUCE', 1, '서도윤', '관리자가 A라인 작업지시 6의 생산을 시작했습니다.', '2026-11-06 08:00:00'),

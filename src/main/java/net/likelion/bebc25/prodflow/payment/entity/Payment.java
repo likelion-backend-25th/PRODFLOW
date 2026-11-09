@@ -16,13 +16,11 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentMethod;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
-import org.hibernate.annotations.CreationTimestamp;
-
-import java.time.LocalDateTime;
 
 @Getter
 @Entity
@@ -35,7 +33,7 @@ import java.time.LocalDateTime;
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Payment {
+public class Payment extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -65,29 +63,18 @@ public class Payment {
     @Column(nullable = false)
     private PaymentStatus status = PaymentStatus.READY;
 
-    @CreationTimestamp
-    @Column(
-            nullable = false,
-            updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(nullable = false)
-    private String createdBy;
-
     @Builder
     private Payment(
             CustomerOrder order,
             String portonePaymentId,
             PaymentType paymentType,
-            Long amount,
-            String createdBy
+            Long amount
     ) {
         this.order = order;
         this.portonePaymentId = portonePaymentId;
         this.paymentType = paymentType;
         this.amount = amount;
         this.status = PaymentStatus.READY;
-        this.createdBy = createdBy;
     }
 
     // 가상계좌 발급 성공
