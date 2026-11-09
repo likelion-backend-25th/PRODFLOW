@@ -63,14 +63,11 @@ class ProductionPlanRepositoryTest {
     }
 
     @Test
-    @DisplayName("재배치 대상은 준비만, 고장 대상은 준비와 생산이고 생산 중 개수는 생산만 센다")
+    @DisplayName("재배치 대상은 준비만이고 생산 중 개수는 생산만 센다")
     void findRescheduleAndBrokenTargets() {
         assertThat(productionPlanRepository.findRescheduleTargets(line.getId(), DAY))
                 .extracting(plan -> plan.getWorkOrder().getWorkNo())
                 .containsExactly("WO-PLAN-PREPARE");
-        assertThat(productionPlanRepository.findBrokenTargets(line.getId(), DAY))
-                .extracting(plan -> plan.getWorkOrder().getWorkNo())
-                .containsExactly("WO-PLAN-PREPARE", "WO-PLAN-PRODUCE");
         assertThat(productionPlanRepository.countInProgressPlans(line.getId(), DAY)).isEqualTo(1);
         assertThat(productionPlanRepository.countInProgressPlans(line.getId(), NEXT.plusDays(1))).isZero();
     }

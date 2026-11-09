@@ -47,7 +47,7 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             """)
     long sumQuantityByOrderProductId(@Param("orderProductId") Long orderProductId);
 
-    // 오늘 이후 생산·일시 정지 계획. 점검·고장으로 바꾸기 전에 남으면 상태를 바꾸지 않는다.
+    // 오늘 이후 생산·일시 정지 계획. 점검으로 바꾸기 전에 남아 있으면 상태를 바꾸지 않는다.
     @Query("""
             select count(plan)
             from ProductionPlan plan
@@ -75,19 +75,4 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             @Param("fromDate") LocalDate fromDate
     );
 
-    // 고장 라인의 오늘 이후 준비·생산·일시정지 계획. 취소 수주는 뺀다.
-    @Query("""
-            select plan
-            from ProductionPlan plan
-            join fetch plan.workOrder wo
-            where wo.line.id = :lineId
-              and plan.planDate >= :fromDate
-              and wo.orderProduct.customerOrder.statusCode.code <> 'CANCELLED'
-              and wo.commonCode.code in ('PREPARE', 'PRODUCE', 'SUSPEND')
-            order by plan.planDate asc, wo.id asc
-            """)
-    List<ProductionPlan> findBrokenTargets(
-            @Param("lineId") Long lineId,
-            @Param("fromDate") LocalDate fromDate
-    );
 }

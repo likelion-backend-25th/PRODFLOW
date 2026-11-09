@@ -459,6 +459,38 @@ class WorkOrderServiceTest {
     }
 
     @Test
+    @DisplayName("생산 중이거나 일시정지인 작업은 다른 라인으로 바꾸지 않는다")
+    void rejectLineChangeWhenWorkHasStarted() {
+        Line source = lineRepository.save(new Line("시작-원라인", 1000));
+        Line target = lineRepository.save(new Line("시작-다른라인", 1000));
+        LocalDate day = firstOpenWeekday();
+        Long workOrderId = workOrderService.create(
+                request(15L, source.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
+        // 시작 예정일이 오늘보다 뒤면 생산 중 검증보다 날짜 검증이 먼저 난다.
+        ReflectionTestUtils.setField(workOrder, "plannedStartDate", LocalDate.now());
+
+        workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L);
+
+        assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(target.getId(), null), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("생산을 시작한 작업은 라인을 변경할 수 없습니다.");
+        assertThat(workOrder.getLine().getId()).isEqualTo(source.getId());
+        // 같은 라인을 다시 보내거나 담당자만 바꾸는 것은 된다.
+        DetailResponse sameLine = workOrderService.update(workOrderId, updateRequest(source.getId(), null), 1L);
+        assertThat(sameLine.lineId()).isEqualTo(source.getId());
+        DetailResponse assigned = workOrderService.update(workOrderId, updateRequest(null, 6L), 1L);
+        assertThat(assigned.assignedId()).isEqualTo(6L);
+        assertThat(assigned.lineId()).isEqualTo(source.getId());
+
+        workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("SUSPEND", null), 1L);
+        assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(target.getId(), null), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("생산을 시작한 작업은 라인을 변경할 수 없습니다.");
+        assertThat(workOrderRepository.findById(workOrderId).orElseThrow().getLine().getId()).isEqualTo(source.getId());
+    }
+
+    @Test
     @DisplayName("가동 가능 라인으로 작업지시 라인을 바꾼다")
     void updateLineToAvailableLine() {
         LocalDate day = firstOpenWeekday();
