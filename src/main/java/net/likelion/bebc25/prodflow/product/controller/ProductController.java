@@ -158,13 +158,13 @@ public class ProductController {
 
     @Operation(
             summary = "생산품목 현재 도면 조회",
-            description = "생산품목의 현재 도면 파일 목록을 조회한다"
+            description = "생산품목의 현재 도면 파일 목록을 조회한다. 각 항목에 10분 유효 S3 미리보기 주소(previewUrl)를 포함한다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping("/{id}/drawings/current")
-    public ResponseEntity<List<ProductDrawingDto.Response>> getCurrentDrawings(
+    public ResponseEntity<List<ProductDrawingDto.CurrentResponse>> getCurrentDrawings(
             @Parameter(description = "생산품목 ID", example = "1")
             @PathVariable Long id
     ) {
