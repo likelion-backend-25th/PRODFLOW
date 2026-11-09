@@ -1,7 +1,9 @@
 package net.likelion.bebc25.prodflow.payment.repository;
 
+import jakarta.persistence.LockModeType;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -22,4 +24,13 @@ public interface VirtualAccountRepository extends JpaRepository<VirtualAccount, 
     List<VirtualAccount> findByPayment_IdOrderByIdDesc(Long paymentId);
 
     Optional<VirtualAccount> findFirstByPayment_IdOrderByIdDesc(Long paymentId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT vc
+            FROM VirtualAccount vc
+            WHERE vc.payment.id = :paymentId
+                    ORDER BY vc.id DESC
+            """)
+    Optional<VirtualAccount> findRecentByPayment_IdForUpdate(@Param("payment_id") Long paymentId);
 }

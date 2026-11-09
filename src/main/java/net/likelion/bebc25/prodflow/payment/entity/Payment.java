@@ -1,6 +1,17 @@
 package net.likelion.bebc25.prodflow.payment.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -109,6 +120,10 @@ public class Payment {
 
         this.status = PaymentStatus.PAID;
         this.paymentMethod = PaymentMethod.MD;
+    }
+
+    public void updateStatus(PaymentStatus status) {
+        this.status = status;
     }
 
 

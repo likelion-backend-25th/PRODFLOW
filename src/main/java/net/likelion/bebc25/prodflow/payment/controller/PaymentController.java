@@ -5,22 +5,26 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
+import net.likelion.bebc25.prodflow.payment.dto.PortOneDto;
 import net.likelion.bebc25.prodflow.payment.service.PaymentService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/payments")
 @Tag(name = "결제", description = "수주 결제·입금 조회 API")
@@ -61,5 +65,23 @@ public class PaymentController {
         PaymentDto.OrderResponse response = paymentService.getByOrderId(orderId);
 
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+            summary = "웹훅 수신 API",
+            description = "웹훅을 수신 받아 결제 상태를 갱신한다"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "갱신 성공")
+    })
+    @PostMapping("/webhook")
+    public ResponseEntity<Void> webhook(@RequestBody PortOneDto.Webhook webhook) {
+        log.info("PortOne 웹훅 수신");
+        if (webhook.data() == null) {
+            log.info("PortOne 웹훅 무시: data 없음");
+            return ResponseEntity.noContent().build();
+        }
+        paymentService.handleWebhook(webhook);
+        return ResponseEntity.noContent().build();
     }
 }
