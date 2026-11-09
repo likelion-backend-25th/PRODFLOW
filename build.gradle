@@ -20,6 +20,15 @@ repositories {
 
 dependencies {
 
+    // Spring AI 버전 관리
+    implementation platform('org.springframework.ai:spring-ai-bom:2.0.2')
+
+    // Gemini 2개 모델 연동
+    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+
+    // Groq GPT-OSS 20B 연동
+    implementation 'org.springframework.ai:spring-ai-openai'
+
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 
     // 견적 PDF 생성

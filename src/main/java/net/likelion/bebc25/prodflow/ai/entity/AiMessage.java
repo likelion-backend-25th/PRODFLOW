@@ -2,6 +2,7 @@ package net.likelion.bebc25.prodflow.ai.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
@@ -19,11 +20,13 @@ import net.likelion.bebc25.prodflow.ai.enums.AiMessageRole;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
+@EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
         name = "ai_message",
@@ -54,12 +57,22 @@ public class AiMessage {
     @Column(columnDefinition = "TEXT")
     private String generatedSql;
 
+    // MCP 조회 결과 (표, 차트 데이터)
+    @Column(columnDefinition = "LONGTEXT")
+    private String resultJson;
+
+
     @CreatedDate // Entity 최초 저장될 때 생성일시를 자동으로 주입
     @Column(updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
     // 대화방에서 번호순서에 맞춰 누가 말하고 어떠한 내용을 담고 있는가
-    public AiMessage(AiConversation aiConversation, int sequenceNo, AiMessageRole role, String content) {
+    public AiMessage(
+            AiConversation aiConversation,
+            int sequenceNo,
+            AiMessageRole role,
+            String content) {
+
         this.aiConversation = aiConversation;
         this.sequenceNo = sequenceNo;
         this.role = role;
@@ -67,7 +80,8 @@ public class AiMessage {
     }
 
     // ai가 의도를 어떻게 해석하고 sql을 생성하여 저장했는가
-    public void applyResult(String generatedSql) {
+    public void applyResult(String generatedSql, String resultJson) {
         this.generatedSql = generatedSql;
+        this.resultJson = resultJson;
     }
 }
