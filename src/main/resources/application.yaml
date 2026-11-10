@@ -55,6 +55,25 @@ spring:
         api-key: ${GEMINI_API_KEY}
         chat:
           model: gemini-3.1-flash-lite
+    mcp:
+      server:
+        name: prodflow-mcp
+        type: SYNC
+        protocol: STREAMABLE
+        annotation-scanner:
+          enabled: true
+
+# AI 조회 전용 DataSource (spring 바깥)
+ai:
+  datasource:
+    jdbc-url: ${spring.datasource.url}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${AI_DB_USERNAME}
+    password: ${AI_DB_PASSWORD}
+    maximum-pool-size: 2
+    minimum-idle: 0
+    connection-timeout: 5000
+    read-only: true
 
 
 # Springdoc OpenAPI 및 Swagger UI 설정
@@ -127,6 +146,11 @@ portone:
   # 그록 인증키
 groq:
   api-key: ${GROQ_API_KEY}
+
+# MCP 내부 통신 주소
+prodflow:
+  mcp:
+    url: ${PRODFLOW_MCP_URL:http://127.0.0.1:8080}
   
   
   # 허용 프론트 도메인
