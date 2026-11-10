@@ -209,6 +209,12 @@ public class SecurityConfig {
                                 "/api/v1/products/*/drawings"
                         ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
 
+                        // 생산품목 도면 삭제는 최고 관리자 또는 수주 관리자만 허용
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/v1/products/*/drawings/*"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
                         // 생산품목 수정은 최고 관리자 또는 수주 관리자만 허용
                         .requestMatchers(
                                 HttpMethod.PUT,

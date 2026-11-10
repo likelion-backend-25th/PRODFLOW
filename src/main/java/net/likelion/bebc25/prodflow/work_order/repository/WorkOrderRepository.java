@@ -214,6 +214,12 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
             Long workOrderId
     );
 
+    // 수주에 지정 상태가 아닌 작업지시가 있는지 (출고대기 전환 전 포장완료 여부 확인)
+    boolean existsByOrderProduct_CustomerOrder_IdAndCommonCode_CodeNotIn(
+            Long customerOrderId,
+            Collection<String> codes
+    );
+
     // 지정한 수주들의 작업지시와 연관 정보를 ID 순으로 조회하고 쓰기 잠금을 건다.
     // 상태로 제한하지 않으며, 담당자가 없는 작업도 포함한다.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -262,4 +268,24 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     // 지정한 수주의 품목에 연결된 작업지시가 상태와 관계없이 하나라도 있는지 확인한다.
     boolean existsByOrderProduct_CustomerOrder_Id(Long orderId);
+
+    // 배송 목록용. 작업지시가 있는 수주 ID
+    @Query("""
+            select distinct w.orderProduct.customerOrder.id
+            from WorkOrder w
+            where w.orderProduct.customerOrder.id in :orderIds
+            """)
+    List<Long> findDistinctOrderIdsByOrderIdIn(@Param("orderIds") Collection<Long> orderIds);
+
+    // 배송 목록용. 지정 상태가 아닌 작업이 하나라도 있는 수주 ID
+    @Query("""
+            select distinct w.orderProduct.customerOrder.id
+            from WorkOrder w
+            where w.orderProduct.customerOrder.id in :orderIds
+              and w.commonCode.code not in :codes
+            """)
+    List<Long> findDistinctOrderIdsByOrderIdInAndCodeNotIn(
+            @Param("orderIds") Collection<Long> orderIds,
+            @Param("codes") Collection<String> codes
+    );
 }
