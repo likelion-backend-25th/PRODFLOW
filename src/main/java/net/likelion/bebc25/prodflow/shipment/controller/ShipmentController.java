@@ -30,7 +30,10 @@ public class ShipmentController {
 
     @Operation(
             summary = "배송 목록 조회",
-            description = "배송 관리 화면용 목록이다. tab으로 포장중(PACKING), 출고대기(READY_TO_SHIP), 배송중(SHIPPING), 잔금대기(BALANCE)를 고른다. tab을 생략하면 출고대기다. 응답에 탭별 건수와 납기 빠른 순 목록이 포함된다."
+            description = "배송 관리 화면용 목록이다. tab으로 포장중(PACKING), 출고대기(READY_TO_SHIP), 배송중(SHIPPING), 잔금대기(BALANCE)를 고른다. "
+                    + "tab을 생략하면 출고대기다. 응답에 탭별 건수와 납기 빠른 순 목록이 포함된다. "
+                    + "포장중 탭은 작업지시가 있고 전부 포장완료(PACK_DONE)인 수주만 목록·건수에 포함하며, "
+                    + "readyToShipEligible은 그 항목에서 true다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -44,6 +47,28 @@ public class ShipmentController {
             @RequestParam(required = false, defaultValue = "READY_TO_SHIP") String tab
     ) {
         return ResponseEntity.ok(shipmentService.findList(tab));
+    }
+
+    @Operation(
+            summary = "포장중 → 출고대기 전환",
+            description = "포장중 수주를 출고대기로 바꾼다. 해당 수주의 모든 작업지시가 포장완료(PACK_DONE)여야 한다. "
+                    + "출고대기에서만 운송장을 등록할 수 있다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "전환 성공",
+            content = @Content(schema = @Schema(implementation = ShipmentDto.ReadyToShipResponse.class))
+    )
+    @ApiResponse(responseCode = "400", description = "포장중이 아님, 작업 미완료")
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "404", description = "수주 또는 직원을 찾을 수 없음")
+    @PostMapping("/orders/{orderId}/ready-to-ship")
+    public ResponseEntity<ShipmentDto.ReadyToShipResponse> markReadyToShip(
+            @Parameter(description = "수주 ID", required = true)
+            @PathVariable Long orderId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(shipmentService.markReadyToShip(orderId, userDetails.getUserId()));
     }
 
     @Operation(
