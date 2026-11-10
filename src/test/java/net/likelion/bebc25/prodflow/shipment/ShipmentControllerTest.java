@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.shipment;
 
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.global.exception.GlobalExceptionHandler;
 import net.likelion.bebc25.prodflow.shipment.controller.ShipmentController;
 import net.likelion.bebc25.prodflow.shipment.dto.ShipmentDto;
@@ -8,12 +9,17 @@ import net.likelion.bebc25.prodflow.shipment.service.ShipmentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.NoSuchElementException;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -25,6 +31,7 @@ class ShipmentControllerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new ShipmentController(shipmentService))
+                .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
@@ -73,14 +80,19 @@ class ShipmentControllerTest {
     @Test
     @DisplayName("수주 ID 경로가 없으면 기본 탭의 배송 목록을 조회한다")
     void getListWithoutOrderId() throws Exception {
-        when(shipmentService.findList("READY_TO_SHIP")).thenReturn(new ShipmentDto.ListResponse(
-                "READY_TO_SHIP", new ShipmentDto.TabCounts(0, 0, 0, 0), java.util.List.of()));
+        when(shipmentService.findList(eq("READY_TO_SHIP"), any(Pageable.class)))
+                .thenReturn(new ShipmentDto.ListResponse(
+                        "READY_TO_SHIP",
+                        new ShipmentDto.TabCounts(0, 0, 0, 0),
+                        new PageResponse<>(List.of(), 0, 10, 0, 0)
+                ));
 
         mvc.perform(get("/api/v1/shipments"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tab").value("READY_TO_SHIP"))
-                .andExpect(jsonPath("$.items").isEmpty());
-        verify(shipmentService).findList("READY_TO_SHIP");
+                .andExpect(jsonPath("$.page.content").isEmpty())
+                .andExpect(jsonPath("$.page.totalElements").value(0));
+        verify(shipmentService).findList(eq("READY_TO_SHIP"), any(Pageable.class));
         verify(shipmentService, never()).getByOrderId(any());
     }
 

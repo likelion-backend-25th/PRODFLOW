@@ -122,14 +122,13 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     @EntityGraph(attributePaths = "quotation")
     List<CustomerOrder> findByQuotationIdIn(List<Long> quotationIds);
 
-    // 배송 탭: 상태별 수주. 납기 빠른 순
+    // 배송 탭: 상태별 수주. 납기 빠른 순(정렬은 Pageable)
     @EntityGraph(attributePaths = {"client", "statusCode"})
     @Query("""
             SELECT o FROM CustomerOrder o
             WHERE o.statusCode.code = :status
-            ORDER BY o.estimatedDueDate ASC
             """)
-    List<CustomerOrder> findByStatusCodeOrderByEstimatedDueDateAsc(@Param("status") String status);
+    Page<CustomerOrder> findByStatusCode(@Param("status") String status, Pageable pageable);
 
     // 잔금 대기: 배송 완료인데 전액 입금이 아닌 수주
     @EntityGraph(attributePaths = {"client", "statusCode"})
@@ -137,9 +136,11 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
             SELECT o FROM CustomerOrder o
             WHERE o.statusCode.code = 'COMPLETED'
               AND o.paymentStatus <> :paid
-            ORDER BY o.estimatedDueDate ASC
             """)
-    List<CustomerOrder> findBalanceWaitingOrders(@Param("paid") OrderPaymentStatus paid);
+    Page<CustomerOrder> findBalanceWaitingOrders(
+            @Param("paid") OrderPaymentStatus paid,
+            Pageable pageable
+    );
 
     long countByStatusCode_Code(String code);
 

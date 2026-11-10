@@ -1,13 +1,13 @@
 package net.likelion.bebc25.prodflow.shipment.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.shipment.entity.Shipment;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 
 public class ShipmentDto {
 
@@ -46,12 +46,12 @@ public class ShipmentDto {
     ) {
     }
 
-    // 배송 목록 응답
+    // 배송 목록 응답. 탭 건수는 전체 기준, page는 현재 탭 목록 페이징
     @Schema(name = "ShipmentListResponse")
     public record ListResponse(
             String tab,
             TabCounts counts,
-            List<ListItem> items
+            PageResponse<ListItem> page
     ) {
     }
 
