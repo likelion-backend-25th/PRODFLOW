@@ -1,22 +1,25 @@
 package net.likelion.bebc25.prodflow.payment.controller;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.List;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import jakarta.validation.Valid;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
-import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
-import net.likelion.bebc25.prodflow.payment.dto.PortOneDto;
-import net.likelion.bebc25.prodflow.payment.dto.VirtualAccountDto;
-import net.likelion.bebc25.prodflow.payment.service.PaymentQueryService;
-import net.likelion.bebc25.prodflow.payment.service.PaymentService;
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,16 +29,25 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.time.Instant;
-import java.util.Base64;
-import java.util.List;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
+import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
+import net.likelion.bebc25.prodflow.payment.dto.PaymentNotificationDto;
+import net.likelion.bebc25.prodflow.payment.dto.PortOneDto;
+import net.likelion.bebc25.prodflow.payment.dto.VirtualAccountDto;
+import net.likelion.bebc25.prodflow.payment.service.PaymentNotificationService;
+import net.likelion.bebc25.prodflow.payment.service.PaymentQueryService;
+import net.likelion.bebc25.prodflow.payment.service.PaymentService;
 
 @Slf4j
 @RestController
@@ -46,10 +58,27 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final PaymentQueryService paymentQueryService;
+    private final PaymentNotificationService paymentNotificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${portone.webhook-secret:}")
     private String webhookSecret;
+
+    @Operation(summary = "계약금 가상계좌 발급 및 결제정보 이메일 발송",
+            description = "확인한 수주 내용을 재검증하고 기존 발급 기능으로 계좌를 준비한 뒤 이메일을 전송한다. "
+                    + "동일 requestId는 재전송하지 않으며, 메일 실패 후 새 요청은 기존 유효 계좌를 사용한다.")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    @PostMapping("/orders/{orderId}/notifications")
+    public ResponseEntity<PaymentNotificationDto.Response> sendNotification(
+            @PathVariable Long orderId,
+            @Valid @RequestBody PaymentNotificationDto.Request request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        PaymentNotificationDto.Response response = paymentNotificationService.send(orderId, request, userDetails
+                .getUserId());
+
+        return ResponseEntity.ok(response);
+    }
 
     // 현금 계약금 수동 입금 처리
     @Operation(
@@ -122,7 +151,8 @@ public class PaymentController {
     }
 
     // 기존 계좌 말소를 PortOne에서 확인한 뒤 새 ID로 재발급한다.
-    @Operation(summary = "가상계좌 재발급", description = "요청 본문 없이 재발급합니다. 입금기한은 PAYMENT_VA_DUE_DAYS로 자동 계산하고, 기존 계좌 말소가 확인된 뒤 새 계좌를 발급합니다.")
+    @Operation(summary = "가상계좌 재발급",
+            description = "요청 본문 없이 재발급합니다. 입금기한은 PAYMENT_VA_DUE_DAYS로 자동 계산하고, 기존 계좌 말소가 확인된 뒤 새 계좌를 발급합니다.")
     @ApiResponse(responseCode = "200", description = "새 가상계좌 발급 성공")
     @ApiResponse(responseCode = "409", description = "이미 입금되었거나 이전 계좌 말소 확인 불가")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")

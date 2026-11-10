@@ -1,30 +1,32 @@
 package net.likelion.bebc25.prodflow.global.exception;
 
-import jakarta.validation.ConstraintViolationException;
-import lombok.extern.slf4j.Slf4j;
-import net.likelion.bebc25.prodflow.auth.exception.AuthException;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationPdfDto;
-import net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authorization.AuthorizationDeniedException;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
+import jakarta.validation.ConstraintViolationException;
+
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
+
+import net.likelion.bebc25.prodflow.auth.exception.AuthException;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationPdfDto;
+import net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException;
 
 @Slf4j
 @RestControllerAdvice
@@ -179,10 +181,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<Map<String, String>> handleResponseStatus(ResponseStatusException ex) {
-        return ResponseEntity.status(ex.getStatusCode()).body(Map.of(
-                "code", "HTTP_" + ex.getStatusCode().value(),
-                "message", ex.getReason() == null ? "요청을 처리할 수 없습니다." : ex.getReason()));
+    public ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException ex) {
+        ApiErrorResponse response = ApiErrorResponse.of(
+                "HTTP_" + ex.getStatusCode().value(),
+                ex.getReason() == null ? "요청을 처리할 수 없습니다." : ex.getReason(),
+                ex.getStatusCode().value());
+        return ResponseEntity.status(ex.getStatusCode()).body(response);
     }
 
     // 요청 본문을 읽거나 변환할 수 없을 때 호출됨 (400 Bad Request 응답)

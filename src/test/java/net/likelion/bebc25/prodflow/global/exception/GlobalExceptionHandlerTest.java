@@ -1,15 +1,20 @@
 package net.likelion.bebc25.prodflow.global.exception;
 
-import net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException;
 import org.junit.jupiter.api.Test;
+
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+import net.likelion.bebc25.prodflow.quotation.exception.QuotationPdfPreparationException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -24,10 +29,10 @@ class GlobalExceptionHandlerTest {
     void pdfExceptionsUseGlobalHandlerAndPreserveRetryContract() throws Exception {
         for (HttpStatus httpStatus : new HttpStatus[]{
                 HttpStatus.BAD_REQUEST, HttpStatus.CONFLICT, HttpStatus.BAD_GATEWAY}) {
-            var exception = new QuotationPdfPreparationException(
+            QuotationPdfPreparationException exception = new QuotationPdfPreparationException(
                     123L, httpStatus, "PDF_TEST_ERROR", "PDF 준비 실패",
                     new RuntimeException("외부 서비스 내부 상세"));
-            var mvc = MockMvcBuilders.standaloneSetup(new ExceptionController(exception))
+            MockMvc mvc = MockMvcBuilders.standaloneSetup(new ExceptionController(exception))
                     .setControllerAdvice(handler).build();
             mvc.perform(get("/test/exception"))
                     .andExpect(status().is(httpStatus.value()))
@@ -44,7 +49,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void externalApiFailureReturns502WithoutExposingInternalDetails() {
-        var response = handler.handleExternalApiException(
+        ResponseEntity<ApiErrorResponse> response = handler.handleExternalApiException(
                 new ExternalApiException("공휴일 API 내부 상세", new RuntimeException("원인")));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
@@ -75,7 +80,7 @@ class GlobalExceptionHandlerTest {
     }
 
     private void assertHandled(RuntimeException exception, int statusCode, String code) throws Exception {
-        var mvc = MockMvcBuilders.standaloneSetup(new ExceptionController(exception))
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new ExceptionController(exception))
                 .setControllerAdvice(handler).build();
 
         mvc.perform(get("/test/exception"))
@@ -85,6 +90,29 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.status").value(statusCode))
                 .andExpect(jsonPath("$.timestamp").isNotEmpty())
                 .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
+    @Test
+    void responseStatusExceptionsUseStandardErrorBody() throws Exception {
+        ResponseStatusException exception = new ResponseStatusException(
+                HttpStatus.CONFLICT, "취소할 수 없는 수주입니다.");
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new ExceptionController(exception))
+                .setControllerAdvice(handler).build();
+        mvc.perform(get("/test/exception"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("HTTP_409"))
+                .andExpect(jsonPath("$.message").value("취소할 수 없는 수주입니다."))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
+    @Test
+    void responseStatusWithoutReasonUsesDefaultMessage() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleResponseStatus(
+                new ResponseStatusException(HttpStatus.BAD_REQUEST));
+        assertThat(response.getBody().message()).isEqualTo("요청을 처리할 수 없습니다.");
+        assertThat(response.getBody().status()).isEqualTo(400);
     }
 
     @RestController
