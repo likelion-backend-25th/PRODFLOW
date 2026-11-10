@@ -28,12 +28,12 @@ public class VirtualAccount extends BaseTimeEntity {
 
     // 은행 정보는 enum 순서가 아닌 명칭으로 DB에 저장한다.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false)
     private Bank bank;
 
     // 재발급 전 결제 ID도 추적하기 위한 외부 거래 식별자.
     // 과거 데이터는 null일 수 있으므로 nullable로 유지한다.
-    @Column(name = "portone_payment_id", length = 40)
+    @Column
     private String portonePaymentId;
 
     // 가상계좌 번호
@@ -46,11 +46,11 @@ public class VirtualAccount extends BaseTimeEntity {
     private VirtualAccountStatus status = VirtualAccountStatus.ACTIVE;
 
     // 예금주
-    @Column(name = "account_name")
+    @Column
     private String accountName;
 
     // 가상계좌 만료 일시
-    @Column(name = "expires_at", nullable = false)
+    @Column(nullable = false)
     private OffsetDateTime expiresAt;
 
     @Builder
@@ -76,9 +76,20 @@ public class VirtualAccount extends BaseTimeEntity {
         this.status = VirtualAccountStatus.USED;
     }
 
-    // 가상계좌 만료
+    // 아직 ACTIVE인 계좌만 만료시킨다. 입금 완료(USED)·말소(CANCELLED)를 덮어쓰지 않는다.
     public void expire() {
-        this.status = VirtualAccountStatus.EXPIRED;
+        if (this.status == VirtualAccountStatus.ACTIVE && isExpired()) {
+            this.status = VirtualAccountStatus.EXPIRED;
+        }
+    }
+
+    // 스케줄러 실행 전에도 API에서는 만료된 계좌를 즉시 EXPIRED로 보여준다.
+    // DB의 상태를 직접 변경하지 않는 조회 전용 메서드이다.
+    public VirtualAccountStatus getEffectiveStatus() {
+        if (this.status == VirtualAccountStatus.ACTIVE && isExpired()) {
+            return VirtualAccountStatus.EXPIRED;
+        }
+        return this.status;
     }
 
     // 가상계좌 사용 취소
@@ -91,9 +102,9 @@ public class VirtualAccount extends BaseTimeEntity {
         return this.status == VirtualAccountStatus.ACTIVE;
     }
 
-    // 실제 시간 기준 만료 여부 확인
+    // 만료시각과 정확히 일치하는 순간부터 만료로 판단한다.
     public boolean isExpired() {
-        return OffsetDateTime.now().isAfter(expiresAt);
+        return expiresAt != null && !OffsetDateTime.now().isBefore(expiresAt);
     }
 
     public void recordOriginalPortonePaymentId(String paymentId) {

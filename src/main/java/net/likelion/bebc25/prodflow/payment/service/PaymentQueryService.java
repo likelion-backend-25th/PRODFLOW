@@ -11,7 +11,9 @@ import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
 import net.likelion.bebc25.prodflow.payment.enums.Bank;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentMethod;
 import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
+import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
 import net.likelion.bebc25.prodflow.payment.repository.PaymentHistoryRepository;
 import net.likelion.bebc25.prodflow.payment.repository.PaymentRepository;
 import net.likelion.bebc25.prodflow.payment.repository.VirtualAccountRepository;
@@ -40,30 +42,32 @@ public class PaymentQueryService {
     private final VirtualAccountRepository virtualAccountRepository;
     private final PaymentHistoryRepository paymentHistoryRepository;
 
-    // 입금관리 통계 조회
+    // 입금관리 통계 조회 (전월 대비 증감률·퍼센트 제외)
+    // 네 가지 금액은 서로 중복되지 않도록 다음 기준을 사용한다.
+    //   전체 = 입금 완료 + 입금 대기 + 미수(미발급/발급 실패/재발급 진행 등)
     public PaymentDto.SummaryResponse getSummary() {
 
-        // 취소되지 않은 수주의 총액 (미발급 잔금 포함)
-        long orderTotal =
-                paymentRepository.sumValidOrderAmount();
+        // 취소되지 않은 수주의 총액: 결제건이 아직 없는 잔금도 포함한다.
+        long totalScheduledAmount = paymentRepository.sumValidOrderAmount();
 
-        // 실제 입금 완료 금액
-        long completedAmount =
-                paymentRepository.sumAmountByStatus(PaymentStatus.PAID);
+        // 입금 완료: 계약금/잔금 및 수동 입금(MD)을 모두 포함한다.
+        long completedAmount = paymentRepository.sumAmountByStatus(PaymentStatus.PAID);
 
-        // 가상계좌 발급 후 입금 대기 중인 금액
-        long waitingAmount =
-                paymentRepository.sumAmountByStatus(PaymentStatus.WAITING);
+        // 입금 대기: 가상계좌 발급 완료 후 입금을 기다리는 결제건이다.
+        long waitingAmount = paymentRepository.sumAmountByStatus(PaymentStatus.WAITING);
 
-        // 전체 미입금 예정 금액
-        long totalScheduledAmount =
-                orderTotal - completedAmount;
+        // 미수: READY·FAILED·REISSUE_CLOSING 등 또는 아직 생성되지 않은 잔금을 포함한다.
+        // 상태가 잘못 집계되어 음수가 표시되는 것을 방지한다.
+        long unpaidAmount = Math.max(
+                0L,
+                totalScheduledAmount - completedAmount - waitingAmount
+        );
 
         return new PaymentDto.SummaryResponse(
                 totalScheduledAmount,
                 waitingAmount,
                 completedAmount,
-                null // 미수 금액은 정책 확정 후 구현
+                unpaidAmount
         );
     }
 
@@ -178,6 +182,15 @@ public class PaymentQueryService {
                 order.getStatusCode().getCode()
         );
 
+        // 실제 입금금액: 현재는 부분 입금 없이 전액 입금만 처리한다.
+        boolean paid = payment.getStatus() == PaymentStatus.PAID;
+        long actualPaidAmount = paid ? payment.getAmount() : 0L;
+
+        // 수동 입금의 MANUAL-... 식별값은 PortOne 결제 ID가 아니다.
+        String portonePaymentId = payment.getPaymentMethod() == PaymentMethod.VA
+                ? payment.getPortonePaymentId()
+                : null;
+
         // 결제 정보
         PaymentDto.PaymentInfo paymentInfo = new PaymentDto.PaymentInfo(
                 payment.getId(),
@@ -185,7 +198,9 @@ public class PaymentQueryService {
                 payment.getAmount(),
                 payment.getStatus(),
                 payment.getPaymentMethod(),
-                payment.getCreatedAt()
+                payment.getCreatedAt(),
+                actualPaidAmount,
+                portonePaymentId
         );
 
         // 가상계좌 정보
@@ -194,18 +209,45 @@ public class PaymentQueryService {
                         ? null
                         : VirtualAccountDto.Response.from(account);
 
-        // 입금내역 정보
+        // 입금내역 정보 (기존 API 구조 유지)
         PaymentHistoryDto.Response historyInfo =
                 history == null
                         ? null
                         : PaymentHistoryDto.Response.from(history);
 
+        // 실제 재발급 서비스(beginReissue)의 사전 조건과 동일하게 계산한다.
+        // 재발급 중(REISSUE_CLOSING)은 기존 요청을 복구할 수는 있지만,
+        // 프론트에서 새 재발급 버튼을 다시 활성화하지 않는다.
+        boolean reissueAvailable = canReissue(payment, account, history);
+
         return new PaymentDto.DetailResponse(
                 orderInfo,
                 paymentInfo,
                 accountInfo,
-                historyInfo
+                historyInfo,
+                reissueAvailable
         );
+    }
+
+    // 프론트 버튼 표시를 위한 DB 기준 사전 판정이다.
+    // 실제 재발급 요청에서는 동시 입금 여부와 PortOne 상태를 다시 검증한다.
+    private boolean canReissue(Payment payment, VirtualAccount account, PaymentHistory history) {
+        if (payment.getPaymentMethod() != PaymentMethod.VA
+                || history != null
+                || account == null
+                || account.getEffectiveStatus() == VirtualAccountStatus.USED
+                || payment.getPortonePaymentId() == null
+                || payment.getPortonePaymentId().isBlank()) {
+            return false;
+        }
+
+        if ("CANCELLED".equals(payment.getOrder().getStatusCode().getCode())) {
+            return false;
+        }
+
+        return payment.getStatus() == PaymentStatus.WAITING
+                || payment.getStatus() == PaymentStatus.CANCELLED
+                || payment.getStatus() == PaymentStatus.FAILED;
     }
 
     // 목록 검색 조건

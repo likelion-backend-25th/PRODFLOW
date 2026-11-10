@@ -2,11 +2,15 @@ package net.likelion.bebc25.prodflow.payment.repository;
 
 import jakarta.persistence.LockModeType;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
+import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -50,6 +54,24 @@ public interface VirtualAccountRepository extends JpaRepository<VirtualAccount, 
             """)
     Optional<VirtualAccount> findRecentByPayment_IdForUpdate(
             @Param("paymentId") Long paymentId
+    );
+
+    // 지정 시각까지 만료된 ACTIVE 계좌만 DB에 EXPIRED로 반영한다.
+    // 상태 조건을 UPDATE 자체에 포함하므로 USED/CANCELLED는 변경되지 않는다.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE VirtualAccount v
+            SET v.status = :expired,
+                v.updatedAt = :updatedAt,
+                v.updatedBy = 'SYSTEM'
+            WHERE v.status = :active
+              AND v.expiresAt <= :now
+            """)
+    int expireActiveAccounts(
+            @Param("now") OffsetDateTime now,
+            @Param("updatedAt") LocalDateTime updatedAt,
+            @Param("active") VirtualAccountStatus active,
+            @Param("expired") VirtualAccountStatus expired
     );
 
     // 여러 결제건의 가상계좌 일괄 조회 (최신순)

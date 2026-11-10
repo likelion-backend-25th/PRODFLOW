@@ -5,7 +5,9 @@ import net.likelion.bebc25.prodflow.payment.entity.Payment;
 import net.likelion.bebc25.prodflow.payment.entity.PaymentHistory;
 import net.likelion.bebc25.prodflow.payment.entity.VirtualAccount;
 import net.likelion.bebc25.prodflow.payment.enums.Bank;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
 import net.likelion.bebc25.prodflow.payment.enums.VirtualAccountStatus;
+import net.likelion.bebc25.prodflow.payment.service.PaymentQueryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,8 @@ class PaymentRepositoryTest {
     private EntityManager em;
     @Autowired
     private PaymentRepository paymentRepository;
+    @Autowired
+    private PaymentQueryService paymentQueryService;
     @Autowired
     private PaymentHistoryRepository paymentHistoryRepository;
     @Autowired
@@ -76,4 +80,30 @@ class PaymentRepositoryTest {
                 });
         assertThat(virtualAccountRepository.findLatestByOrderId(Long.MAX_VALUE)).isEmpty();
     }
+
+    @Test
+    @DisplayName("입금관리 통계는 취소 수주를 제외하며 전체 금액을 대기·완료·미수로 구분한다")
+    void getPaymentSummary() {
+        var summary = paymentQueryService.getSummary();
+
+        // 결제건이 아직 없는 수주의 잔금까지 전체 예정 금액에 반영한다.
+        Long expectedOrderTotal = em.createQuery("""
+                select coalesce(sum(o.totalAmount), 0)
+                from CustomerOrder o
+                where o.statusCode.code <> 'CANCELLED'
+                """, Long.class).getSingleResult();
+
+        assertThat(summary.totalScheduledAmount()).isEqualTo(expectedOrderTotal);
+        assertThat(summary.waitingAmount())
+                .isEqualTo(paymentRepository.sumAmountByStatus(PaymentStatus.WAITING));
+        assertThat(summary.completedAmount())
+                .isEqualTo(paymentRepository.sumAmountByStatus(PaymentStatus.PAID));
+
+        assertThat(summary.unpaidAmount()).isNotNull().isGreaterThanOrEqualTo(0L);
+        assertThat(summary.unpaidAmount()).isEqualTo(Math.max(0L,
+                summary.totalScheduledAmount()
+                        - summary.waitingAmount()
+                        - summary.completedAmount()));
+    }
+
 }
