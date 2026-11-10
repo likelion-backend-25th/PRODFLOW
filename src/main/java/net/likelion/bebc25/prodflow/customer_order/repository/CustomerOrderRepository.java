@@ -1,5 +1,17 @@
 package net.likelion.bebc25.prodflow.customer_order.repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
@@ -7,20 +19,14 @@ import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.shipment.entity.Shipment;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
 
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
+    // 견적 -> 수주 순으로 잠그기 전에 엔티티를 로딩하지 않고 원본 견적 ID만 조회한다.
+    @Query("select o.quotation.id from CustomerOrder o where o.id = :id")
+    Optional<Long> findQuotationIdById(@Param("id") Long id);
+
     // 현금 입금의 중복 처리와 상태 변경을 직렬화한다.
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from CustomerOrder o where o.id = :id")
     Optional<CustomerOrder> findByIdForUpdate(@Param("id") Long id);
 
@@ -46,7 +52,7 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     String SEARCH_CONDITION = """
             where o.statusCode.codeGroup.id = 2
-              and ((:done = true and o.statusCode.code = 'COMPLETED')
+              and ((:done = true and o.statusCode.code in ('COMPLETED', 'CANCELLED'))
                    or (:done = false and o.statusCode.code not in ('COMPLETED', 'CANCELLED')))
               and (:keyword is null or lower(o.orderNo) like :keyword escape '!'
                    or lower(o.client.company) like :keyword escape '!'

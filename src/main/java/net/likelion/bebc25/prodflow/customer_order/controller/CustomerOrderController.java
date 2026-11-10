@@ -1,24 +1,19 @@
 package net.likelion.bebc25.prodflow.customer_order.controller;
 
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import jakarta.validation.Valid;
+
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import net.likelion.bebc25.prodflow.common.dto.PageResponse;
-import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDetailDto;
-import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto;
-import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderListDto;
-import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderListSortType;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderListTab;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
-import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderService;
-import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import org.springdoc.core.annotations.ParameterObject;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -30,6 +25,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,9 +33,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
+import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDetailDto;
+import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto;
+import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderListDto;
+import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderListSortType;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderListTab;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
+import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderCancelService;
+import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderService;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -47,6 +51,23 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CustomerOrderController {
     private final CustomerOrderService customerOrderService;
+    private final CustomerOrderCancelService customerOrderCancelService;
+
+    @Operation(summary = "입금 전 대기 수주 취소", description = "수주·원본 견적·발급 전 결제를 취소하고 이력을 저장한다. "
+            + "이미 취소된 수주는 이력을 추가하지 않고 반환한다. 가상계좌 발급·말소는 수행하지 않으며, "
+            + "계좌 발급 이력 또는 외부 발급 진행·확인 필요 상태가 있으면 409로 거부한다.")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    @PatchMapping("/{orderId}/cancel")
+    public ResponseEntity<CustomerOrderDetailDto.Response> cancel(
+            @PathVariable Long orderId,
+            @Valid @RequestBody CustomerOrderDto.CancelRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        CustomerOrderDetailDto.Response response = customerOrderCancelService.cancel(orderId, request, userDetails
+                .getUserId());
+
+        return ResponseEntity.ok(response);
+    }
 
     // 상세 화면의 수주 상태 변경 이력 조회
     @Operation(summary = "수주 상태 변경 이력 조회", description = "해당 수주의 저장된 이력을 처리 시각·ID 내림차순으로 모두 반환한다. "
@@ -103,7 +124,7 @@ public class CustomerOrderController {
     }
 
     // 수주 목록 조회
-    @Operation(summary = "수주 목록 조회", description = "OPEN은 완료·취소 제외, DONE은 완료만 조회. "
+    @Operation(summary = "수주 목록 조회", description = "OPEN은 완료·취소 제외, DONE은 완료·취소된 종료 수주 조회. "
             + "검색어는 수주번호·거래처명·저장된 품목명에 적용하며 조건은 모두 AND로 적용한다. "
             + "기본 8개, 등록일 최신순. COMPLETED_AT은 배송 완료일 최신순이며 완료일이 없으면 뒤에 표시한다. "
             + "진행 상태는 그룹 ID 2의 common_code이며 statusCodeId로 검색한다. "
@@ -118,7 +139,8 @@ public class CustomerOrderController {
             @RequestParam(defaultValue = "CREATED_AT") OrderListSortType sortType,
             @ParameterObject @PageableDefault(size = 8) Pageable pageable) {
 
-        PageResponse<CustomerOrderListDto.Response> response = customerOrderService.getOrders(new CustomerOrderListDto.SearchCondition(
+        PageResponse<CustomerOrderListDto.Response> response = customerOrderService.getOrders(
+                new CustomerOrderListDto.SearchCondition(
                 tab, keyword, confirmationStatus, statusCodeId, paymentStatus, sortType), pageable);
 
         return ResponseEntity.ok(response);
@@ -135,7 +157,8 @@ public class CustomerOrderController {
     }
 
     // 수주 진행 상태 선택 목록 조회
-    @Operation(summary = "수주 진행 상태 목록", description = "common_code 중 code_group_id=2이고 ACTIVE인 코드를 sort_order 순으로 반환한다.")
+    @Operation(summary = "수주 진행 상태 목록",
+            description = "common_code 중 code_group_id=2이고 ACTIVE인 코드를 sort_order 순으로 반환한다.")
     @GetMapping("/statuses")
     public ResponseEntity<List<CustomerOrderListDto.StatusResponse>> getStatuses() {
         List<CustomerOrderListDto.StatusResponse> response = customerOrderService.getStatuses();

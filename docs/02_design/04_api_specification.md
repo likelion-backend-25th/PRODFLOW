@@ -1,4 +1,78 @@
-# 1. REST API 명세서 및 규격서 (하루배움 LMS)
+# PRODFLOW 계약금 안내 API
+
+기존 본문의 LMS 명세는 템플릿 예시이며 아래는 PRODFLOW의 실제 추가 API이다.
+
+## 계약금 가상계좌 발급 및 이메일 발송
+
+- `POST /api/v1/payments/orders/{orderId}/notifications`
+- 권한: `SUPER_ADMIN`, `ORDER_MANAGER`. 활성 상태이며 최초 비밀번호 변경을 완료한 직원.
+- 모달 조회는 기존 `GET /api/v1/orders/{orderId}` 및 `GET /api/v1/payments?orderId={orderId}`를 사용한다.
+- 수주 등록·모달 조회에서는 결제나 계좌를 생성하지 않는다.
+- `requestId`는 UUID 형식의 요청 식별자다. 네트워크 오류 재시도에는 같은 ID를 유지한다.
+- 나머지 필드는 모달에서 확인한 기존 API 응답이다. 서버 최신값과 다르면 HTTP 409로 재확인을 요구한다.
+- 청구액·수신처·메일 본문은 서버 저장값을 사용한다.
+
+```json
+{
+  "requestId": "11111111-1111-1111-1111-111111111111",
+  "recipient": "client@example.com",
+  "totalAmount": 110000,
+  "supplyAmount": 100000,
+  "vatAmount": 10000,
+  "depositAmount": 55000,
+  "vatIncluded": false,
+  "depositDueDate": "2026-11-13",
+  "items": [
+    { "id": 3, "productName": "품목 A", "quantity": 100, "unitPrice": 1000, "supplyAmount": 100000 }
+  ]
+}
+```
+
+응답(HTTP 200)은 요청 처리 결과를 나타낸다. 계좌·메일 실패도 `status`를 확인해야 한다.
+
+```json
+{
+  "requestId": "11111111-1111-1111-1111-111111111111",
+  "status": "SENT",
+  "message": "가상계좌 및 결제정보 이메일을 전송했습니다."
+}
+```
+
+| status | 의미 및 후속 동작 |
+|---|---|
+| PROCESSING | 계좌 준비 중. 다른 요청으로 재발송하지 않는다. |
+| SENDING | 메일 전송 중 또는 결과 불명확. 운영자가 메일 서버·요청 기록 확인 후 조치한다. |
+| SENT | 메일 서버 전송 성공. 실제 수신·열람 보장은 아니다. |
+| FAILED | 메일 전송 실패. 사용자가 새 요청 ID로 재시도하면 기존 유효 계좌를 사용한다. |
+| ISSUE_UNCERTAIN | 계좌·최신 수주 상태 확인 실패. 동기화·수주 확인 후 새 요청으로 재시도한다. |
+
+필수값 오류는 400, 권한 오류는 403, 수주 없음은 404, 상태·확인 정보 충돌은 409이다.
+기존 계좌 만료일 계산은 유지하며 계약금 마감일(등록일+3일)을 연장하지 않는다.
+
+---
+
+## 수주 수동 취소
+
+- `PATCH /api/v1/orders/{orderId}/cancel`
+- 권한: 활성 상태이며 최초 비밀번호 변경을 완료한 `SUPER_ADMIN`, `ORDER_MANAGER`.
+- 요청: `{"reason":"거래처 요청으로 주문 취소"}`. 공백만 입력할 수 없고 최대 255자이다.
+- 성공: HTTP 200, 기존 수주 상세 응답(`CustomerOrderDetailDto.Response`). 수주 진행·확정 상태는 `CANCELLED`.
+- 수주·원본 견적·외부 발급 전 결제를 같은 트랜잭션으로 취소하고 상태변경 이력을 저장한다.
+- 이미 수주와 견적이 취소 상태이면 기존 결과를 반환하며 취소 이력을 추가하지 않는다.
+- 필수 사유 오류는 400, 계정·권한 오류는 403, 수주 없음은 404이다.
+- 대기·미입금이 아니거나 실제 입금 내역·작업지시가 있으면 409이다.
+- 계좌 발급 이력, `READY`·`CANCELLED` 외 결제 상태 또는 결제정보 발송 처리 중 상태도 409이다.
+- 가상계좌 만료·말소는 후속 연계 범위이며 현재 API에서는 외부 PG 호출을 하지 않는다.
+
+## 수주 목록의 종료 탭
+
+- 기존 `GET /api/v1/orders`의 `tab=OPEN`은 완료·취소를 제외하며, `tab=DONE`은 완료·취소를 모두 조회한다.
+- 화면 탭 이름은 `생산 예정`·`종료 수주`이다. `statusCodeId`로 완료 또는 취소를 개별 검색할 수 있다.
+- 요약 응답의 `doneCount`는 완료·취소 합계이며 `doneThisMonth`는 기존처럼 월간 완료 건수이다.
+- 최근 완료 기록은 `tab=DONE&confirmationStatus=CONFIRMED&sortType=COMPLETED_AT`으로 완료만 조회한다.
+- CSV 내보내기도 동일한 탭·필터 조건을 사용한다.
+
+# 기존 REST API 명세 템플릿 (하루배움 LMS)
 
 ## 목차
 - [1. REST API 명세서 및 규격서 (하루배움 LMS)](#1-rest-api-명세서-및-규격서-하루배움-lms)
