@@ -42,7 +42,7 @@ public class VirtualAccountDto {
                     account.getAccountNumber(),
                     account.getAccountName(),
                     account.getExpiresAt(),
-                    account.getStatus()
+                    account.getEffectiveStatus()
             );
         }
     }
