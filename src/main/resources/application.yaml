@@ -122,6 +122,11 @@ portone:
   store-id: ${PORTONE_STORE_ID:}
   channel-key: ${PORTONE_CHANNEL_KEY:}
   webhook-url: ${PORTONE_WEBHOOK_URL:}
+  webhook-secret: ${PORTONE_WEBHOOK_SECRET:}
+
+payment:
+  virtual-account-bank: ${PAYMENT_VA_BANK:SHINHAN}
+  virtual-account-due-days: ${PAYMENT_VA_DUE_DAYS:7}
 
 
   # 그록 인증키

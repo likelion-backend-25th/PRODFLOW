@@ -19,6 +19,8 @@ import net.likelion.bebc25.prodflow.customer_order.enums.OrderListSortType;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderListTab;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductRepository;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
+import net.likelion.bebc25.prodflow.payment.service.PaymentService;
 import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
 import net.likelion.bebc25.prodflow.quotation.entity.QuotationItem;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
@@ -51,13 +53,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -74,6 +70,7 @@ public class CustomerOrderService {
     private final CommonCodeRepository commonCodeRepository;
     private final QuotationScheduleService scheduleService;
     private final StatusHistoryRepository statusHistoryRepository;
+    private final PaymentService paymentService;
 
     // 수주 상태 변경 이력 전체 조회
     public List<CustomerOrderDto.HistoryResponse> getHistories(Long orderId) {
@@ -179,6 +176,7 @@ public class CustomerOrderService {
                 .map(item -> new OrderProduct(order, item.getProduct(), item.getProductName(),
                         quantities.get(item.getId()), item.getUnitPrice())).toList());
         orderRepository.flush();
+        paymentService.prepareAndScheduleIssue(order, PaymentType.DEPOSIT);
         return CustomerOrderDto.CreateResponse.from(order);
     }
 

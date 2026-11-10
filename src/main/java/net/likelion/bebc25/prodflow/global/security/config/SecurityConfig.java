@@ -130,6 +130,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/logout"
                         ).permitAll()
 
+                        // PortOne 서버 -> 공개 콜백. 서명은 PaymentController에서 별도로 검증한다.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook").permitAll()
+
                         // 최초 비밀번호 변경 API
                         // 로그인한 직원만 접근 가능
                         .requestMatchers(

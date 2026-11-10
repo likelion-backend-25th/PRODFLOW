@@ -13,6 +13,7 @@ public enum PaymentStatus {
     CANCELLED("결제 취소"),
     REQUESTED("발급 요청 중"),
     ISSUE_UNCERTAIN("발급 확인 필요"),
+    REISSUE_CLOSING("재발급 이전 계좌 말소 확인 중"),
     PENDING("처리 대기"),
     PAY_PENDING("승인 대기"),
     VIRTUAL_ACCOUNT_ISSUED("입금 대기"),
