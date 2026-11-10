@@ -1,16 +1,9 @@
 package net.likelion.bebc25.prodflow.payment.controller;
 
-import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
-import net.likelion.bebc25.prodflow.global.exception.GlobalExceptionHandler;
-import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
-import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
-import net.likelion.bebc25.prodflow.payment.dto.PaymentHistoryDto;
-import net.likelion.bebc25.prodflow.payment.enums.PaymentMethod;
-import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
-import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
-import net.likelion.bebc25.prodflow.payment.service.PaymentQueryService;
-import net.likelion.bebc25.prodflow.payment.service.PaymentService;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,8 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,12 +23,28 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.NoSuchElementException;
+import net.likelion.bebc25.prodflow.client_notification.enums.PaymentNotificationStatus;
+import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
+import net.likelion.bebc25.prodflow.global.exception.GlobalExceptionHandler;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
+import net.likelion.bebc25.prodflow.payment.dto.PaymentDto;
+import net.likelion.bebc25.prodflow.payment.dto.PaymentHistoryDto;
+import net.likelion.bebc25.prodflow.payment.dto.PaymentNotificationDto;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentMethod;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentStatus;
+import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
+import net.likelion.bebc25.prodflow.payment.service.PaymentNotificationService;
+import net.likelion.bebc25.prodflow.payment.service.PaymentQueryService;
+import net.likelion.bebc25.prodflow.payment.service.PaymentService;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -45,6 +54,7 @@ class PaymentControllerTest {
 
     private PaymentService paymentService;
     private PaymentQueryService paymentQueryService;
+    private PaymentNotificationService paymentNotificationService;
     private MockMvc mvc;
 
     @BeforeEach
@@ -53,6 +63,7 @@ class PaymentControllerTest {
         // 테스트마다 새로운 Mock 객체 생성
         paymentService = mock(PaymentService.class);
         paymentQueryService = mock(PaymentQueryService.class);
+        paymentNotificationService = mock(PaymentNotificationService.class);
 
         // 로그인 사용자 설정
         CustomUserDetails principal = mock(CustomUserDetails.class);
@@ -66,7 +77,8 @@ class PaymentControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(
                         new PaymentController(
                                 paymentService,
-                                paymentQueryService
+                                paymentQueryService,
+                                paymentNotificationService
                         )
                 )
                 .setCustomArgumentResolvers(
@@ -80,6 +92,64 @@ class PaymentControllerTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("계약금 안내 발송은 수주 ID와 로그인 직원 및 확인 내용을 서비스에 전달한다")
+    void sendPaymentNotification() throws Exception {
+        when(paymentNotificationService.send(eq(123L), any(), eq(7L)))
+                .thenReturn(new PaymentNotificationDto.Response("11111111-1111-1111-1111-111111111111",
+                        PaymentNotificationStatus.SENT, "발송 완료"));
+        mvc.perform(post("/api/v1/payments/orders/123/notifications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "requestId": "11111111-1111-1111-1111-111111111111",
+                                  "recipient": "client@example.com",
+                                  "totalAmount": 11000, "supplyAmount": 10000, "vatAmount": 1000,
+                                  "depositAmount": 5500, "vatIncluded": false,
+                                  "depositDueDate": "2099-01-01",
+                                  "items": [{"id": 3, "productName": "품목", "quantity": 100,
+                                             "unitPrice": 100, "supplyAmount": 10000}]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SENT"));
+        verify(paymentNotificationService).send(eq(123L), any(), eq(7L));
+    }
+
+    @Test
+    @DisplayName("발송 확인 정보가 누락되면 발급 서비스 호출 전에 거부한다")
+    void rejectIncompleteNotificationRequest() throws Exception {
+        mvc.perform(post("/api/v1/payments/orders/123/notifications")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(paymentNotificationService);
+    }
+
+    @Test
+    @DisplayName("잘못된 UUID·음수 금액·비어 있는 품목은 발송 전에 거부한다")
+    void rejectInvalidNotificationValues() throws Exception {
+        String validBody = """
+                {
+                  "requestId": "11111111-1111-1111-1111-111111111111",
+                  "recipient": "client@example.com",
+                  "totalAmount": 11000, "supplyAmount": 10000, "vatAmount": 1000,
+                  "depositAmount": 5500, "vatIncluded": false, "depositDueDate": "2099-01-01",
+                  "items": [{"id": 3, "productName": "품목", "quantity": 100,
+                             "unitPrice": 100, "supplyAmount": 10000}]
+                }
+                """;
+        for (String invalidBody : List.of(
+                validBody.replace("11111111-1111-1111-1111-111111111111", "-".repeat(36)),
+                validBody.replace("\"depositAmount\": 5500", "\"depositAmount\": -1"),
+                validBody.replace("\"quantity\": 100", "\"quantity\": 0"),
+                validBody.replace("\"items\": [{", "\"items\": [null, {"))) {
+            mvc.perform(post("/api/v1/payments/orders/123/notifications")
+                            .contentType(MediaType.APPLICATION_JSON).content(invalidBody))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(paymentNotificationService);
     }
 
     @Test

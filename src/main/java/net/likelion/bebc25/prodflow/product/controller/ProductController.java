@@ -6,11 +6,15 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.product.dto.ProductDrawingDto;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.product.service.ProductDrawingService;
 import net.likelion.bebc25.prodflow.product.service.ProductService;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -56,18 +60,19 @@ public class ProductController {
 
     @Operation(
             summary = "생산품목 리스트 조회",
-            description = "생산품목 목록을 조회한다. status로 생산가능/생산중단을 필터할 수 있다."
+            description = "생산품목 목록을 페이징 조회한다. status로 생산가능/생산중단을 필터할 수 있다. "
+                    + "page는 0부터 시작하며 기본 size는 10, id 오름차순이다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping
-    public ResponseEntity<List<ProductDto.Response>> getList(
+    public ResponseEntity<PageResponse<ProductDto.Response>> getList(
             @Parameter(description = "생산품목 상태", example = "AVAILABLE")
-            @RequestParam(required = false) ProductStatus status
+            @RequestParam(required = false) ProductStatus status,
+            @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        List<ProductDto.Response> response = productService.getList(status);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(productService.getList(status, pageable));
     }
 
     @Operation(
@@ -105,20 +110,21 @@ public class ProductController {
 
     @Operation(
             summary = "생산품목 검색",
-            description = "키워드와 상태로 생산품목을 검색한다."
+            description = "키워드와 상태로 생산품목을 페이징 검색한다. 키워드가 비어 있으면 목록 조회와 동일하다. "
+                    + "page는 0부터 시작하며 기본 size는 10, id 오름차순이다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping("/search")
-    public ResponseEntity<List<ProductDto.Response>> search(
+    public ResponseEntity<PageResponse<ProductDto.Response>> search(
             @Parameter(description = "검색 키워드", example = "쉬폰")
             @RequestParam(required = false) String keyword,
             @Parameter(description = "생산품목 상태", example = "AVAILABLE")
-            @RequestParam(required = false) ProductStatus status
+            @RequestParam(required = false) ProductStatus status,
+            @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        List<ProductDto.Response> response = productService.productSearch(keyword, status);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(productService.productSearch(keyword, status, pageable));
     }
 
     @Operation(

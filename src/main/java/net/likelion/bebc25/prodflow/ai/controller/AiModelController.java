@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/ai")
@@ -81,11 +83,20 @@ public class AiModelController {
                     "인증 토큰이 없습니다."
             );
         }
+        // 이전 대화 기록 목록
+        List<AiDto.HistoryMessage> history =
+                aiChatService.getHistory(conversationId, userId);
 
-        // 3. AI 모델 호출 및 MCP SQL 실행 결과 수집
         AiDto.AskExecution result = aiModelService.askWithDetails(
                 request,
-                accessToken
+                accessToken,
+                history
+        );
+
+        System.out.println("이전 메시지 수: " + history.size());
+        history.forEach(m ->
+                System.out.println("역할: " + m.role()
+                        + ", SQL 결과 있음: " + (m.resultJson() != null))
         );
 
         // 4. 사용자 질문, AI 답변 및 SQL 실행 결과 저장
@@ -96,7 +107,7 @@ public class AiModelController {
                 result
         );
 
-// 5. 기존 API 응답 형식 유지
+        // 5. 기존 API 응답 형식 유지
         return ResponseEntity.ok(
                 new AiDto.AskResponse(
                         result.model(),

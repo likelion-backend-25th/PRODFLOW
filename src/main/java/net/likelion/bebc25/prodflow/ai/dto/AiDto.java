@@ -72,4 +72,12 @@ public class AiDto {
             String resultJson
     ) {
     }
+
+    // AI 모델에 전달할 이전 대화 기록
+    public record HistoryMessage(
+            String role,
+            String content,
+            String resultJson
+    ) {
+    }
 }

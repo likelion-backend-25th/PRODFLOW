@@ -1,6 +1,7 @@
 package net.likelion.bebc25.prodflow.shipment.service;
 
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
 import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.common.repository.StatusHistoryRepository;
@@ -22,6 +23,9 @@ import net.likelion.bebc25.prodflow.shipment.repository.ShipmentRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,31 +57,48 @@ public class ShipmentService {
 
     // 배송 관리 화면용 목록. 탭별로 수주를 모으고 상단 건수도 같이 내려준다.
     // 포장중 탭은 작업지시가 있고 전부 포장완료인 수주만 목록에 넣는다.
-    public ShipmentDto.ListResponse findList(String tab) {
+    public ShipmentDto.ListResponse findList(String tab, Pageable pageable) {
         String normalized = normalizeTab(tab);
-        List<CustomerOrder> orders = findOrdersByTab(normalized);
 
-        List<Long> orderIds = new ArrayList<>();
-        for (CustomerOrder order : orders) {
-            orderIds.add(order.getId());
-        }
+        List<CustomerOrder> orders;
+        long totalElements;
+        Set<Long> readyToShipEligibleOrderIds;
 
-        Set<Long> readyToShipEligibleOrderIds = findReadyToShipEligibleOrderIds(orderIds);
         if (TAB_PACKING.equals(normalized)) {
+            List<CustomerOrder> packingOrders =
+                    customerOrderRepository.findByStatusCodeOrderByEstimatedDueDateAsc(TAB_PACKING);
+            List<Long> packingOrderIds = new ArrayList<>();
+            for (CustomerOrder order : packingOrders) {
+                packingOrderIds.add(order.getId());
+            }
+            readyToShipEligibleOrderIds = findReadyToShipEligibleOrderIds(packingOrderIds);
+
             List<CustomerOrder> eligibleOrders = new ArrayList<>();
-            List<Long> eligibleOrderIds = new ArrayList<>();
-            for (CustomerOrder order : orders) {
+            for (CustomerOrder order : packingOrders) {
                 if (readyToShipEligibleOrderIds.contains(order.getId())) {
                     eligibleOrders.add(order);
-                    eligibleOrderIds.add(order.getId());
                 }
             }
-            orders = eligibleOrders;
-            orderIds = eligibleOrderIds;
+            totalElements = eligibleOrders.size();
+            orders = slice(eligibleOrders, pageable);
+        } else {
+            Page<CustomerOrder> orderPage = findOrdersByTab(normalized, pageable);
+            orders = orderPage.getContent();
+            totalElements = orderPage.getTotalElements();
+            List<Long> orderIds = new ArrayList<>();
+            for (CustomerOrder order : orders) {
+                orderIds.add(order.getId());
+            }
+            readyToShipEligibleOrderIds = findReadyToShipEligibleOrderIds(orderIds);
         }
 
-        Map<Long, List<OrderProduct>> productsByOrderId = groupProducts(orderIds);
-        Map<Long, Shipment> shipmentByOrderId = groupShipments(orderIds);
+        List<Long> pageOrderIds = new ArrayList<>();
+        for (CustomerOrder order : orders) {
+            pageOrderIds.add(order.getId());
+        }
+
+        Map<Long, List<OrderProduct>> productsByOrderId = groupProducts(pageOrderIds);
+        Map<Long, Shipment> shipmentByOrderId = groupShipments(pageOrderIds);
 
         List<ShipmentDto.ListItem> items = new ArrayList<>();
         for (CustomerOrder order : orders) {
@@ -89,7 +110,10 @@ public class ShipmentService {
             ));
         }
 
-        return new ShipmentDto.ListResponse(normalized, countTabs(), items);
+        PageResponse<ShipmentDto.ListItem> page = PageResponse.from(
+                new PageImpl<>(items, pageable, totalElements)
+        );
+        return new ShipmentDto.ListResponse(normalized, countTabs(), page);
     }
 
     // 외부 추적 조회 없이 저장된 배송 정보만 읽는다.
@@ -280,11 +304,23 @@ public class ShipmentService {
         );
     }
 
-    private List<CustomerOrder> findOrdersByTab(String tab) {
+    private Page<CustomerOrder> findOrdersByTab(String tab, Pageable pageable) {
         if (TAB_BALANCE.equals(tab)) {
-            return customerOrderRepository.findBalanceWaitingOrders(OrderPaymentStatus.PAID);
+            return customerOrderRepository.findBalanceWaitingOrders(OrderPaymentStatus.PAID, pageable);
         }
-        return customerOrderRepository.findByStatusCodeOrderByEstimatedDueDateAsc(tab);
+        return customerOrderRepository.findByStatusCode(tab, pageable);
+    }
+
+    private List<CustomerOrder> slice(List<CustomerOrder> orders, Pageable pageable) {
+        if (!pageable.isPaged()) {
+            return orders;
+        }
+        int from = (int) pageable.getOffset();
+        if (from >= orders.size()) {
+            return List.of();
+        }
+        int to = Math.min(from + pageable.getPageSize(), orders.size());
+        return orders.subList(from, to);
     }
 
     private ShipmentDto.TabCounts countTabs() {
