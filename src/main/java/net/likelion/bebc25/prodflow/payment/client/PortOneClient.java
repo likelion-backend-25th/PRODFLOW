@@ -70,11 +70,10 @@ public class PortOneClient {
         }
     }
 
-    /**
-     * PortOne V2 POST /payments/{paymentId}/virtual-account/close.
-     * 정상 응답의 closedAt을 받아야만 재발급 다음 단계로 진행한다.
-     * 이미 입금된 결제 취소/환불 API와 다른 엔드포인트다.
-     */
+
+    // PortOne V2 POST /payments/{paymentId}/virtual-account/close.
+    // 정상 응답의 closedAt을 받아야만 재발급 다음 단계로 진행한다.
+    //이미 입금된 결제 취소/환불 API와 다른 엔드포인트다.
     public PortOneDto.CloseVirtualAccountResponse closeVirtualAccount(String paymentId) {
         properties.requireConfigured();
         return restClient.post()
