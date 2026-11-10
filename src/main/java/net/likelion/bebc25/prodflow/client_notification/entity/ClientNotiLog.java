@@ -2,11 +2,10 @@ package net.likelion.bebc25.prodflow.client_notification.entity;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -14,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -62,6 +62,22 @@ public class ClientNotiLog {
 
     @Column(name = "error_message")
     private String errorMessage;
+
+    public static ClientNotiLog deposit(
+            CustomerOrder order, User sender, String recipient, ClientNotiStatus status, String errorMessage
+    ) {
+        ClientNotiLog log = new ClientNotiLog();
+        log.customerOrder = order;
+        log.sentBy = sender;
+        log.kind = "DEPOSIT";
+        log.channel = "EMAIL";
+        log.recipient = recipient;
+        log.status = status;
+        log.sentAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+        log.errorMessage = errorMessage == null ? null
+                : errorMessage.substring(0, Math.min(255, errorMessage.length()));
+        return log;
+    }
 
     // 견적 이메일 발송 결과 생성
     public static ClientNotiLog quotation(

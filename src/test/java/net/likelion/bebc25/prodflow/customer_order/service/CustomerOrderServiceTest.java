@@ -1,18 +1,36 @@
 package net.likelion.bebc25.prodflow.customer_order.service;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
 import jakarta.persistence.EntityManager;
 import jakarta.validation.ConstraintViolationException;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
 import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
-import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto;
 import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDetailDto;
-import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
+import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto;
 import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderListDto;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderListSortType;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderListTab;
@@ -24,22 +42,6 @@ import net.likelion.bebc25.prodflow.quotation.entity.QuotationItem;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -98,7 +100,8 @@ public class CustomerOrderServiceTest {
                 false, QuotationStatus.APPROVED, 220000L);
         em.persist(quotation);
         newQuotationId = quotation.getId();
-        QuotationItem quotationItem = new QuotationItem(quotation, product, product.getProductName(), "테스트 기종", 200, 1000L);
+        QuotationItem quotationItem = new QuotationItem(quotation, product, product.getProductName(), "테스트 기종", 200,
+                1000L);
         em.persist(quotationItem);
         newQuotationItemId = quotationItem.getId();
 
@@ -134,6 +137,16 @@ public class CustomerOrderServiceTest {
         assertThat(findOrder.getDepositDueDate()).isEqualTo(today.plusDays(3));
         assertThat(findOrder.getShippingAddress()).isEqualTo("(12345) 서울시 테스트로 1 2층");
         assertThat(findOrder.getStatusCode().getCode()).isEqualTo("WAITING");
+
+        assertThat(customerOrderService.getHistories(response.id())).singleElement().satisfies(history -> {
+            assertThat(history.fromStatus()).isEqualTo("NONE");
+            assertThat(history.toStatus()).isEqualTo("WAITING");
+            assertThat(history.userId()).isEqualTo(newUserId);
+            assertThat(history.userName()).isEqualTo("수주 담당자");
+            assertThat(history.note())
+                    .isEqualTo("승인된 견적으로 수주를 등록했습니다. 계약금 확인 전 대기 상태입니다.");
+            assertThat(history.createdAt()).isNotNull();
+        });
 
         // 수주 수량을 줄여도 승인 견적 수량은 유지
         QuotationItem quotationItem = em.find(QuotationItem.class, newQuotationItemId);
@@ -209,7 +222,8 @@ public class CustomerOrderServiceTest {
         CustomerOrderListDto.SearchCondition condition = new CustomerOrderListDto.SearchCondition(
                 OrderListTab.OPEN, "서비스 테스트", null, 6L, null, OrderListSortType.CREATED_AT);
 
-        PageResponse<CustomerOrderListDto.Response> result = customerOrderService.getOrders(condition, PageRequest.of(0, 8));
+        PageResponse<CustomerOrderListDto.Response> result = customerOrderService.getOrders(condition, PageRequest
+                .of(0, 8));
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent()).hasSize(1);
@@ -359,7 +373,8 @@ public class CustomerOrderServiceTest {
     @DisplayName("시스템 처리 이력은 직원 ID 없이 저장된 이름으로 조회한다")
     void getSystemHistory() {
         CustomerOrder order = createDetailOrder(false);
-        StatusHistory history = new StatusHistory(HistoryEntityType.ORDER, order.getId(), "WAITING", "CANCELLED", order.getUser());
+        StatusHistory history = new StatusHistory(HistoryEntityType.ORDER, order.getId(), "WAITING", "CANCELLED",
+                order.getUser());
         em.persist(history);
         em.flush();
         em.createQuery("update StatusHistory h set h.user = null, h.userName = :name where h.id = :id")
