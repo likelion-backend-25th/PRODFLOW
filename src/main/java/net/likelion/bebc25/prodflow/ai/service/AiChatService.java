@@ -206,4 +206,32 @@ public class AiChatService {
         // 대화방 종료
         conversation.close();
     }
+
+    // AI 모델에 전달할 이전 대화 기록 조회
+    public List<AiDto.HistoryMessage> getHistory(
+            Long conversationId,
+            Long userId
+    ) {
+        // 1. 대화방 소유자 및 종료 여부 확인
+        validateConversation(conversationId, userId);
+
+        // 2. 해당 대화방의 이전 메시지 조회
+        List<AiMessage> messages = aiMessageRepository
+                .findByAiConversation_IdOrderBySequenceNoAsc(
+                        conversationId
+                );
+
+        // 3. 최근 20개 메시지만 선택
+        int start = Math.max(0, messages.size() - 20);
+
+        // 4. AI 모델에 전달할 DTO 변환
+        return messages.subList(start, messages.size())
+                .stream()
+                .map(message -> new AiDto.HistoryMessage(
+                        message.getRole().name(),
+                        message.getContent(),
+                        message.getResultJson()
+                ))
+                .toList();
+    }
 }
