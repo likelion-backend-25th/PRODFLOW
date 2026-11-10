@@ -19,6 +19,14 @@ repositories {
 }
 
 dependencies {
+    // MCP Server - AI 조회 Tool 제공
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+
+    // MCP Client - Gemini/Groq에서 MCP Tool 호출
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-client'
+
+    /// AI가 생성한 SQL을 분석하는 라이브러리
+    implementation 'com.github.jsqlparser:jsqlparser:5.4'
 
     // Spring AI 버전 관리
     implementation platform('org.springframework.ai:spring-ai-bom:2.0.2')
@@ -27,7 +35,11 @@ dependencies {
     implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
 
     // Groq GPT-OSS 20B 연동
-    implementation 'org.springframework.ai:spring-ai-openai'
+    // Swagger 라이브러리 충돌 방지
+    implementation('org.springframework.ai:spring-ai-openai') {
+        exclude group: 'io.swagger.core.v3',
+                module: 'swagger-annotations'
+    }
 
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 
@@ -40,7 +52,7 @@ dependencies {
     // ... 기존 의존성 ...
 
     // Swagger / OpenAPI
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0'
 
     // JJWT
     implementation 'io.jsonwebtoken:jjwt-api:0.13.0'

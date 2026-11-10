@@ -23,11 +23,13 @@ public interface AiConversationRepository extends JpaRepository<AiConversation, 
             @Param("conversationId") Long conversationId
     );
 
-    // 사용자별 대화방 목록 조회 (최신순)
-    List<AiConversation> findByUserIdOrderByCreatedAtDesc(Long userId);
+    // 활성화된 대화방 목록 조회
+    List<AiConversation> findByUser_IdAndIsClosedFalseOrderByCreatedAtDesc(
+            Long userId
+    );
 
-    // 본인 대화방 상세 조회
-    Optional<AiConversation> findByIdAndUser_Id(
+    // 본인의 활성 대화방만 조회
+    Optional<AiConversation> findByIdAndUser_IdAndIsClosedFalse(
             Long conversationId,
             Long userId
     );

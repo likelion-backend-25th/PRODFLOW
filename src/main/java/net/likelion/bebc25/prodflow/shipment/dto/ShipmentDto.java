@@ -32,7 +32,9 @@ public class ShipmentDto {
             String carrierName,
             String trackingNumber,
             LocalDateTime startedAt,
-            LocalDateTime deliveredAt
+            LocalDateTime deliveredAt,
+            // 포장중 탭 목록에 오른 수주는 전부 PACK_DONE이므로 true. 다른 탭에서는 false.
+            boolean readyToShipEligible
     ) {
     }
 
@@ -65,6 +67,22 @@ public class ShipmentDto {
             Boolean complete,
             LocalDateTime deliveredAt
     ) {
+    }
+
+    // 포장중 → 출고대기 전환 응답
+    @Schema(name = "ShipmentReadyToShipResponse")
+    public record ReadyToShipResponse(
+            Long orderId,
+            String orderNo,
+            String orderStatus
+    ) {
+        public static ReadyToShipResponse from(CustomerOrder order) {
+            return new ReadyToShipResponse(
+                    order.getId(),
+                    order.getOrderNo(),
+                    order.getStatusCode().getCode()
+            );
+        }
     }
 
     // 수주가 존재하지만 배송은 아직 등록되지 않은 경우도 구분한다.

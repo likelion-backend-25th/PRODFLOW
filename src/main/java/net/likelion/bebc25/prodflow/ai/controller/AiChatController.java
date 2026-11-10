@@ -51,6 +51,32 @@ public class AiChatController {
         return ResponseEntity.status(201).body(conversationId);
     }
 
+    @Operation(
+            summary = "AI 대화방 종료",
+            description = "로그인한 사용자가 본인의 AI 대화방을 종료한다. "
+                    + "종료된 대화방은 기존 대화 기록을 유지하지만 "
+                    + "새로운 질문을 전송할 수 없다."
+    )
+    @ApiResponse(responseCode = "204", description = "대화방 종료 성공")
+    @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
+    @ApiResponse(responseCode = "404", description = "대화방이 존재하지 않거나 본인 대화방이 아님")
+    @ApiResponse(responseCode = "409", description = "이미 종료된 대화방")
+    @PatchMapping("/{conversationId}/close")
+    public ResponseEntity<Void> closeConversation(
+            @Parameter(description = "대화방 ID", example = "1")
+            @PathVariable Long conversationId,
+
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        aiChatService.closeConversation(
+                conversationId,
+                userDetails.getUserId()
+        );
+
+        return ResponseEntity.noContent().build();
+    }
+
     // 본인 대화방 목록 조회
     @Operation(
             summary = "AI 대화방 목록 조회",

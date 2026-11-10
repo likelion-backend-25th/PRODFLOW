@@ -47,4 +47,12 @@ public class ProductDrawing extends BaseTimeEntity {
         drawing.replacedAt = null; // 현재 유효한 파일
         return drawing;
     }
+
+    // 현재 목록에서 빼고 이력만 남긴다.
+    public void markReplaced(LocalDateTime replacedAt) {
+        if (replacedAt == null) {
+            throw new IllegalArgumentException("삭제 시각이 필요합니다.");
+        }
+        this.replacedAt = replacedAt;
+    }
 }

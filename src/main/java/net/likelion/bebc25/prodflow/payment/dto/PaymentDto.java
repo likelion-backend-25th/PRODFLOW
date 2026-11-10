@@ -219,8 +219,11 @@ public final class PaymentDto {
             // 가상계좌 정보
             VirtualAccountDto.Response virtualAccount,
 
-            // 입금내역
-            PaymentHistoryDto.Response paymentHistory
+            // 기존 입금내역 정보
+            PaymentHistoryDto.Response paymentHistory,
+
+            // 재발급 요청 버튼 활성화 여부 (실제 POST에서는 PortOne 상태 재검증)
+            boolean reissueAvailable
     ) {
     }
 
@@ -261,7 +264,13 @@ public final class PaymentDto {
             PaymentMethod paymentMethod,
 
             // 결제건 생성일
-            LocalDateTime createdAt
+            LocalDateTime createdAt,
+
+            // 현재 정책: 전액 입금되었다면 예정 금액, 그렇지 않으면 0원
+            long actualPaidAmount,
+
+            // 현재 가상계좌의 PortOne 결제 ID (수동 입금이면 null)
+            String portonePaymentId
     ) {
     }
 

@@ -122,6 +122,15 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     @EntityGraph(attributePaths = "quotation")
     List<CustomerOrder> findByQuotationIdIn(List<Long> quotationIds);
 
+    // 배송 탭: 상태별 수주. 납기 빠른 순 (포장중 필터·건수용 전체 조회)
+    @EntityGraph(attributePaths = {"client", "statusCode"})
+    @Query("""
+            SELECT o FROM CustomerOrder o
+            WHERE o.statusCode.code = :status
+            ORDER BY o.estimatedDueDate ASC
+            """)
+    List<CustomerOrder> findByStatusCodeOrderByEstimatedDueDateAsc(@Param("status") String status);
+
     // 배송 탭: 상태별 수주. 납기 빠른 순(정렬은 Pageable)
     @EntityGraph(attributePaths = {"client", "statusCode"})
     @Query("""
@@ -172,4 +181,15 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     // 거래처의 수주 이력 조회
     Page<CustomerOrder> findAllByClient_Id(Long clientId, Pageable pageable);
+
+    // 최근 기간 동안 수주를 진행한 거래처의 수
+    @Query(value = """
+                SELECT COUNT(DISTINCT o.client_id)
+                FROM customer_order o
+                WHERE o.created_at > :dateTime
+                    AND o.created_at <= NOW()
+            """, nativeQuery = true)
+    long countRecentOrderClients(
+            @Param("dateTime") LocalDateTime dateTime
+    );
 }

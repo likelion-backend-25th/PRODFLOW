@@ -535,6 +535,28 @@ public class ClientServiceTest {
     }
 
     @Test
+    @DisplayName("한 달 전을 기준으로 신규 거래처 수와 수주가 있는 거래처 수를 반환한다")
+    void countGreaterThanOneMonth() {
+        // given
+        given(clientRepository.countByCreatedAtGreaterThan(any(LocalDateTime.class))).willReturn(3L);
+        given(customerOrderRepository.countRecentOrderClients(any(LocalDateTime.class))).willReturn(7L);
+
+        // when
+        LocalDateTime earliestCutoff = LocalDateTime.now().minusMonths(1);
+        ClientDto.CountRecentMonthResponse response = clientService.countGreaterThanOneMonth();
+        LocalDateTime latestCutoff = LocalDateTime.now().minusMonths(1);
+
+        // then
+        assertThat(response.countByCreatedAt()).isEqualTo(3L);
+        assertThat(response.countByOrder()).isEqualTo(7L);
+
+        ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(clientRepository).countByCreatedAtGreaterThan(cutoff.capture());
+        assertThat(cutoff.getValue()).isBetween(earliestCutoff, latestCutoff);
+        verify(customerOrderRepository).countRecentOrderClients(cutoff.getValue());
+    }
+
+    @Test
     @DisplayName("존재하지 않는 거래처 ID로 상세 조회하면 예외가 발생한다")
     void getClientDetailWithNonexistentId() {
         // given

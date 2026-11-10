@@ -22,11 +22,13 @@ import net.likelion.bebc25.prodflow.payment.repository.PaymentRepository;
 import net.likelion.bebc25.prodflow.payment.repository.VirtualAccountRepository;
 import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.NoSuchElementException;
@@ -44,6 +46,22 @@ public class PaymentStore {
     private final LineRepository lineRepository;
     private final WorkOrderService workOrderService;
     private final StatusHistoryRepository statusHistoryRepository;
+
+    /**
+     * 만료일이 지난 계좌의 DB 상태를 주기적으로 갱신한다.
+     * Spring Boot 애플리케이션에 @EnableScheduling이 이미 존재한다.
+     * 실제 입금 완료/말소 시의 USED/CANCELLED 상태는 덮어쓰지 않는다.
+     */
+    @Scheduled(fixedDelayString = "${payment.virtual-account-expire-check-ms:3600000}")
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void expireDueVirtualAccounts() {
+        virtualAccountRepository.expireActiveAccounts(
+                OffsetDateTime.now(ZoneId.of("Asia/Seoul")),
+                LocalDateTime.now(),
+                VirtualAccountStatus.ACTIVE,
+                VirtualAccountStatus.EXPIRED
+        );
+    }
 
     // PortOne POST 직전에 REQUESTED 상태를 별도 트랜잭션으로 확정한다.
     // 같은 결제에 중복 POST를 보내지 않기 위해 락 + 상태 체크를 수행한다.

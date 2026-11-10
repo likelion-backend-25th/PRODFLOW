@@ -22,6 +22,7 @@ import net.likelion.bebc25.prodflow.shipment.repository.CarrierRepository;
 import net.likelion.bebc25.prodflow.shipment.repository.ShipmentRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -42,6 +43,7 @@ public class ShipmentService {
     private static final String TAB_SHIPPING = "SHIPPING";
     private static final String TAB_BALANCE = "BALANCE";
     private static final String COMPLETED = "COMPLETED";
+    private static final String PACK_DONE = "PACK_DONE";
 
     private final CustomerOrderRepository customerOrderRepository;
     private final OrderProductRepository orderProductRepository;
@@ -51,31 +53,65 @@ public class ShipmentService {
     private final StatusHistoryRepository statusHistoryRepository;
     private final UserRepository userRepository;
     private final PaymentService paymentService;
+    private final WorkOrderRepository workOrderRepository;
 
     // 배송 관리 화면용 목록. 탭별로 수주를 모으고 상단 건수도 같이 내려준다.
+    // 포장중 탭은 작업지시가 있고 전부 포장완료인 수주만 목록에 넣는다.
     public ShipmentDto.ListResponse findList(String tab, Pageable pageable) {
         String normalized = normalizeTab(tab);
-        Page<CustomerOrder> orders = findOrdersByTab(normalized, pageable);
 
-        List<Long> orderIds = new ArrayList<>();
-        for (CustomerOrder order : orders.getContent()) {
-            orderIds.add(order.getId());
+        List<CustomerOrder> orders;
+        long totalElements;
+        Set<Long> readyToShipEligibleOrderIds;
+
+        if (TAB_PACKING.equals(normalized)) {
+            List<CustomerOrder> packingOrders =
+                    customerOrderRepository.findByStatusCodeOrderByEstimatedDueDateAsc(TAB_PACKING);
+            List<Long> packingOrderIds = new ArrayList<>();
+            for (CustomerOrder order : packingOrders) {
+                packingOrderIds.add(order.getId());
+            }
+            readyToShipEligibleOrderIds = findReadyToShipEligibleOrderIds(packingOrderIds);
+
+            List<CustomerOrder> eligibleOrders = new ArrayList<>();
+            for (CustomerOrder order : packingOrders) {
+                if (readyToShipEligibleOrderIds.contains(order.getId())) {
+                    eligibleOrders.add(order);
+                }
+            }
+            totalElements = eligibleOrders.size();
+            orders = slice(eligibleOrders, pageable);
+        } else {
+            Page<CustomerOrder> orderPage = findOrdersByTab(normalized, pageable);
+            orders = orderPage.getContent();
+            totalElements = orderPage.getTotalElements();
+            List<Long> orderIds = new ArrayList<>();
+            for (CustomerOrder order : orders) {
+                orderIds.add(order.getId());
+            }
+            readyToShipEligibleOrderIds = findReadyToShipEligibleOrderIds(orderIds);
         }
 
-        Map<Long, List<OrderProduct>> productsByOrderId = groupProducts(orderIds);
-        Map<Long, Shipment> shipmentByOrderId = groupShipments(orderIds);
+        List<Long> pageOrderIds = new ArrayList<>();
+        for (CustomerOrder order : orders) {
+            pageOrderIds.add(order.getId());
+        }
+
+        Map<Long, List<OrderProduct>> productsByOrderId = groupProducts(pageOrderIds);
+        Map<Long, Shipment> shipmentByOrderId = groupShipments(pageOrderIds);
 
         List<ShipmentDto.ListItem> items = new ArrayList<>();
-        for (CustomerOrder order : orders.getContent()) {
+        for (CustomerOrder order : orders) {
             items.add(toListItem(
                     order,
                     productsByOrderId.getOrDefault(order.getId(), List.of()),
-                    shipmentByOrderId.get(order.getId())
+                    shipmentByOrderId.get(order.getId()),
+                    readyToShipEligibleOrderIds.contains(order.getId())
             ));
         }
 
         PageResponse<ShipmentDto.ListItem> page = PageResponse.from(
-                new PageImpl<>(items, orders.getPageable(), orders.getTotalElements())
+                new PageImpl<>(items, pageable, totalElements)
         );
         return new ShipmentDto.ListResponse(normalized, countTabs(), page);
     }
@@ -91,6 +127,46 @@ public class ShipmentService {
         Shipment shipment = shipmentRepository.findByOrderId(orderId).orElse(null);
 
         return ShipmentDto.OrderResponse.from(shipment, order.getStatusCode().getCode());
+    }
+
+    // 포장중 수주를 출고대기로 바꾼다. 모든 작업지시가 포장완료여야 한다.
+    @Transactional
+    public ShipmentDto.ReadyToShipResponse markReadyToShip(Long orderId, Long userId) {
+        if (orderId == null) {
+            throw new IllegalArgumentException("수주 ID를 입력해 주세요.");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException("처리한 직원을 찾을 수 없습니다."));
+
+        CustomerOrder order = customerOrderRepository.findById(orderId)
+                .orElseThrow(() -> new NoSuchElementException("수주를 찾을 수 없습니다."));
+
+        String currentStatus = order.getStatusCode().getCode();
+        if (!TAB_PACKING.equals(currentStatus)) {
+            throw new IllegalArgumentException("포장중 수주만 출고대기로 바꿀 수 있습니다.");
+        }
+        if (!workOrderRepository.existsByOrderProduct_CustomerOrder_Id(orderId)) {
+            throw new IllegalArgumentException("작업지시가 없는 수주는 출고대기로 바꿀 수 없습니다.");
+        }
+        if (workOrderRepository.existsByOrderProduct_CustomerOrder_IdAndCommonCode_CodeNotIn(
+                orderId, List.of(PACK_DONE)
+        )) {
+            throw new IllegalArgumentException("모든 작업이 포장완료된 수주만 출고대기로 바꿀 수 있습니다.");
+        }
+
+        CommonCode readyToShip = commonCodeRepository
+                .findByCodeGroup_GroupCodeAndCodeAndStatus(ORDER_STATUS, TAB_READY_TO_SHIP, CodeStatus.ACTIVE)
+                .orElseThrow(() -> new IllegalArgumentException("출고대기 상태 코드를 찾을 수 없습니다."));
+
+        order.changeProgress(readyToShip);
+        statusHistoryRepository.save(new StatusHistory(
+                HistoryEntityType.ORDER,
+                order.getId(),
+                currentStatus,
+                readyToShip.getCode(),
+                user
+        ));
+        return ShipmentDto.ReadyToShipResponse.from(order);
     }
 
     // 출고대기 수주에 운송장을 등록하고 배송중으로 바꾼다.
@@ -235,9 +311,21 @@ public class ShipmentService {
         return customerOrderRepository.findByStatusCode(tab, pageable);
     }
 
+    private List<CustomerOrder> slice(List<CustomerOrder> orders, Pageable pageable) {
+        if (!pageable.isPaged()) {
+            return orders;
+        }
+        int from = (int) pageable.getOffset();
+        if (from >= orders.size()) {
+            return List.of();
+        }
+        int to = Math.min(from + pageable.getPageSize(), orders.size());
+        return orders.subList(from, to);
+    }
+
     private ShipmentDto.TabCounts countTabs() {
         return new ShipmentDto.TabCounts(
-                customerOrderRepository.countByStatusCode_Code(TAB_PACKING),
+                countPackingReadyToShipEligible(),
                 customerOrderRepository.countByStatusCode_Code(TAB_READY_TO_SHIP),
                 customerOrderRepository.countByStatusCode_Code(TAB_SHIPPING),
                 customerOrderRepository.countByStatusCode_CodeAndPaymentStatusNot(
@@ -245,6 +333,17 @@ public class ShipmentService {
                         OrderPaymentStatus.PAID
                 )
         );
+    }
+
+    // 포장중 건수는 목록과 같이 전부 포장완료인 수주만 센다.
+    private long countPackingReadyToShipEligible() {
+        List<CustomerOrder> packingOrders =
+                customerOrderRepository.findByStatusCodeOrderByEstimatedDueDateAsc(TAB_PACKING);
+        List<Long> orderIds = new ArrayList<>();
+        for (CustomerOrder order : packingOrders) {
+            orderIds.add(order.getId());
+        }
+        return findReadyToShipEligibleOrderIds(orderIds).size();
     }
 
     private Map<Long, List<OrderProduct>> groupProducts(List<Long> orderIds) {
@@ -270,10 +369,28 @@ public class ShipmentService {
         return map;
     }
 
+    // 작업지시가 있고 전부 포장완료인 수주. 포장중 탭 목록·건수·출고 대기 버튼 기준이다.
+    private Set<Long> findReadyToShipEligibleOrderIds(List<Long> orderIds) {
+        if (orderIds.isEmpty()) {
+            return Set.of();
+        }
+        Set<Long> withWorkOrders = new HashSet<>(
+                workOrderRepository.findDistinctOrderIdsByOrderIdIn(orderIds)
+        );
+        Set<Long> notAllPackDone = new HashSet<>(
+                workOrderRepository.findDistinctOrderIdsByOrderIdInAndCodeNotIn(
+                        orderIds, List.of(PACK_DONE)
+                )
+        );
+        withWorkOrders.removeAll(notAllPackDone);
+        return withWorkOrders;
+    }
+
     private ShipmentDto.ListItem toListItem(
             CustomerOrder order,
             List<OrderProduct> products,
-            Shipment shipment
+            Shipment shipment,
+            boolean readyToShipEligible
     ) {
         int totalQuantity = 0;
         for (OrderProduct product : products) {
@@ -311,7 +428,8 @@ public class ShipmentService {
                 carrierName,
                 trackingNumber,
                 startedAt,
-                deliveredAt
+                deliveredAt,
+                readyToShipEligible
         );
     }
 

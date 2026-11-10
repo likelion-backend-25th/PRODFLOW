@@ -65,7 +65,7 @@ class ProductDrawingServiceTest {
         });
 
         MockMultipartFile file = new MockMultipartFile(
-                "file",
+                "files",
                 "drawing.pdf",
                 "application/pdf",
                 "hello".getBytes()
@@ -83,6 +83,26 @@ class ProductDrawingServiceTest {
         assertThat(captor.getValue().getFileName()).isEqualTo("drawing.pdf");
         assertThat(captor.getValue().getObjectKey()).startsWith("products/1/");
         assertThat(captor.getValue().getReplacedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("현재 도면을 삭제하면 목록에서 빼고 저장소 객체도 지운다")
+    void deleteCurrentDrawing() {
+        ProductDrawing drawing = ProductDrawing.create(
+                mock(Product.class),
+                "products/1/uuid_drawing.pdf",
+                "drawing.pdf"
+        );
+        ReflectionTestUtils.setField(drawing, "id", 10L);
+
+        given(productRepository.existsById(1L)).willReturn(true);
+        given(productDrawingRepository.findByIdAndProduct_IdAndReplacedAtIsNull(10L, 1L))
+                .willReturn(Optional.of(drawing));
+
+        productDrawingService.delete(1L, 10L);
+
+        assertThat(drawing.getReplacedAt()).isNotNull();
+        verify(storageClient).delete("products/1/uuid_drawing.pdf");
     }
 
     @Test

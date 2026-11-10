@@ -17,8 +17,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -33,42 +34,48 @@ public class ProductDrawingService {
     private final ProductDrawingRepository productDrawingRepository;
     private final StorageClient storageClient;
 
-
     @Transactional
     public Response upload(Long productId, MultipartFile file) {
-        if (file == null || file.isEmpty()) {
+        return uploadAll(productId, file == null ? List.of() : List.of(file)).getFirst();
+    }
+
+    // 한 요청에 여러 파일을 받아 순서대로 저장한다.
+    @Transactional
+    public List<Response> uploadAll(Long productId, List<MultipartFile> files) {
+        List<MultipartFile> targets = normalizeFiles(files);
+        if (targets.isEmpty()) {
             throw new IllegalArgumentException("업로드할 파일이 없습니다.");
         }
-        if (file.getSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("파일은 100MB 이하여야 합니다.");
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new EntityNotFoundException("품목을 찾을 수 없습니다: id=" + productId));
+
+        List<Response> saved = new ArrayList<>();
+        for (MultipartFile file : targets) {
+            saved.add(store(product, file));
         }
-        Optional<Product> optionalProduct = productRepository.findById(productId);
-        if (optionalProduct.isEmpty()) {
+        return saved;
+    }
+
+    // 현재 파일만 목록에서 제외한다. S3 객체도 지운다.
+    @Transactional
+    public void delete(Long productId, Long drawingId) {
+        if (!productRepository.existsById(productId)) {
             throw new EntityNotFoundException("품목을 찾을 수 없습니다: id=" + productId);
         }
-        Product product = optionalProduct.get();
+        ProductDrawing drawing = productDrawingRepository
+                .findByIdAndProduct_IdAndReplacedAtIsNull(drawingId, productId)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "도면 파일을 찾을 수 없습니다: productId=" + productId + ", drawingId=" + drawingId
+                ));
 
-        String fileName = file.getOriginalFilename();
-        if (fileName == null || fileName.isBlank()) {
-            fileName = "file";
+        String objectKey = drawing.getObjectKey();
+        drawing.markReplaced(LocalDateTime.now());
+        try {
+            storageClient.delete(objectKey);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("파일 삭제에 실패했습니다.", e);
         }
-        String objectKey = "products/" + productId + "/" + UUID.randomUUID() + "_" + fileName;
-
-        try (InputStream inputStream = file.getInputStream()) {
-            storageClient.upload(
-                    objectKey,
-                    inputStream,
-                    file.getContentType(),
-                    file.getSize()
-            );
-        } catch (IOException e) {
-            throw new IllegalStateException("파일 업로드에 실패했습니다.", e);
-        }
-
-
-        ProductDrawing drawing = ProductDrawing.create(product, objectKey, fileName);
-        ProductDrawing saved = productDrawingRepository.save(drawing);
-        return Response.from(saved);
     }
 
     public List<CurrentResponse> getCurrentFiles(Long productId) {
@@ -85,7 +92,6 @@ public class ProductDrawingService {
                 .toList();
     }
 
-
     public List<Response> getList(Long productId) {
         if (!productRepository.existsById(productId)) {
             throw new EntityNotFoundException("품목을 찾을 수 없습니다: id=" + productId);
@@ -93,5 +99,44 @@ public class ProductDrawingService {
         return productDrawingRepository.findByProductIdOrderByCreatedAtDesc(productId).stream()
                 .map(Response::from)
                 .toList();
+    }
+
+    private List<MultipartFile> normalizeFiles(List<MultipartFile> files) {
+        if (files == null || files.isEmpty()) {
+            return List.of();
+        }
+        List<MultipartFile> targets = new ArrayList<>();
+        for (MultipartFile file : files) {
+            if (file != null && !file.isEmpty()) {
+                targets.add(file);
+            }
+        }
+        return targets;
+    }
+
+    private Response store(Product product, MultipartFile file) {
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new IllegalArgumentException("파일은 100MB 이하여야 합니다.");
+        }
+
+        String fileName = file.getOriginalFilename();
+        if (fileName == null || fileName.isBlank()) {
+            fileName = "file";
+        }
+        String objectKey = "products/" + product.getId() + "/" + UUID.randomUUID() + "_" + fileName;
+
+        try (InputStream inputStream = file.getInputStream()) {
+            storageClient.upload(
+                    objectKey,
+                    inputStream,
+                    file.getContentType(),
+                    file.getSize()
+            );
+        } catch (IOException e) {
+            throw new IllegalStateException("파일 업로드에 실패했습니다.", e);
+        }
+
+        ProductDrawing drawing = ProductDrawing.create(product, objectKey, fileName);
+        return Response.from(productDrawingRepository.save(drawing));
     }
 }

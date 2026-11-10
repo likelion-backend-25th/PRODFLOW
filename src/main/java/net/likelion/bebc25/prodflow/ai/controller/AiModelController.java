@@ -11,11 +11,13 @@ import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.ai.dto.AiDto;
 import net.likelion.bebc25.prodflow.ai.service.AiChatService;
 import net.likelion.bebc25.prodflow.ai.service.AiModelService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -48,29 +50,58 @@ public class AiModelController {
     @ApiResponse(responseCode = "409", description = "종료된 대화방")
     @PostMapping("/conversations/{conversationId}/messages")
     public ResponseEntity<AiDto.AskResponse> ask(
+
             @Parameter(description = "대화방 ID", example = "1")
             @PathVariable Long conversationId,
 
+            // JWT에서 인증된 사용자 ID 추출
             @Parameter(hidden = true)
             @AuthenticationPrincipal(expression = "userId") Long userId,
+
+            // MCP Server에 전달할 JWT
+            @Parameter(hidden = true)
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
 
             @Valid @RequestBody AiDto.AskRequest request
     ) {
         // 1. 대화방 소유자 및 종료 여부 확인
         aiChatService.validateConversation(conversationId, userId);
 
-        // 2. 선택한 AI 모델 호출
-        AiDto.AskResponse response = aiModelService.ask(request);
+        // 2. Authorization 헤더에서 Bearer 토큰 추출
+        if (!authorization.startsWith("Bearer ")) {
+            throw new IllegalArgumentException(
+                    "올바르지 않은 인증 토큰 형식입니다."
+            );
+        }
 
-        // 3. 사용자 질문과 AI 답변 저장
+        String accessToken = authorization.substring(7);
+
+        if (accessToken.isBlank()) {
+            throw new IllegalArgumentException(
+                    "인증 토큰이 없습니다."
+            );
+        }
+
+        // 3. AI 모델 호출 및 MCP SQL 실행 결과 수집
+        AiDto.AskExecution result = aiModelService.askWithDetails(
+                request,
+                accessToken
+        );
+
+        // 4. 사용자 질문, AI 답변 및 SQL 실행 결과 저장
         aiChatService.saveMessage(
                 conversationId,
                 userId,
                 request.message(),
-                response.answer()
+                result
         );
 
-        // 4. AI 답변 반환
-        return ResponseEntity.ok(response);
+// 5. 기존 API 응답 형식 유지
+        return ResponseEntity.ok(
+                new AiDto.AskResponse(
+                        result.model(),
+                        result.answer()
+                )
+        );
     }
 }

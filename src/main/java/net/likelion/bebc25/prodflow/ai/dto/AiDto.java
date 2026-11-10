@@ -63,4 +63,13 @@ public class AiDto {
             String title
     ) {
     }
+
+    // AI 실행 결과 (내부 서비스 전달용)
+    public record AskExecution(
+            String model,
+            String answer,
+            String generatedSql,
+            String resultJson
+    ) {
+    }
 }
