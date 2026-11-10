@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.client.dto.ClientDto;
@@ -29,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.net.URI;
 import java.util.List;
 
+@Tag(name = "거래처", description = "거래처 조회,등록,수정 API")
 @RestController
 @RequestMapping("/api/v1/clients")
 @RequiredArgsConstructor
@@ -121,5 +123,17 @@ public class ClientController {
             ) Pageable pageable
     ) {
         return ResponseEntity.ok(clientService.findClients(keyword, pageable));
+    }
+
+    @Operation(
+            summary = "최근 한달간 등록된 거래처와 거래 요청한 거래처 수 조회",
+            description = "최근 한달간 등록된 거래처와 거래 요청한 거래처 수를 계산하여 조회한다"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/counts")
+    public ResponseEntity<ClientDto.CountRecentMonthResponse> countsRecentMonth() {
+        return ResponseEntity.ok(clientService.countGreaterThanOneMonth());
     }
 }
