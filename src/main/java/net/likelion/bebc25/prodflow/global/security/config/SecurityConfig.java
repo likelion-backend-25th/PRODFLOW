@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.global.security.config;
 
+import jakarta.servlet.DispatcherType;
 import net.likelion.bebc25.prodflow.global.security.handler.CustomAccessDeniedHandler;
 import net.likelion.bebc25.prodflow.global.security.handler.CustomAuthenticationEntryPoint;
 import net.likelion.bebc25.prodflow.global.security.jwt.JwtAuthenticationFilter;
@@ -114,6 +115,15 @@ public class SecurityConfig {
 
                 // API 요청 경로 및 HTTP 메서드에 따른 접근 권한 설정
                 .authorizeHttpRequests(auth -> auth
+
+                        // 오류 응답 처리 경로만 허용
+                        .requestMatchers(request ->
+                                request.getDispatcherType() == DispatcherType.ERROR
+                                        && "/error".equals(request.getServletPath())
+                        ).permitAll()
+
+                        // MCP 최초 요청은 JWT 인증 필수
+                        .requestMatchers("/mcp").authenticated()
 
                         // Swagger UI 및 OpenAPI 문서 접근 허용
                         .requestMatchers(

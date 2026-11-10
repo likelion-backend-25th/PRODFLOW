@@ -61,13 +61,13 @@ public class AiChatService {
         }
     }
 
-    // 사용자 질문 및 Ai 답변 저장
+    // 사용자 질문 및 AI 답변과 SQL 실행 결과 저장
     @Transactional
     public void saveMessage(
             Long conversationId,
             Long userId,
             String question,
-            String answer
+            AiDto.AskExecution result
     ) {
         // 동시 메시지 저장 시 순서번호 충돌 방지
         AiConversation conversation = aiConversationRepository
@@ -77,11 +77,11 @@ public class AiChatService {
 
         validateAccess(conversation, userId);
 
-        // 마지막 메세지 순서번호 조회
-        int lastSequence = aiMessageRepository.
-                findMaxSequenceNo(conversationId);
+        // 마지막 메시지 순서번호 조회
+        int lastSequence = aiMessageRepository
+                .findMaxSequenceNo(conversationId);
 
-        // 최초 질문인 경우에만 제목 설정
+        // 최초 질문인 경우 제목 설정
         if (lastSequence == 0) {
             conversation.setInitialTitle(question);
         }
@@ -89,7 +89,7 @@ public class AiChatService {
         // 사용자 질문 저장
         AiMessage userMessage = new AiMessage(
                 conversation,
-                lastSequence + 1, // 저장 위치
+                lastSequence + 1,
                 AiMessageRole.USER,
                 question
         );
@@ -99,17 +99,26 @@ public class AiChatService {
                 conversation,
                 lastSequence + 2,
                 AiMessageRole.ASSISTANT,
-                answer
+                result.answer()
         );
-        // 유저의 질문과 ai 답변을 저장
-        aiMessageRepository.saveAll(List.of(userMessage, assistantMessage));
+
+        // AI가 실행한 SQL과 조회 결과 적용
+        assistantMessage.applyResult(
+                result.generatedSql(),
+                result.resultJson()
+        );
+
+        // 사용자 질문과 AI 답변 저장
+        aiMessageRepository.saveAll(
+                List.of(userMessage, assistantMessage)
+        );
     }
 
     // 본인 대화방 목록 조회
     public List<AiDto.ConversationResponse> getMyConversations(Long userId) {
 
         return aiConversationRepository
-                .findByUserIdOrderByCreatedAtDesc(userId)
+                .findByUser_IdAndIsClosedFalseOrderByCreatedAtDesc(userId)
                 .stream()
                 .map(conversation -> new AiDto.ConversationResponse(
                         conversation.getId(),
@@ -127,7 +136,7 @@ public class AiChatService {
     ) {
         // 본인 대화방인지 확인
         AiConversation conversation = aiConversationRepository
-                .findByIdAndUser_Id(conversationId, userId)
+                .findByIdAndUser_IdAndIsClosedFalse(conversationId, userId)
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "대화방이 존재하지 않거나 접근 권한이 없습니다."
@@ -180,5 +189,21 @@ public class AiChatService {
         }
 
         conversation.changeTitle(title.strip());
+    }
+
+    // AI 대화방 종료
+    @Transactional
+    public void closeConversation(Long conversationId, Long userId) {
+
+        // 본인 대화방인지 확인
+        AiConversation conversation = aiConversationRepository
+                .findByIdAndUser_IdAndIsClosedFalse(conversationId, userId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "대화방이 존재하지 않거나 접근 권한이 없습니다."
+                        ));
+
+        // 대화방 종료
+        conversation.close();
     }
 }
