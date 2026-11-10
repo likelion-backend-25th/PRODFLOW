@@ -171,4 +171,15 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     // 거래처의 수주 이력 조회
     Page<CustomerOrder> findAllByClient_Id(Long clientId, Pageable pageable);
+
+    // 최근 기간 동안 수주를 진행한 거래처의 수
+    @Query(value = """
+                SELECT COUNT(DISTINCT o.client_id)
+                FROM customer_order o
+                WHERE o.created_at > :dateTime
+                    AND o.created_at <= NOW()
+            """, nativeQuery = true)
+    long countRecentOrderClients(
+            @Param("dateTime") LocalDateTime dateTime
+    );
 }

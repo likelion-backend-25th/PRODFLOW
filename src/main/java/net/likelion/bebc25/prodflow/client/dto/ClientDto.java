@@ -27,7 +27,7 @@ public class ClientDto {
 
             @NotNull
             Long userId,
-            
+
             @JsonProperty
             Address address
     ) {
@@ -102,6 +102,15 @@ public class ClientDto {
     ) {
         public static ImportResponse from(Long id, String company) {
             return new ImportResponse(id, company);
+        }
+    }
+
+    public record CountRecentMonthResponse(
+            Long countByOrder,
+            Long countByCreatedAt
+    ) {
+        public static CountRecentMonthResponse from(Long countByOrder, Long countByCreatedAt) {
+            return new CountRecentMonthResponse(countByOrder, countByCreatedAt);
         }
     }
 }

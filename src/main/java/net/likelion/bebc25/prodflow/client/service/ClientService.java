@@ -147,6 +147,14 @@ public class ClientService {
         });
     }
 
+    public ClientDto.CountRecentMonthResponse countGreaterThanOneMonth() {
+        LocalDateTime oneMonthAgo = LocalDateTime.now().minusMonths(1);
+        Long countByCreatedAt = clientRepository.countByCreatedAtGreaterThan(oneMonthAgo);
+        Long countByOrder = customerOrderRepository.countRecentOrderClients(oneMonthAgo);
+
+        return ClientDto.CountRecentMonthResponse.from(countByOrder, countByCreatedAt);
+    }
+
     private boolean isValidExcel(Row headerRow) {
         if (!headerRow.getCell(0).getStringCellValue().equals("company")
                 || !headerRow.getCell(1).getStringCellValue().equals("employee")
