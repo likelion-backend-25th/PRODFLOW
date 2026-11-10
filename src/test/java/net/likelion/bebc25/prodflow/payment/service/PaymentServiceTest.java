@@ -159,23 +159,49 @@ class PaymentServiceTest {
         assertThat(paymentService.getByOrderId(order.getId()).balanceAmount()).isEqualTo(10001);
     }
 
+
     @Test
     @DisplayName("최신 계좌가 만료·취소 상태여도 예전 활성 계좌로 대체하지 않는다")
     void getLatestAccountRegardlessOfStatus() {
+
         Payment deposit = savePayment(PaymentType.DEPOSIT, 5000L);
+
         saveAccount(deposit, "OLD-ACTIVE");
+
         VirtualAccount latest = saveAccount(deposit, "LATEST-EXPIRED");
+
+        // 입금기한을 현재 시각보다 하루 전으로 변경
+        latest.updateExpiresAt(OffsetDateTime.now().minusDays(1));
+
+        // 실제 만료 조건을 만족하므로 EXPIRED로 변경
         latest.expire();
 
-        PaymentDto.OrderResponse expired = paymentService.getByOrderId(order.getId());
-        assertThat(expired.payments().getFirst().virtualAccount().virtualAccountId()).isEqualTo(latest.getId());
-        assertThat(expired.payments().getFirst().virtualAccount().status()).isEqualTo(VirtualAccountStatus.EXPIRED);
+        PaymentDto.OrderResponse expired =
+                paymentService.getByOrderId(order.getId());
 
+        assertThat(expired.payments().getFirst()
+                .virtualAccount().virtualAccountId())
+                .isEqualTo(latest.getId());
+
+        assertThat(expired.payments().getFirst()
+                .virtualAccount().status())
+                .isEqualTo(VirtualAccountStatus.EXPIRED);
+
+        // 만료된 계좌를 취소 처리
         latest.cancel();
-        PaymentDto.OrderResponse cancelled = paymentService.getByOrderId(order.getId());
-        assertThat(cancelled.payments().getFirst().virtualAccount().status()).isEqualTo(VirtualAccountStatus.CANCELLED);
-        assertThat(cancelled.payments().getFirst().paymentHistory()).isNull();
+
+        PaymentDto.OrderResponse cancelled =
+                paymentService.getByOrderId(order.getId());
+
+        assertThat(cancelled.payments().getFirst()
+                .virtualAccount().status())
+                .isEqualTo(VirtualAccountStatus.CANCELLED);
+
+        assertThat(cancelled.payments().getFirst()
+                .paymentHistory())
+                .isNull();
     }
+
 
     @Test
     @DisplayName("초과 입금 데이터의 미수금은 음수가 되지 않는다")
