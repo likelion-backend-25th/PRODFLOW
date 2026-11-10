@@ -9,6 +9,9 @@ import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.shipment.dto.ShipmentDto;
 import net.likelion.bebc25.prodflow.shipment.service.ShipmentService;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,7 +34,8 @@ public class ShipmentController {
     @Operation(
             summary = "배송 목록 조회",
             description = "배송 관리 화면용 목록이다. tab으로 포장중(PACKING), 출고대기(READY_TO_SHIP), 배송중(SHIPPING), 잔금대기(BALANCE)를 고른다. "
-                    + "tab을 생략하면 출고대기다. 응답에 탭별 건수와 납기 빠른 순 목록이 포함된다. "
+                    + "tab을 생략하면 출고대기다. 응답에 탭별 전체 건수와 현재 탭의 페이징 목록이 포함된다. "
+                    + "page는 0부터 시작하며 기본 size는 10, 납기(estimatedDueDate) 오름차순이다. "
                     + "포장중 탭은 작업지시가 있고 전부 포장완료(PACK_DONE)인 수주만 목록·건수에 포함하며, "
                     + "readyToShipEligible은 그 항목에서 true다."
     )
@@ -44,9 +48,10 @@ public class ShipmentController {
     @ApiResponse(responseCode = "401", description = "액세스 토큰이 없거나 유효하지 않음")
     @GetMapping
     public ResponseEntity<ShipmentDto.ListResponse> findList(
-            @RequestParam(required = false, defaultValue = "READY_TO_SHIP") String tab
+            @RequestParam(required = false, defaultValue = "READY_TO_SHIP") String tab,
+            @PageableDefault(size = 10, sort = "estimatedDueDate", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        return ResponseEntity.ok(shipmentService.findList(tab));
+        return ResponseEntity.ok(shipmentService.findList(tab, pageable));
     }
 
     @Operation(

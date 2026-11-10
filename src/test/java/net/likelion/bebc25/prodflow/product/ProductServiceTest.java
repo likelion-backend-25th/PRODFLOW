@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.product;
 
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto;
 import net.likelion.bebc25.prodflow.product.dto.ProductDto.Response;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -54,22 +56,22 @@ class ProductServiceTest {
         assertThat(detail.status()).isEqualTo(ProductStatus.AVAILABLE);
         assertThat(detail.createdAt()).isNotNull();
 
-        List<Response> list = productService.getList(null);
-        assertThat(list).hasSize(5);
+        PageResponse<Response> list = productService.getList(null, PageRequest.of(0, 10));
+        assertThat(list.getContent()).hasSize(5);
+        assertThat(list.getTotalElements()).isEqualTo(5);
     }
 
     @Test
     @DisplayName("검색테스트")
     void searchProduct() {
-        List<Response> all = productService.productSearch(null, null);
-        assertThat(all).hasSize(5);
+        PageResponse<Response> all = productService.productSearch(null, null, PageRequest.of(0, 10));
+        assertThat(all.getContent()).hasSize(5);
 
-        List<Response> byName = productService.productSearch("클리어", null);
-        assertThat(byName).hasSize(1);
-        assertThat(byName.getFirst().modelCode()).isEqualTo("PF-CS-A100");
-        List<Response> byKeyword = productService.productSearch("맥세이프", null);
-        assertThat(byKeyword).hasSize(2);
-
+        PageResponse<Response> byName = productService.productSearch("클리어", null, PageRequest.of(0, 10));
+        assertThat(byName.getContent()).hasSize(1);
+        assertThat(byName.getContent().getFirst().modelCode()).isEqualTo("PF-CS-A100");
+        PageResponse<Response> byKeyword = productService.productSearch("맥세이프", null, PageRequest.of(0, 10));
+        assertThat(byKeyword.getContent()).hasSize(2);
     }
 
     @Test
