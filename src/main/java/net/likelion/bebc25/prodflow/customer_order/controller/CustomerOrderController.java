@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.common.dto.PageResponse;
+import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDetailDto;
 import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto;
 import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderListDto;
 import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
@@ -18,7 +19,9 @@ import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderService;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +30,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,6 +47,36 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CustomerOrderController {
     private final CustomerOrderService customerOrderService;
+
+    // 상세 화면의 수주 상태 변경 이력 조회
+    @Operation(summary = "수주 상태 변경 이력 조회", description = "해당 수주의 저장된 이력을 처리 시각·ID 내림차순으로 모두 반환한다. "
+            + "이력이 없으면 빈 배열을 반환하며, 작업지시·라인 이력은 포함하지 않는다. 처리자 ID는 시스템 이력에서 null일 수 있다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "수주 상태 변경 이력 조회 완료"),
+            @ApiResponse(responseCode = "401", description = "로그인 필요", content = @Content),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 수주", content = @Content)
+    })
+    @GetMapping("/{orderId}/histories")
+    public ResponseEntity<List<CustomerOrderDto.HistoryResponse>> getHistories(@PathVariable Long orderId) {
+        List<CustomerOrderDto.HistoryResponse> response = customerOrderService.getHistories(orderId);
+
+        return ResponseEntity.ok(response);
+    }
+
+    // 목록에서 선택한 수주의 상세 조회
+    @Operation(summary = "수주 상세 조회", description = "상태와 관계없이 수주 ID로 기본 정보·품목·금액·납기·배송지를 조회한다. "
+            + "담당자 연락처·주소 및 품목명·단가는 수주에 저장된 값을 사용한다. "
+            + "작업지시·결제·배송 추적·알림·상태 이력은 포함하지 않는다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "수주 상세 조회 완료"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 수주", content = @Content)
+    })
+    @GetMapping("/{orderId}")
+    public ResponseEntity<CustomerOrderDetailDto.Response> getOrder(@PathVariable Long orderId) {
+        CustomerOrderDetailDto.Response response = customerOrderService.getOrder(orderId);
+
+        return ResponseEntity.ok(response);
+    }
 
     // 수주 등록
     @Operation(summary = "수주 등록", description = "승인 견적으로 수주와 품목을 등록한다. 품목별 수량은 100개 이상, "
@@ -84,8 +118,10 @@ public class CustomerOrderController {
             @RequestParam(defaultValue = "CREATED_AT") OrderListSortType sortType,
             @ParameterObject @PageableDefault(size = 8) Pageable pageable) {
 
-        return ResponseEntity.ok(customerOrderService.getOrders(new CustomerOrderListDto.SearchCondition(
-                tab, keyword, confirmationStatus, statusCodeId, paymentStatus, sortType), pageable));
+        PageResponse<CustomerOrderListDto.Response> response = customerOrderService.getOrders(new CustomerOrderListDto.SearchCondition(
+                tab, keyword, confirmationStatus, statusCodeId, paymentStatus, sortType), pageable);
+
+        return ResponseEntity.ok(response);
     }
 
     // 수주 전체 집계 조회
@@ -93,16 +129,18 @@ public class CustomerOrderController {
             + "생산중은 IN_PRODUCTION·PACKING·ON_HOLD, 배송중은 READY_TO_SHIP·SHIPPING 합계. 이번 달은 한국 날짜의 배송 완료일 기준.")
     @GetMapping("/summary")
     public ResponseEntity<CustomerOrderListDto.SummaryResponse> getSummary() {
+        CustomerOrderListDto.SummaryResponse response = customerOrderService.getSummary();
 
-        return ResponseEntity.ok(customerOrderService.getSummary());
+        return ResponseEntity.ok(response);
     }
 
     // 수주 진행 상태 선택 목록 조회
     @Operation(summary = "수주 진행 상태 목록", description = "common_code 중 code_group_id=2이고 ACTIVE인 코드를 sort_order 순으로 반환한다.")
     @GetMapping("/statuses")
     public ResponseEntity<List<CustomerOrderListDto.StatusResponse>> getStatuses() {
+        List<CustomerOrderListDto.StatusResponse> response = customerOrderService.getStatuses();
 
-        return ResponseEntity.ok(customerOrderService.getStatuses());
+        return ResponseEntity.ok(response);
     }
 
     // 검색 결과 전체 CSV 다운로드
@@ -122,5 +160,41 @@ public class CustomerOrderController {
         return ResponseEntity.ok().contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename("수주목록.csv", StandardCharsets.UTF_8).build().toString()).body(csv);
+    }
+
+    @Operation(
+            summary = "거래처 수주 이력 조회",
+            description = "특정 거래처의 수주 이력을 페이지네이션하여 조회한다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/clients/{id}")
+    public ResponseEntity<Page<CustomerOrderDto.ClientDetailResponse>> findByClientId(
+            @Parameter(description = "거래처 ID", example = "1")
+            @PathVariable("id") Long clientId,
+            @PageableDefault(
+                    page = 0,
+                    size = 4,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable
+    ) {
+        return ResponseEntity.ok(customerOrderService.findByClientId(clientId, pageable));
+    }
+
+    @Operation(
+            summary = "거래처의 가장 최근 수주 조회",
+            description = "특정 거래처의 가장 최근에 수주한 내역을 조회한다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/clients/{id}/recent")
+    public ResponseEntity<CustomerOrderDto.ClientDetailResponse> getRecentByClientId(
+            @Parameter(description = "거래처 ID", example = "1")
+            @PathVariable("id") Long clientId
+    ) {
+        return ResponseEntity.ok(customerOrderService.getRecentByClientId(clientId));
     }
 }

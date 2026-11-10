@@ -116,7 +116,7 @@ public class GlobalExceptionHandler {
 
     // 권한이 없는 리소스 접근시 호출됨 (403 Forbidden 응답)
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiErrorResponse> handleAuthorizationDeniedException(AccessDeniedException ex) {
+    public ResponseEntity<ApiErrorResponse> handleAccessDeniedException(AccessDeniedException ex) {
         ApiErrorResponse response = ApiErrorResponse.of(ErrorCode.FORBIDDEN_OPERATION, ex.getMessage());
         return ResponseEntity.status(ErrorCode.FORBIDDEN_OPERATION.getHttpStatus()).body(response);
     }

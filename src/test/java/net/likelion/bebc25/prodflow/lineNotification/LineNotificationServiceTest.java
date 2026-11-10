@@ -1,6 +1,8 @@
 package net.likelion.bebc25.prodflow.lineNotification;
 
+import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
+import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.line_notification.dto.LineNotificationDto;
 import net.likelion.bebc25.prodflow.line_notification.entity.LineNotification;
 import net.likelion.bebc25.prodflow.line_notification.enums.LineNotificationType;
@@ -26,6 +28,9 @@ class LineNotificationServiceTest {
 
     @Autowired
     private LineNotificationRepository lineNotificationRepository;
+
+    @Autowired
+    private LineRepository lineRepository;
 
     @Test
     @DisplayName("사용자의 알림 목록을 조회한다")
@@ -70,7 +75,7 @@ class LineNotificationServiceTest {
     void markAsRead() {
         // given
         Long notificationId = 1L;
-        Long userId = 4L;
+        Long userId = 6L;
 
         // when
         LineNotificationDto result =
@@ -147,7 +152,7 @@ class LineNotificationServiceTest {
                     .isEqualTo(LineNotificationType.BROKEN);
 
             assertThat(latestNotification.getMessage())
-                    .contains("고장 상태로 변경되었습니다.");
+                    .isEqualTo(statusMessage(lineId, "고장"));
         }
     }
 
@@ -179,7 +184,7 @@ class LineNotificationServiceTest {
                 .isEqualTo(LineNotificationType.AVAILABLE);
 
         assertThat(latestNotification.getMessage())
-                .contains("가동 가능 상태로 변경되었습니다.");
+                .isEqualTo(statusMessage(lineId, "가동 가능"));
     }
 
     @Test
@@ -210,7 +215,7 @@ class LineNotificationServiceTest {
                 .isEqualTo(LineNotificationType.MAINTENANCE);
 
         assertThat(latestNotification.getMessage())
-                .contains("점검 상태로 변경되었습니다.");
+                .isEqualTo(statusMessage(lineId, "점검"));
     }
 
     @Test
@@ -247,19 +252,41 @@ class LineNotificationServiceTest {
     }
 
     @Test
-    @DisplayName("비활성 생산 관리자와 다른 역할에는 라인 알림을 만들지 않는다")
-    void notifyLineStatusChangedSkipsInactiveAndOtherRoles() {
-        long beforeInactive =
-                lineNotificationRepository.countByTarget_IdAndReadAtIsNull(8L);
-        long beforeOrderManager =
-                lineNotificationRepository.countByTarget_IdAndReadAtIsNull(2L);
+    @DisplayName("라인 상태 알림은 활성 최고관리자, 수주 관리자, 생산 관리자에게만 만든다")
+    void notifyLineStatusChangedReachesStatusRolesOnly() {
+        long beforeAdmin = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(1L);
+        long beforeOrderManager2 = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(2L);
+        long beforeOrderManager = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(3L);
+        long beforeProductionManager = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(4L);
+        long beforeInquiry = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(7L);
+        long beforeInactive = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(8L);
+        long beforeDeleted = lineNotificationRepository.countByTarget_IdAndReadAtIsNull(9L);
 
         lineNotificationService.notifyLineStatusChanged(1L, LineStatus.BROKEN);
 
-        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(8L))
-                .isEqualTo(beforeInactive);
-        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(2L))
-                .isEqualTo(beforeOrderManager);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(1L)).isEqualTo(beforeAdmin + 1);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(2L)).isEqualTo(beforeOrderManager2 + 1);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(3L)).isEqualTo(beforeOrderManager + 1);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(4L)).isEqualTo(beforeProductionManager + 1);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(7L)).isEqualTo(beforeInquiry);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(8L)).isEqualTo(beforeInactive);
+        assertThat(lineNotificationRepository.countByTarget_IdAndReadAtIsNull(9L)).isEqualTo(beforeDeleted);
+    }
+
+    @Test
+    @DisplayName("상태 알림 문구는 저장된 라인 이름을 한 번만 쓴다")
+    void statusMessageUsesStoredLineNameOnce() {
+        Line line = lineRepository.save(new Line("야간라인", 100));
+
+        lineNotificationService.notifyLineStatusChanged(line.getId(), LineStatus.INSPECTION);
+
+        LineNotification latestNotification = lineNotificationRepository
+                .findByTarget_IdOrderByCreatedAtDesc(4L)
+                .get(0);
+
+        assertThat(latestNotification.getNotificationType()).isEqualTo(LineNotificationType.MAINTENANCE);
+        assertThat(latestNotification.getMessage()).isEqualTo("야간라인이 점검 상태로 변경되었습니다.");
+        assertThat(latestNotification.getMessage()).doesNotContain("라인 라인");
     }
 
     @Test
@@ -270,5 +297,10 @@ class LineNotificationServiceTest {
         )
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("생산라인을 찾을 수 없습니다.");
+    }
+
+    private String statusMessage(Long lineId, String statusLabel) {
+        String lineName = lineRepository.findById(lineId).orElseThrow().getLineName();
+        return lineName + "이 " + statusLabel + " 상태로 변경되었습니다.";
     }
 }

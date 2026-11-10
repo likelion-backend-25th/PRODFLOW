@@ -1,11 +1,11 @@
 package net.likelion.bebc25.prodflow.customer_order.repository;
 
+import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
+import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
-import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
-import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
 import net.likelion.bebc25.prodflow.shipment.entity.Shipment;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,11 +14,36 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.time.LocalDateTime;
 
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
+    // 현금 입금의 중복 처리와 상태 변경을 직렬화한다.
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from CustomerOrder o where o.id = :id")
+    Optional<CustomerOrder> findByIdForUpdate(@Param("id") Long id);
+
+    // 나중에 입금한 수주가 먼저 등록된 대기 수주의 생산 자리를 차지하지 않게 한다.
+    @Query("""
+            select o from CustomerOrder o
+            where o.statusCode.code = 'WAITING'
+              and (o.createdAt < :createdAt or (o.createdAt = :createdAt and o.id < :id))
+            order by o.createdAt, o.id
+            """)
+    List<CustomerOrder> findEarlierWaitingOrders(@Param("createdAt") LocalDateTime createdAt, @Param("id") Long id);
+
+    // 거래처·원본 견적·등록자·진행 상태를 포함한 수주 상세 조회
+    @Query("""
+            select o from CustomerOrder o
+            join fetch o.client
+            join fetch o.quotation
+            join fetch o.user
+            join fetch o.statusCode
+            where o.id = :id
+            """)
+    Optional<CustomerOrder> findDetailById(@Param("id") Long id);
+
     String SEARCH_CONDITION = """
             where o.statusCode.codeGroup.id = 2
               and ((:done = true and o.statusCode.code = 'COMPLETED')
@@ -97,6 +122,29 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     @EntityGraph(attributePaths = "quotation")
     List<CustomerOrder> findByQuotationIdIn(List<Long> quotationIds);
 
+    // 배송 탭: 상태별 수주. 납기 빠른 순
+    @EntityGraph(attributePaths = {"client", "statusCode"})
+    @Query("""
+            SELECT o FROM CustomerOrder o
+            WHERE o.statusCode.code = :status
+            ORDER BY o.estimatedDueDate ASC
+            """)
+    List<CustomerOrder> findByStatusCodeOrderByEstimatedDueDateAsc(@Param("status") String status);
+
+    // 잔금 대기: 배송 완료인데 전액 입금이 아닌 수주
+    @EntityGraph(attributePaths = {"client", "statusCode"})
+    @Query("""
+            SELECT o FROM CustomerOrder o
+            WHERE o.statusCode.code = 'COMPLETED'
+              AND o.paymentStatus <> :paid
+            ORDER BY o.estimatedDueDate ASC
+            """)
+    List<CustomerOrder> findBalanceWaitingOrders(@Param("paid") OrderPaymentStatus paid);
+
+    long countByStatusCode_Code(String code);
+
+    long countByStatusCode_CodeAndPaymentStatusNot(String code, OrderPaymentStatus paymentStatus);
+
     // 특정 거래처의 누적 수주량
     Long countByClientId(Long clientId);
 
@@ -120,4 +168,18 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     // 거래처의 최근 수주 조회
     Optional<CustomerOrder> findFirstByClient_IdOrderByCreatedAtDesc(Long clientId);
+
+    // 거래처의 수주 이력 조회
+    Page<CustomerOrder> findAllByClient_Id(Long clientId, Pageable pageable);
+
+    // 최근 기간 동안 수주를 진행한 거래처의 수
+    @Query(value = """
+                SELECT COUNT(DISTINCT o.client_id)
+                FROM customer_order o
+                WHERE o.created_at > :dateTime
+                    AND o.created_at <= NOW()
+            """, nativeQuery = true)
+    long countRecentOrderClients(
+            @Param("dateTime") LocalDateTime dateTime
+    );
 }

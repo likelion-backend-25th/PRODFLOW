@@ -119,7 +119,8 @@ public class QuotationSendService {
                     "저장된 PDF를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", ex);
         }
         if (!QuotationDocumentFingerprint.matches(draft, file)
-                || !request.confirmationToken().equals(file.metadata().get(QuotationDocumentFingerprint.METADATA_KEY))) {
+                || !request.confirmationToken().equals(
+                        file.metadata().get(QuotationDocumentFingerprint.METADATA_KEY))) {
             throw conflict("확인한 견적서와 현재 PDF가 다릅니다. PDF를 다시 확인해주세요.");
         }
         quotation.sent();

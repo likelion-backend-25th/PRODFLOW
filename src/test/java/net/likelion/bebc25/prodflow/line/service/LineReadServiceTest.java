@@ -7,35 +7,23 @@ import net.likelion.bebc25.prodflow.line.dto.LineDto.LineList;
 import net.likelion.bebc25.prodflow.line.dto.LineDto.ListResponse;
 import net.likelion.bebc25.prodflow.line.dto.LineDto.UpdateRequest;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
-import net.likelion.bebc25.prodflow.line.serivce.LineService;
+import net.likelion.bebc25.prodflow.line.service.LineService;
 import net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
-import net.likelion.bebc25.prodflow.work_order.serivce.WorkOrderService;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
+import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// 애플리케이션 설정은 유지한다. 이 테스트만 테이블을 지우지 않고 data.sql도 다시 실행하지 않는다.
-//@SpringBootTest(properties = {
-//        "spring.jpa.hibernate.ddl-auto=validate",
-//        "spring.sql.init.mode=never"
-//})
-
-// CI 에러 임시 해결 (@Sql 해당 부분 제거할 때 @Sql import 도 같이 삭제)
-@SpringBootTest(properties = {
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.sql.init.mode=never"
-})
-@Sql("/data.sql")
+@SpringBootTest
 @Transactional
 class LineReadServiceTest {
 

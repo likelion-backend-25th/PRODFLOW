@@ -6,14 +6,13 @@ import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.work_order.entity.WorkOrder;
-import net.likelion.bebc25.prodflow.work_order.repsitory.WorkOrderRepository;
+import net.likelion.bebc25.prodflow.work_order.repository.WorkOrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -21,12 +20,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// CI 에러 임시 해결 (@Sql 해당 부분 제거할 때 @Sql import 도 같이 삭제)
-@SpringBootTest(properties = {
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.sql.init.mode=never"
-})
-@Sql("/data.sql")
+@SpringBootTest
 @Transactional
 class WorkOrderRepositoryTest {
 
@@ -60,7 +54,7 @@ class WorkOrderRepositoryTest {
         LocalDate today = LocalDate.now();
 
         assertThat(workOrderRepository.search(
-                        line.getId(), "PREPARE", today, today, "PF-2026-013", PageRequest.of(0, 5))
+                        line.getId(), "PREPARE", today, today, "PF-20261103-13", PageRequest.of(0, 5))
                 .getContent())
                 .extracting(WorkOrder::getWorkNo)
                 .containsExactly("WO-REPO-PREPARE");
@@ -68,6 +62,20 @@ class WorkOrderRepositoryTest {
                         line.getId(), "PRODUCE", null, null, "없는수주", PageRequest.of(0, 5))
                 .getContent())
                 .isEmpty();
+
+        assertThat(workOrderRepository.searchPage(
+                        line.getId(), "PREPARE", today, today, "PF-20261103-13", PageRequest.of(0, 5))
+                .getContent())
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.workNo()).isEqualTo("WO-REPO-PREPARE");
+                    assertThat(row.orderNo()).isEqualTo("PF-20261103-13");
+                    assertThat(row.lineName()).isEqualTo("저장소-라인");
+                    assertThat(row.assignedName()).isEqualTo("김태호");
+                    assertThat(row.status()).isEqualTo("PREPARE");
+                    assertThat(row.quantity()).isEqualTo(100);
+                    assertThat(row.workOrderDate()).isEqualTo(today);
+                });
     }
 
     @Test

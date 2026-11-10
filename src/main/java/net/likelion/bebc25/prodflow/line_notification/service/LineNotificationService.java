@@ -3,7 +3,7 @@ package net.likelion.bebc25.prodflow.line_notification.service;
 import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.line.entity.Line;
 import net.likelion.bebc25.prodflow.line.enums.LineStatus;
-import net.likelion.bebc25.prodflow.line.repsitory.LineRepository;
+import net.likelion.bebc25.prodflow.line.repository.LineRepository;
 import net.likelion.bebc25.prodflow.line_notification.dto.LineNotificationDto;
 import net.likelion.bebc25.prodflow.line_notification.entity.LineNotification;
 import net.likelion.bebc25.prodflow.line_notification.enums.LineNotificationType;
@@ -78,7 +78,14 @@ public class LineNotificationService {
         lineNotificationRepository.save(notification);
     }
 
-    // 생산 현장관리자 전체에게 알림 생성
+    // 라인 상태 알림은 활성 최고관리자, 수주 관리자, 생산 현장 관리자에게 보낸다. 업무 조회 담당자는 제외한다.
+    private static final List<UserRole> statusNoticeRoles = List.of(
+            UserRole.SUPER_ADMIN,
+            UserRole.ORDER_MANAGER,
+            UserRole.PRODUCTION_MANAGER
+    );
+
+    // 라인 상태 알림 수신 역할의 활성 사용자에게 알림 생성
     @Transactional
     public void notificationProductionManagers(
             Long lineId,
@@ -88,8 +95,8 @@ public class LineNotificationService {
         Line line = lineRepository.findById(lineId)
                 .orElseThrow(() -> new IllegalArgumentException("생산라인을 찾을 수 없습니다."));
 
-        List<User> managers = notificationUserRepository.findByRoleAndStatus(
-                UserRole.PRODUCTION_MANAGER,
+        List<User> managers = notificationUserRepository.findByRoleInAndStatus(
+                statusNoticeRoles,
                 UserStatus.ACTIVE
         );
 
@@ -117,15 +124,15 @@ public class LineNotificationService {
         switch (status) {
             case AVAILABLE -> {
                 notificationType = LineNotificationType.AVAILABLE;
-                message = line.getLineName() + " 라인이 가동 가능 상태로 변경되었습니다.";
+                message = statusChangedMessage(line.getLineName(), "가동 가능");
             }
             case INSPECTION -> {
                 notificationType = LineNotificationType.MAINTENANCE;
-                message = line.getLineName() + " 라인이 점검 상태로 변경되었습니다.";
+                message = statusChangedMessage(line.getLineName(), "점검");
             }
             case BROKEN -> {
                 notificationType = LineNotificationType.BROKEN;
-                message = line.getLineName() + " 라인이 고장 상태로 변경되었습니다.";
+                message = statusChangedMessage(line.getLineName(), "고장");
             }
             default -> {
                 return;
@@ -133,6 +140,11 @@ public class LineNotificationService {
         }
 
         notificationProductionManagers(lineId, notificationType, message);
+    }
+
+    // 이름에 이미 라인이 들어 있으므로 뒤에 라인을 다시 붙이지 않는다.
+    private String statusChangedMessage(String lineName, String statusLabel) {
+        return lineName + "이 " + statusLabel + " 상태로 변경되었습니다.";
     }
 
 }

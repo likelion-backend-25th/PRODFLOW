@@ -16,7 +16,7 @@ public interface QuotationScheduleRepository extends Repository<CustomerOrder, L
     // 생산량 반영 대상 수주 조회
     @Query("""
             select o from CustomerOrder o join fetch o.statusCode
-            where o.statusCode.code in ('WAITING', 'CONFIRMED', 'PRODUCTION_READY', 'IN_PRODUCTION', 'ON_HOLD')
+            where o.statusCode.code in ('WAITING', 'CONFIRMED', 'IN_PRODUCTION', 'ON_HOLD')
             order by o.createdAt, o.id
             """)
     List<CustomerOrder> findActiveOrders();

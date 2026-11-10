@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.global.security.config;
 
+import jakarta.servlet.DispatcherType;
 import net.likelion.bebc25.prodflow.global.security.handler.CustomAccessDeniedHandler;
 import net.likelion.bebc25.prodflow.global.security.handler.CustomAuthenticationEntryPoint;
 import net.likelion.bebc25.prodflow.global.security.jwt.JwtAuthenticationFilter;
@@ -115,6 +116,15 @@ public class SecurityConfig {
                 // API 요청 경로 및 HTTP 메서드에 따른 접근 권한 설정
                 .authorizeHttpRequests(auth -> auth
 
+                        // 오류 응답 처리 경로만 허용
+                        .requestMatchers(request ->
+                                request.getDispatcherType() == DispatcherType.ERROR
+                                        && "/error".equals(request.getServletPath())
+                        ).permitAll()
+
+                        // MCP 최초 요청은 JWT 인증 필수
+                        .requestMatchers("/mcp").authenticated()
+
                         // Swagger UI 및 OpenAPI 문서 접근 허용
                         .requestMatchers(
                                 "/swagger-ui.html",
@@ -129,6 +139,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout"
                         ).permitAll()
+
+                        // PortOne 서버 -> 공개 콜백. 서명은 PaymentController에서 별도로 검증한다.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook").permitAll()
 
                         // 최초 비밀번호 변경 API
                         // 로그인한 직원만 접근 가능
@@ -204,6 +217,12 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/v1/products",
                                 "/api/v1/products/*/drawings"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
+                        // 생산품목 도면 삭제는 최고 관리자 또는 수주 관리자만 허용
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/v1/products/*/drawings/*"
                         ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
 
                         // 생산품목 수정은 최고 관리자 또는 수주 관리자만 허용

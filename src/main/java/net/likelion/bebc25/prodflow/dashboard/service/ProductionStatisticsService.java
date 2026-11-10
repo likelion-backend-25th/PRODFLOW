@@ -170,8 +170,9 @@ public class ProductionStatisticsService {
 
             int week = getWeekOfMonth(date, monthStart);
 
-            LocalDate weekStart = date.with(DayOfWeek.MONDAY);
-            LocalDate weekEnd = date.with(DayOfWeek.SUNDAY);
+            // 일요일로 시작해야 월 경계의 수량이 다른 주차에 붙지 않는다.
+            LocalDate weekStart = sundayOfWeek(date);
+            LocalDate weekEnd = weekStart.plusDays(6);
 
             weeklyMap.putIfAbsent(
                     week,
@@ -216,18 +217,18 @@ public class ProductionStatisticsService {
         return result;
     }
 
-    // 월요일 시작 기준으로 해당 월의 몇 번째 주인지 계산
+    // 일요일이 시작인 주에서 해당 월의 몇 번째 주인지 계산한다.
     private int getWeekOfMonth(LocalDate date, LocalDate monthStart) {
-        LocalDate firstMonday = monthStart.with(DayOfWeek.MONDAY);
-
-        if (firstMonday.isAfter(monthStart)) {
-            firstMonday = firstMonday.minusWeeks(1);
-        }
-
         return (int) ChronoUnit.WEEKS.between(
-                firstMonday,
-                date.with(DayOfWeek.MONDAY)
+                sundayOfWeek(monthStart),
+                sundayOfWeek(date)
         ) + 1;
+    }
+
+    // ISO 주의 일요일은 그 주의 마지막 날이므로, 직전 일요일을 주의 시작으로 되돌린다.
+    private LocalDate sundayOfWeek(LocalDate date) {
+        int daysFromSunday = date.getDayOfWeek().getValue() % 7;
+        return date.minusDays(daysFromSunday);
     }
 
     // 조회 기간 유효성 검사

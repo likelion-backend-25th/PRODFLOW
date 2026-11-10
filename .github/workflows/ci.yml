@@ -33,6 +33,10 @@ jobs:
         with:
           java-version: '25'
           distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Gradle 설정
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Gradle 실행 권한 부여
         run: chmod +x gradlew
@@ -45,6 +49,10 @@ jobs:
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
           MYSQL_USER: ${{ secrets.MYSQL_USER }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+
+          # AI 조회 전용 DB 계정
+          AI_DB_USERNAME: ${{ secrets.AI_DB_USERNAME }}
+          AI_DB_PASSWORD: ${{ secrets.AI_DB_PASSWORD }}
 
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_ACCESS_TOKEN_EXPIRATION: ${{ secrets.JWT_ACCESS_TOKEN_EXPIRATION }}
@@ -64,3 +72,7 @@ jobs:
 
           #HOLIDAY_INITIALIZATION_ENABLED: "false"
           SHIPMENT_TRACKING_REFRESH_ENABLED: "false"
+
+          # AI API 인증키
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

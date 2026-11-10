@@ -13,6 +13,7 @@ import net.likelion.bebc25.prodflow.product.service.ProductDrawingService;
 import net.likelion.bebc25.prodflow.product.service.ProductService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -139,36 +141,66 @@ public class ProductController {
 
     @Operation(
             summary = "생산품목 도면 업로드",
-            description = "RequestPart로 도면 파일을 받아 해당 생산품목에 업로드한다"
+            description = "RequestPart files로 도면 파일을 하나 이상 받아 해당 생산품목에 업로드한다. "
+                    + "같은 파트 이름으로 여러 파일을 보내면 한 번에 여러 장이 등록된다. "
+                    + "기존 단일 업로드용 file 파트도 그대로 받을 수 있다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "업로드 성공")
     })
     @PostMapping(value = "/{id}/drawings", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ProductDrawingDto.Response> uploadDrawing(
+    public ResponseEntity<List<ProductDrawingDto.Response>> uploadDrawings(
             @Parameter(description = "생산품목 ID", example = "1")
             @PathVariable Long id,
-            @RequestPart("file") MultipartFile file
+            @RequestPart(value = "files", required = false) List<MultipartFile> files,
+            @RequestPart(value = "file", required = false) MultipartFile file
     ) {
-        ProductDrawingDto.Response response = productDrawingService.upload(id, file);
+        List<MultipartFile> targets = new ArrayList<>();
+        if (files != null) {
+            targets.addAll(files);
+        }
+        if (file != null) {
+            targets.add(file);
+        }
+        List<ProductDrawingDto.Response> responses = productDrawingService.uploadAll(id, targets);
         return ResponseEntity
-                .created(URI.create("/api/v1/products/" + id + "/drawings/" + response.id()))
-                .body(response);
+                .created(URI.create("/api/v1/products/" + id + "/drawings/" + responses.getFirst().id()))
+                .body(responses);
     }
 
     @Operation(
             summary = "생산품목 현재 도면 조회",
-            description = "생산품목의 현재 도면 파일 목록을 조회한다"
+            description = "생산품목의 현재 도면 파일 목록을 조회한다. 정보 수정 화면에서 기존 파일 목록을 그릴 때 사용한다. "
+                    + "각 항목에 10분 유효 S3 미리보기 주소(previewUrl)를 포함한다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping("/{id}/drawings/current")
-    public ResponseEntity<List<ProductDrawingDto.Response>> getCurrentDrawings(
+    public ResponseEntity<List<ProductDrawingDto.CurrentResponse>> getCurrentDrawings(
             @Parameter(description = "생산품목 ID", example = "1")
             @PathVariable Long id
     ) {
         return ResponseEntity.ok(productDrawingService.getCurrentFiles(id));
+    }
+
+    @Operation(
+            summary = "생산품목 도면 삭제",
+            description = "현재 도면 파일 하나를 삭제한다. 목록에서 빠지고 저장소 객체도 지운다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "삭제 성공"),
+            @ApiResponse(responseCode = "404", description = "품목 또는 도면 없음")
+    })
+    @DeleteMapping("/{id}/drawings/{drawingId}")
+    public ResponseEntity<Void> deleteDrawing(
+            @Parameter(description = "생산품목 ID", example = "1")
+            @PathVariable Long id,
+            @Parameter(description = "도면 ID", example = "10")
+            @PathVariable Long drawingId
+    ) {
+        productDrawingService.delete(id, drawingId);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(

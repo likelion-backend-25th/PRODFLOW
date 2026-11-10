@@ -1,13 +1,14 @@
 package net.likelion.bebc25.prodflow.product;
 
+import net.likelion.bebc25.prodflow.common.storage.StorageClient;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
+import net.likelion.bebc25.prodflow.product.dto.ProductDrawingDto.CurrentResponse;
 import net.likelion.bebc25.prodflow.product.dto.ProductDrawingDto.Response;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.entity.ProductDrawing;
 import net.likelion.bebc25.prodflow.product.repository.ProductDrawingRepository;
 import net.likelion.bebc25.prodflow.product.repository.ProductRepository;
 import net.likelion.bebc25.prodflow.product.service.ProductDrawingService;
-import net.likelion.bebc25.prodflow.common.storage.StorageClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +19,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,7 +65,7 @@ class ProductDrawingServiceTest {
         });
 
         MockMultipartFile file = new MockMultipartFile(
-                "file",
+                "files",
                 "drawing.pdf",
                 "application/pdf",
                 "hello".getBytes()
@@ -79,5 +83,62 @@ class ProductDrawingServiceTest {
         assertThat(captor.getValue().getFileName()).isEqualTo("drawing.pdf");
         assertThat(captor.getValue().getObjectKey()).startsWith("products/1/");
         assertThat(captor.getValue().getReplacedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("현재 도면을 삭제하면 목록에서 빼고 저장소 객체도 지운다")
+    void deleteCurrentDrawing() {
+        ProductDrawing drawing = ProductDrawing.create(
+                mock(Product.class),
+                "products/1/uuid_drawing.pdf",
+                "drawing.pdf"
+        );
+        ReflectionTestUtils.setField(drawing, "id", 10L);
+
+        given(productRepository.existsById(1L)).willReturn(true);
+        given(productDrawingRepository.findByIdAndProduct_IdAndReplacedAtIsNull(10L, 1L))
+                .willReturn(Optional.of(drawing));
+
+        productDrawingService.delete(1L, 10L);
+
+        assertThat(drawing.getReplacedAt()).isNotNull();
+        verify(storageClient).delete("products/1/uuid_drawing.pdf");
+    }
+
+    @Test
+    @DisplayName("현재 도면 조회 시 10분 유효 previewUrl을 포함한다")
+    void getCurrentFilesIncludesPreviewUrl() {
+        Long productId = 1L;
+        ProductDrawing drawing = ProductDrawing.create(
+                mock(Product.class),
+                "products/1/uuid_drawing.pdf",
+                "drawing.pdf"
+        );
+        ReflectionTestUtils.setField(drawing, "id", 10L);
+        ReflectionTestUtils.setField(drawing, "createdAt", LocalDateTime.of(2026, 11, 2, 13, 0));
+
+        given(productRepository.existsById(productId)).willReturn(true);
+        given(productDrawingRepository.findByProductIdAndReplacedAtIsNull(productId))
+                .willReturn(List.of(drawing));
+        given(storageClient.createPresignedGetUrl(
+                eq("products/1/uuid_drawing.pdf"),
+                eq(Duration.ofMinutes(10))
+        )).willReturn("https://example.com/signed-drawing.pdf");
+
+        List<CurrentResponse> responses = productDrawingService.getCurrentFiles(productId);
+
+        assertThat(responses).hasSize(1);
+        CurrentResponse response = responses.getFirst();
+        assertThat(response.id()).isEqualTo(10L);
+        assertThat(response.fileName()).isEqualTo("drawing.pdf");
+        assertThat(response.previewUrl()).isEqualTo("https://example.com/signed-drawing.pdf");
+        assertThat(response.expiresAt()).isBetween(
+                Instant.now().plus(Duration.ofMinutes(9)),
+                Instant.now().plus(Duration.ofMinutes(11))
+        );
+        verify(storageClient).createPresignedGetUrl(
+                "products/1/uuid_drawing.pdf",
+                Duration.ofMinutes(10)
+        );
     }
 }

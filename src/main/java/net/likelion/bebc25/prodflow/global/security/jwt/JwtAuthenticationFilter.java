@@ -24,6 +24,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService userDetailsService;
 
     @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
+    @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
         // 로그인/재발급/로그아웃은 Refresh Cookie로 처리하며 Bearer 헤더가 필수는 아니다.
@@ -31,6 +36,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || ("POST".equalsIgnoreCase(request.getMethod()) && (
                 path.equals("/api/v1/auth/login") || path.equals("/api/v1/auth/refresh")
                         || path.equals("/api/v1/auth/logout")))
+                || ("POST".equalsIgnoreCase(request.getMethod())
+                && path.equals("/api/v1/payments/webhook"))
                 || path.equals("/swagger-ui.html") || path.startsWith("/swagger-ui/")
                 || path.equals("/v3/api-docs") || path.startsWith("/v3/api-docs/");
     }
@@ -38,6 +45,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+
+        // MCP 요청의 디스패치 유형 및 JWT 전달 여부 확인
+        if ("/mcp".equals(request.getServletPath())) {
+            System.out.println(
+                    "MCP DispatcherType: " + request.getDispatcherType()
+            );
+            System.out.println(
+                    "MCP Authorization 존재: "
+                            + (request.getHeader("Authorization") != null)
+            );
+        }
+
         String header = request.getHeader("Authorization");
         if (header == null || header.isBlank()) {
             filterChain.doFilter(request, response);

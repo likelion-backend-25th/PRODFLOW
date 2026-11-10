@@ -19,6 +19,26 @@ repositories {
 }
 
 dependencies {
+    // MCP Server - AI 조회 Tool 제공
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+
+    // MCP Client - Gemini/Groq에서 MCP Tool 호출
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-client'
+
+    /// AI가 생성한 SQL을 분석하는 라이브러리
+    implementation 'com.github.jsqlparser:jsqlparser:5.4'
+
+    // MCP Server - 기존 조회 기능을 AI Tool로 제공
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+
+    // Spring AI 버전 관리
+    implementation platform('org.springframework.ai:spring-ai-bom:2.0.2')
+
+    // Gemini 2개 모델 연동
+    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+
+    // Groq GPT-OSS 20B 연동
+    implementation 'org.springframework.ai:spring-ai-openai'
 
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 
