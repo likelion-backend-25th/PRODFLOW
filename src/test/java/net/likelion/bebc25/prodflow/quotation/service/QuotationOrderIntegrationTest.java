@@ -1,40 +1,8 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
-import java.time.format.DateTimeFormatter;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.UUID;
 import jakarta.validation.ConstraintViolationException;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.RepeatedTest;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
-
-import net.likelion.bebc25.prodflow.client_notification.entity.PaymentNotificationRequest;
 import net.likelion.bebc25.prodflow.client.entity.Client;
+import net.likelion.bebc25.prodflow.client_notification.entity.PaymentNotificationRequest;
 import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.common.enums.HistoryEntityType;
@@ -65,18 +33,31 @@ import net.likelion.bebc25.prodflow.quotation.enums.QuotationSortType;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @DisplayName("견적에서 수주 등록 연동")
 class QuotationOrderIntegrationTest extends QuotationIntegrationTestSupport {
@@ -362,22 +343,30 @@ class QuotationOrderIntegrationTest extends QuotationIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("READY 상태라도 계좌 발급 이력이 있으면 말소 연계 전 취소하지 않는다")
+    @DisplayName("READY 결제에 가상계좌 이력이 남은 불일치 상태는 자동 취소를 거부한다")
     void rejectsCancellationWhenAccountExists() {
-        CustomerOrderDto.CreateResponse order = orderService.create(orderRequest(approvedForOrder(), 100, dueDate(),
-                true, null), userId);
+        QuotationDto.DetailResponse quote = approvedForOrder();
+        CustomerOrderDto.CreateResponse order = orderService.create(
+                orderRequest(quote, 100, dueDate(), true, null), userId);
         tx().executeWithoutResult(status -> {
             Payment payment = Payment.builder().order(em.find(CustomerOrder.class, order.id()))
-                    .paymentType(PaymentType.DEPOSIT).amount(55000L).portonePaymentId("PF-CANCEL-ACCOUNT").build();
+                    .paymentType(PaymentType.DEPOSIT).amount(55000L)
+                    .portonePaymentId("PF-CANCEL-ACCOUNT").build();
             em.persist(payment);
             em.persist(VirtualAccount.builder().payment(payment).bank(Bank.SHINHAN)
                     .accountNumber("CANCEL-TEST-ACCOUNT").accountName("테스트")
                     .expiresAt(OffsetDateTime.now().plusDays(1)).build());
         });
+
         assertThatThrownBy(() -> cancelService.cancel(order.id(),
                 new CustomerOrderDto.CancelRequest("거래처 요청"), userId))
-                .hasMessageContaining("가상계좌");
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("현재 결제 상태에서는 자동 취소할 수 없습니다.");
+
         assertThat(orderService.getOrder(order.id()).status()).isEqualTo("WAITING");
+        assertThat(service.getQuotationById(quote.id()).status()).isEqualTo(QuotationStatus.APPROVED);
+        assertThat(orderService.getHistories(order.id())).hasSize(1);
+        verifyNoInteractions(portOneClient);
     }
 
     @Test
@@ -397,20 +386,28 @@ class QuotationOrderIntegrationTest extends QuotationIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("취소 트랜잭션 롤백 시 수주·견적·이력은 기존 상태를 유지한다")
-    void rollsBackOrderCancellationTogether() {
+    @DisplayName("독립 트랜잭션에서 완료된 수주 취소는 호출자 트랜잭션 롤백으로 되돌아가지 않는다")
+    void outerRollbackDoesNotUndoCommittedCancellation() {
         QuotationDto.DetailResponse quote = approvedForOrder();
         prepareCancellationStatus();
-        CustomerOrderDto.CreateResponse order = orderService.create(orderRequest(quote, 100, dueDate(), true, null),
-                userId);
+        CustomerOrderDto.CreateResponse order = orderService.create(
+                orderRequest(quote, 100, dueDate(), true, null), userId);
+
         tx().executeWithoutResult(status -> {
-            cancelService.cancel(order.id(), new CustomerOrderDto.CancelRequest("거래처 요청"), userId);
-            em.flush();
-            status.setRollbackOnly();
+            CustomerOrderDetailDto.Response response = cancelService.cancel(
+                    order.id(), new CustomerOrderDto.CancelRequest("거래처 요청"), userId);
+            assertThat(response.status()).isEqualTo("CANCELLED");
+            status.setRollbackOnly(); // 바깥쪽 트랜잭션만 롤백
         });
-        assertThat(orderService.getOrder(order.id()).status()).isEqualTo("WAITING");
-        assertThat(service.getQuotationById(quote.id()).status()).isEqualTo(QuotationStatus.APPROVED);
-        assertThat(orderService.getHistories(order.id())).hasSize(1);
+
+        assertThat(orderService.getOrder(order.id()).status()).isEqualTo("CANCELLED");
+        assertThat(service.getQuotationById(quote.id()).status()).isEqualTo(QuotationStatus.CANCELLED);
+        assertThat(orderService.getHistories(order.id())).hasSize(2).first().satisfies(history -> {
+            assertThat(history.fromStatus()).isEqualTo("WAITING");
+            assertThat(history.toStatus()).isEqualTo("CANCELLED");
+            assertThat(history.note()).isEqualTo("거래처 요청");
+        });
+        verifyNoInteractions(portOneClient);
     }
 
     @Test
@@ -533,9 +530,9 @@ class QuotationOrderIntegrationTest extends QuotationIntegrationTestSupport {
                 userId);
         CustomerOrderDetailDto.Response detail = orderService.getOrder(order.id());
         List<PaymentNotificationDto.Item> items = detail.items().stream().map(item ->
-                new PaymentNotificationDto.Item(
-                        item.id(), item.productName(), item.quantity(), item.unitPrice(), item.supplyAmount()))
-                                .toList();
+                        new PaymentNotificationDto.Item(
+                                item.id(), item.productName(), item.quantity(), item.unitPrice(), item.supplyAmount()))
+                .toList();
         PaymentNotificationDto.Request request = new PaymentNotificationDto.Request(
                 UUID.randomUUID().toString(), detail.client().email(), detail.totalAmount(),
                 detail.supplyAmount(), detail.vatAmount(), detail.totalAmount() / 2,
@@ -563,7 +560,7 @@ class QuotationOrderIntegrationTest extends QuotationIntegrationTestSupport {
                     .setParameter("id", order.id()).getSingleResult();
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.WAITING);
             assertThat(em.createQuery("select count(l) from ClientNotiLog l "
-                    + "where l.customerOrder.id = :id and l.kind = 'DEPOSIT'", Long.class)
+                            + "where l.customerOrder.id = :id and l.kind = 'DEPOSIT'", Long.class)
                     .setParameter("id", order.id()).getSingleResult()).isEqualTo(1);
         });
         assertThat(paymentNotificationService.send(order.id(), request, userId).status().name()).isEqualTo("SENT");
@@ -577,8 +574,8 @@ class QuotationOrderIntegrationTest extends QuotationIntegrationTestSupport {
         QuotationDto.DetailResponse quote = approvedForOrder();
 
         CustomerOrderDto.ShippingAddress address = new CustomerOrderDto.ShippingAddress(
-                        "54321", "부산 새주소로 2", "3층"
-                );
+                "54321", "부산 새주소로 2", "3층"
+        );
 
         CustomerOrderDto.CreateResponse response = orderService.create(
                 orderRequest(
@@ -631,8 +628,8 @@ class QuotationOrderIntegrationTest extends QuotationIntegrationTestSupport {
         );
 
         CustomerOrderDto.ItemRequest foreign = new CustomerOrderDto.ItemRequest(
-                        Long.MAX_VALUE, 100
-                );
+                Long.MAX_VALUE, 100
+        );
 
         for (List<CustomerOrderDto.ItemRequest> items : List.of(
                 List.<CustomerOrderDto.ItemRequest>of(),
@@ -643,16 +640,16 @@ class QuotationOrderIntegrationTest extends QuotationIntegrationTestSupport {
                 )
         )) {
             CustomerOrderDto.CreateRequest invalid = new CustomerOrderDto.CreateRequest(
-                            quote.id(),
-                            items,
-                            dueDate(),
-                            true,
-                            null,
-                            "수신자",
-                            "010-1234-5678",
-                            NotifyChannel.EMAIL,
-                            null
-                    );
+                    quote.id(),
+                    items,
+                    dueDate(),
+                    true,
+                    null,
+                    "수신자",
+                    "010-1234-5678",
+                    NotifyChannel.EMAIL,
+                    null
+            );
 
             assertThatThrownBy(() ->
                     orderService.create(invalid, userId)
