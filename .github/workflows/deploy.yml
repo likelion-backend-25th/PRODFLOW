@@ -22,6 +22,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: 시스템 프롬프트 배치
+        env:
+          PRODFLOW_SYSTEM_PROMPT: ${{ secrets.PRODFLOW_SYSTEM_PROMPT }}
+        run: |
+          if [ -z "$PRODFLOW_SYSTEM_PROMPT" ]; then 
+            echo "PRODFLOW_SYSTEM_PROMPT 시크릿이 없습니다." 
+            exit 1 
+          fi 
+          
+          mkdir -p src/main/resources/prompts 
+          printf '%s' "$PRODFLOW_SYSTEM_PROMPT" \ 
+            > src/main/resources/prompts/prodflow-system.txt
+
       - name: Docker Hub Login
         uses: docker/login-action@v4
         with:
