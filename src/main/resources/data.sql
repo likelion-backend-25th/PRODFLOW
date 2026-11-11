@@ -252,7 +252,7 @@ VALUES (1,
 
        (15,
         '$2y$10$LUyzXI.V1U6TucGyO9wZF.1o5946kFyBBbjrEdWCiH63PmWPmhyqa',
-        '이승언',
+        '김두희',
         'super6@prodflow.site',
         '010-9999-0106',
         'SUPER_ADMIN',
