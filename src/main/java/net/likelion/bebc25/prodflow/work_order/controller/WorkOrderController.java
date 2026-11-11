@@ -68,7 +68,9 @@ public class WorkOrderController {
     @Operation(
             summary = "작업지시 페이징 조회",
             description = "로그인한 사용자가 작업지시를 조회한다. orderId를 지정하면 해당 수주의 작업지시만 조회하며 다른 검색 조건과 AND로 적용한다. "
-                    + "완료 예정일이 빠른 순이고, 같은 날이면 최근 등록이 앞이다. 한 페이지 기본값은 5건이다."
+                    + "assignedId가 있으면 그 담당자의 작업만 페이지를 자르기 전에 조회한다. "
+                    + "검색 조건이 있으면 포장완료는 뒤로 두고, 완료 예정일이 빠른 순이며, 같은 날이면 최근 등록이 앞이다. "
+                    + "한 페이지 기본값은 5건이다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -85,6 +87,7 @@ public class WorkOrderController {
             @RequestParam(required = false) LocalDate to, // 지시일 종료
             @RequestParam(required = false) String status, // 작업 상태 코드
             @RequestParam(required = false) Long lineId, // 생산 라인
+            @RequestParam(required = false) Long assignedId, // 담당자. 있으면 그 사람의 작업만 페이징한다.
             @Parameter(description = "페이지 번호. 0부터 시작한다.", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기", example = "5")
@@ -92,7 +95,8 @@ public class WorkOrderController {
     ) {
         // 정렬이 없는 페이지다. 순서는 레포지토리 메서드가 정한다.
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(workOrderService.findAll(orderId, lineId, status, from, to, keyword, pageable));
+        return ResponseEntity.ok(workOrderService.findAll(
+                orderId, lineId, status, from, to, keyword, assignedId, pageable));
     }
 
 

@@ -516,13 +516,20 @@ public class WorkOrderService {
             String keyword,
             Pageable pageable
     ) {
-        return findAll(null, lineId, status, from, to, keyword, pageable);
+        return findAll(null, lineId, status, from, to, keyword, null, pageable);
     }
 
     // 수주 필터와 기존 검색 조건을 함께 적용한다.
     public Page<WorkOrderDto.PageResponse> findAll(
             Long orderId, Long lineId, String status,
             LocalDate from, LocalDate to, String keyword, Pageable pageable) {
+        return findAll(orderId, lineId, status, from, to, keyword, null, pageable);
+    }
+
+    // 담당자 조건은 페이지를 자르기 전에 적용한다.
+    public Page<WorkOrderDto.PageResponse> findAll(
+            Long orderId, Long lineId, String status,
+            LocalDate from, LocalDate to, String keyword, Long assigneeId, Pageable pageable) {
         if (orderId != null && !customerOrderRepository.existsById(orderId)) {
             throw new NoSuchElementException("수주를 찾을 수 없습니다.");
         }
@@ -531,13 +538,15 @@ public class WorkOrderService {
         String word = keyword == null || keyword.isBlank() ? null : keyword.trim();
 
         boolean hasCondition = orderId != null || lineId != null
-                || code != null || from != null || to != null || word != null;
+                || code != null || from != null || to != null || word != null
+                || assigneeId != null;
 
         if (!hasCondition) {
             return workOrderRepository.findPage(pageable);
         }
 
-        return workOrderRepository.searchPage(orderId, lineId, code, from, to, word, pageable);
+        return workOrderRepository.searchPage(
+                orderId, lineId, code, from, to, word, assigneeId, pageable);
     }
 
     // 작업지시서 상세 조회

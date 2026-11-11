@@ -40,7 +40,7 @@ class WorkOrderControllerTest {
         LocalDate date = LocalDate.of(2026, 10, 26);
         WorkOrderDto.PageResponse row = new WorkOrderDto.PageResponse(1L, "WI-001", "PF-001",
                 "거래처", "품목", 100, "A라인", null, date, date, "PACK", 31L, date, date);
-        when(workOrderService.findAll(eq(123L), eq(2L), eq("PACK"), eq(date), eq(date), eq("품목"), any(Pageable.class)))
+        when(workOrderService.findAll(eq(123L), eq(2L), eq("PACK"), eq(date), eq(date), eq("품목"), isNull(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(row), PageRequest.of(0, 5), 1));
 
         mvc.perform(get("/api/v1/work-orders").param("orderId", "123").param("lineId", "2")
@@ -51,26 +51,26 @@ class WorkOrderControllerTest {
                 .andExpect(jsonPath("$.content[0].orderProductId").value(31))
                 .andExpect(jsonPath("$.content[0].plannedStartDate").value("2026-10-26"))
                 .andExpect(jsonPath("$.content[0].completedAt").value("2026-10-26"));
-        verify(workOrderService).findAll(eq(123L), eq(2L), eq("PACK"), eq(date), eq(date), eq("품목"),
+        verify(workOrderService).findAll(eq(123L), eq(2L), eq("PACK"), eq(date), eq(date), eq("품목"), isNull(),
                 argThat(pageable -> pageable.getPageNumber() == 0 && pageable.getPageSize() == 5));
     }
 
     @Test
     @DisplayName("수주 ID를 생략해도 기존 목록 조회와 페이지 조건을 유지한다")
     void getPageWithoutOrderId() throws Exception {
-        when(workOrderService.findAll(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+        when(workOrderService.findAll(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(1, 2), 0));
 
         mvc.perform(get("/api/v1/work-orders").param("page", "1").param("size", "2"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty());
-        verify(workOrderService).findAll(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
+        verify(workOrderService).findAll(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
                 argThat(pageable -> pageable.getPageNumber() == 1 && pageable.getPageSize() == 2));
     }
 
     @Test
     @DisplayName("없는 수주 ID는 404로 응답한다")
     void unknownOrderReturnsNotFound() throws Exception {
-        when(workOrderService.findAll(eq(Long.MAX_VALUE), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+        when(workOrderService.findAll(eq(Long.MAX_VALUE), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
                 .thenThrow(new NoSuchElementException("수주를 찾을 수 없습니다."));
 
         mvc.perform(get("/api/v1/work-orders").param("orderId", Long.toString(Long.MAX_VALUE)))

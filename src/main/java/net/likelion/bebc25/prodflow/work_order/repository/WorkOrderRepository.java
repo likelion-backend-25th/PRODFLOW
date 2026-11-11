@@ -63,7 +63,8 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     // 마감 날짜별 작업들로 그룹화하여 최신 등록순으로 정렬
     Page<WorkOrder> findAllByOrderByPlannedEndDateAscIdDesc(Pageable pageable);
 
-    // 목록 검색도 같은 컬럼만 조회한다. 조건이 없는 값은 거르지 않는다.
+    // 작업지시서 검색 및 페이징 조회
+    // 검색 조건 AND 적용, 미완료 작업 우선 정렬
     @Query(
             value = """
                     select new net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto$PageResponse(
@@ -85,8 +86,8 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
                     from WorkOrder workOrder
                     join workOrder.orderProduct orderProduct
                     join orderProduct.customerOrder customerOrder
-                    join customerOrder.client client
                     join workOrder.line line
+                    join customerOrder.client client
                     left join workOrder.user assignee
                     join workOrder.commonCode commonCode
                     where (:lineId is null or line.id = :lineId)
@@ -101,7 +102,14 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
                             or client.company like concat('%', :keyword, '%')
                             or assignee.name like concat('%', :keyword, '%')
                       )
-                    order by workOrder.plannedEndDate asc, workOrder.id desc
+                      and (:assigneeId is null or assignee.id = :assigneeId)
+                    order by
+                        case
+                            when commonCode.code = 'PACK_DONE' then 1
+                            else 0
+                        end asc,
+                        workOrder.plannedEndDate asc,
+                        workOrder.id desc
                     """,
             countQuery = """
                     select count(workOrder)
@@ -124,6 +132,7 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
                             or client.company like concat('%', :keyword, '%')
                             or assignee.name like concat('%', :keyword, '%')
                       )
+                      and (:assigneeId is null or assignee.id = :assigneeId)
                     """
     )
     Page<WorkOrderDto.PageResponse> searchPage(
@@ -133,13 +142,14 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to,
             @Param("keyword") String keyword,
+            @Param("assigneeId") Long assigneeId,
             Pageable pageable);
 
-    // 기존 목록 조회 호출은 수주 필터 없이 검색한다.
+    // 기존 목록 조회 호출은 수주·담당자 필터 없이 검색한다.
     default Page<WorkOrderDto.PageResponse> searchPage(
             Long lineId, String status, LocalDate from, LocalDate to,
             String keyword, Pageable pageable) {
-        return searchPage(null, lineId, status, from, to, keyword, pageable);
+        return searchPage(null, lineId, status, from, to, keyword, null, pageable);
     }
 
     // 라인 상세는 작업 엔티티가 필요하다. 목록 화면 조회와 분리한다.

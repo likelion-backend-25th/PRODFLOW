@@ -132,7 +132,19 @@ public class UserService {
     @Transactional
     public UserDto.Response softDeleteUser(Long id) {
 
-        return UserDto.Response.from(findUserByIdOrThrow(id));
+        // 삭제 대상 직원 조회
+        User user = findUserByIdOrThrow(id);
+
+        // 이미 삭제된 직원인지 확인
+        validateNotDeleted(user);
+
+        // 계정 상태를 DELETED로 변경하고 삭제 일시 기록
+        user.softDelete();
+
+        // 삭제된 계정의 Refresh Token 제거
+        refreshTokenRepository.deleteByUserId(id);
+
+        return UserDto.Response.from(user);
     }
 
     // 내 정보 조회
