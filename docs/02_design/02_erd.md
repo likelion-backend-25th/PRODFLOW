@@ -466,22 +466,22 @@ erDiagram
 
 ### 2.3 user (직원 테이블)
 
-| 컬럼명                  | 데이터 타입       | 제약 조건                     | 설명                                                                                                      |
-|----------------------|--------------|---------------------------|---------------------------------------------------------------------------------------------------------|
-| id                   | BIGINT       | PK, AUTO_INCREMENT        | 사용자 고유 ID                                                                                               |
-| password             | VARCHAR(255) | NOT NULL                  | BCrypt 암호화 비밀번호                                                                                         |
-| name                 | VARCHAR(255) | NOT NULL                  | 사용자 이름                                                                                                  |
-| email                | VARCHAR(255) | NOT NULL, UNIQUE          | 사용자 이메일                                                                                                 |
-| phone                | VARCHAR(255) | NOT NULL                  | 사용자 연락처                                                                                                 |
-| role                 | VARCHAR(255) | NOT NULL                  | 사용자 권한. SUPER_ADMIN(최고관리자), ORDER_MANAGER(수주관리자), PRODUCTION_MANAGER(생산현장관리자), INQUIRY_MANAGER(업무조회담당자) |
-| status               | VARCHAR(255) | NOT NULL, Java 기본값 ACTIVE | 계정 상태. ACTIVE(활성), INACTIVE(비활성), DELETED(삭제)                                                           |
-| last_login_at        | DATETIME     | NULL                      | 마지막 로그인 일시                                                                                              |
-| created_at           | DATETIME     | NOT NULL, 수정 불가           | 계정 생성 일시                                                                                                |
-| updated_at           | DATETIME     | NOT NULL                  | 계정 마지막 수정 일시                                                                                            |
-| created_by           | VARCHAR(255) | NULL, 수정 불가               | 계정 생성자. 인증된 사용자 이름 또는 SYSTEM                                                                            |
-| updated_by           | VARCHAR(255) | NULL                      | 계정 마지막 수정자. 인증된 사용자 이름 또는 SYSTEM                                                                        |
-| deleted_at           | DATETIME     | NULL                      | 계정 소프트 삭제 일시                                                                                            |
-| must_change_password | BOOLEAN      | NOT NULL, Java 기본값 TRUE   | 최초 로그인 후 비밀번호 변경 필요 여부. TRUE(변경 필요), FALSE(변경 불필요)                                                      |
+| 컬럼명                  | 데이터 타입       | 제약 조건                      | 설명                                                                                                      |
+|----------------------|--------------|----------------------------|---------------------------------------------------------------------------------------------------------|
+| id                   | BIGINT       | PK, AUTO_INCREMENT         | 사용자 고유 식별자                                                                                              |
+| password             | VARCHAR(255) | NOT NULL                   | BCrypt 암호화 비밀번호                                                                                         |
+| name                 | VARCHAR(255) | NOT NULL                   | 사용자 이름                                                                                                  |
+| email                | VARCHAR(255) | NOT NULL, UNIQUE           | 사용자 이메일                                                                                                 |
+| phone                | VARCHAR(255) | NOT NULL                   | 사용자 연락처                                                                                                 |
+| role                 | VARCHAR(255) | NOT NULL                   | 사용자 권한. SUPER_ADMIN(최고관리자), ORDER_MANAGER(수주관리자), PRODUCTION_MANAGER(생산현장관리자), INQUIRY_MANAGER(업무조회담당자) |
+| status               | VARCHAR(255) | NOT NULL, DEFAULT (ACTIVE) | 계정 상태. ACTIVE(활성, 로그인 및 업무 수행 가능), INACTIVE(비활성, 로그인 및 업무 배정 제한), DELETED(삭제, 계정관리 목록에서 제외)             |
+| last_login_at        | DATETIME     | NULL                       | 마지막 로그인 일시                                                                                              |
+| created_at           | DATETIME     | NOT NULL                   | 계정 생성 일시                                                                                                |
+| updated_at           | DATETIME     | NOT NULL                   | 계정 정보 마지막 수정 일시                                                                                         |
+| created_by           | VARCHAR(255) | NULL                       | 계정을 생성한 사용자 이름. 인증 정보가 없으면 SYSTEM                                                                       |
+| updated_by           | VARCHAR(255) | NULL                       | 계정 정보를 마지막으로 수정한 사용자 이름. 인증 정보가 없으면 SYSTEM                                                              |
+| deleted_at           | DATETIME     | NULL                       | 계정 소프트 삭제 일시. 삭제되지 않은 계정은 NULL                                                                          |
+| must_change_password | BOOLEAN      | NOT NULL, DEFAULT (TRUE)   | 최초 비밀번호 변경 필요 여부. TRUE(비밀번호 변경 필요), FALSE(비밀번호 변경 완료 또는 불필요)                                            |
 
 - 계정은 소프트 삭제하며 DELETED 행과 과거 참조를 유지한다.
 
@@ -754,21 +754,21 @@ erDiagram
 
 ### 2.16 payment (결제)
 
-| 컬럼명                | 데이터 타입       | 제약 조건                      | 설명                                                                                                                                                                                                                                                                                                                    |
-|--------------------|--------------|----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| id                 | BIGINT       | PK, AUTO_INCREMENT         | 결제 고유 ID                                                                                                                                                                                                                                                                                                              |
-| order_id           | BIGINT       | FK, NOT NULL, 복합 UNIQUE 구성 | 해당 결제가 속한 수주 ID (customer_order.id)                                                                                                                                                                                                                                                                                   |
-| payment_method     | VARCHAR(255) | NOT NULL, Java 기본값 VA      | 결제 방식. VA(가상계좌 자동 입금), MD(수동 입금 처리)                                                                                                                                                                                                                                                                                   |
-| portone_payment_id | VARCHAR(255) | NOT NULL                   | ProdFlow에서 생성하는 PortOne 연동용 결제 식별자                                                                                                                                                                                                                                                                                    |
-| payment_type       | VARCHAR(255) | NOT NULL, 복합 UNIQUE 구성     | 결제 구분. DEPOSIT(계약금), BALANCE(잔금)                                                                                                                                                                                                                                                                                      |
-| amount             | BIGINT       | NOT NULL                   | 해당 결제 건에서 납부받아야 하는 금액                                                                                                                                                                                                                                                                                                 |
-| status             | VARCHAR(255) | NOT NULL, Java 기본값 READY   | 결제 진행 상태. READY(결제 준비), WAITING(결제 입금 대기), PAID(입금 완료), FAILED(결제 실패), CANCELLED(결제 취소), REQUESTED(발급 요청 중), ISSUE_UNCERTAIN(발급 확인 필요), REISSUE_CLOSING(재발급 이전 계좌 말소 확인 중), ORDER_CANCEL_CLOSING(수주 취소에 따른 가상계좌 말소 확인 중), PENDING(처리 대기), PAY_PENDING(승인 대기), VIRTUAL_ACCOUNT_ISSUED(입금 대기), PARTIAL_CANCELLED(부분 취소) |
-| reissue_due_at     | DATETIME     | NULL                       | 가상계좌 재발급 요청 시 새로 설정한 입금기한                                                                                                                                                                                                                                                                                             |
-| reissue_closed_at  | DATETIME     | NULL                       | 이전 가상계좌의 말소가 확인된 일시                                                                                                                                                                                                                                                                                                   |
-| created_at         | DATETIME     | NOT NULL, 수정 불가            | 결제 건 생성 일시                                                                                                                                                                                                                                                                                                            |
-| updated_at         | DATETIME     | NOT NULL                   | 결제 건 마지막 수정 일시                                                                                                                                                                                                                                                                                                        |
-| created_by         | VARCHAR(255) | NULL, 수정 불가                | 결제 생성자. 인증된 사용자 이름 또는 SYSTEM                                                                                                                                                                                                                                                                                          |
-| updated_by         | VARCHAR(255) | NULL                       | 결제 수정자. 인증된 사용자 이름 또는 SYSTEM                                                                                                                                                                                                                                                                                          |
+| 컬럼명                | 데이터 타입       | 제약 조건                            | 설명                                                                                                                                                                                                                                                                                                                              |
+|--------------------|--------------|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| id                 | BIGINT       | PK, AUTO_INCREMENT               | 결제 고유 식별자                                                                                                                                                                                                                                                                                                                       |
+| order_id           | BIGINT       | FK → customer_order.id, NOT NULL | 해당 결제가 속한 수주 ID (customer_order.id)                                                                                                                                                                                                                                                                                             |
+| payment_method     | VARCHAR(255) | NOT NULL, DEFAULT (VA)           | 결제 방식. VA(가상계좌 자동 입금), MD(수동 입금 처리)                                                                                                                                                                                                                                                                                             |
+| portone_payment_id | VARCHAR(255) | NOT NULL                         | ProdFlow에서 생성하는 PortOne 연동용 결제 고유 식별자                                                                                                                                                                                                                                                                                           |
+| payment_type       | VARCHAR(255) | NOT NULL                         | 결제 구분. DEPOSIT(계약금), BALANCE(잔금)                                                                                                                                                                                                                                                                                                |
+| amount             | BIGINT       | NOT NULL                         | 해당 결제 건에서 납부받아야 하는 금액                                                                                                                                                                                                                                                                                                           |
+| status             | VARCHAR(255) | NOT NULL, DEFAULT (READY)        | 결제 진행 상태. READY(결제 준비), WAITING(입금 대기), PAID(입금 완료), FAILED(결제 실패), CANCELLED(결제 취소), REQUESTED(발급 요청 중), ISSUE_UNCERTAIN(발급 확인 필요), REISSUE_CLOSING(재발급 이전 계좌 말소 확인 중), ORDER_CANCEL_CLOSING(수주 취소에 따른 가상계좌 말소 확인 중), PENDING(처리 대기), PAY_PENDING(승인 대기), VIRTUAL_ACCOUNT_ISSUED(가상계좌 발급 완료 및 입금 대기), PARTIAL_CANCELLED(부분 취소) |
+| reissue_due_at     | DATETIME     | NULL                             | 가상계좌 재발급 요청 시 새로 지정하는 입금기한                                                                                                                                                                                                                                                                                                      |
+| reissue_closed_at  | DATETIME     | NULL                             | 기존 가상계좌의 말소 완료가 확인된 일시                                                                                                                                                                                                                                                                                                          |
+| created_at         | DATETIME     | NOT NULL                         | 결제 건 생성 일시                                                                                                                                                                                                                                                                                                                      |
+| updated_at         | DATETIME     | NOT NULL                         | 결제 건 마지막 수정 일시                                                                                                                                                                                                                                                                                                                  |
+| created_by         | VARCHAR(255) | NULL                             | 결제 건을 생성한 사용자 이름. 인증 정보가 없으면 SYSTEM                                                                                                                                                                                                                                                                                             |
+| updated_by         | VARCHAR(255) | NULL                             | 결제 건을 마지막으로 수정한 사용자 이름. 인증 정보가 없으면 SYSTEM                                                                                                                                                                                                                                                                                       |
 
 - `UNIQUE(order_id, payment_type)`
 - 동일 수주의 결제 유형(DEPOSIT, BALANCE)당 최대 한 건이다.
@@ -776,20 +776,20 @@ erDiagram
 
 ### 2.17 virtual_account(가상계좌)
 
-| 컬럼명                | 데이터 타입       | 제약 조건                     | 설명                                      |
-|--------------------|--------------|---------------------------|-----------------------------------------|
-| id                 | BIGINT       | PK, AUTO_INCREMENT        | 가상계좌 고유 식별자                             |
-| payment_id         | BIGINT       | FK → payment.id, NOT NULL | 결제건 ID(Payment.id)                      |
-| bank               | VARCHAR(255) | NOT NULL                  | 은행 Enum 이름. 예: SHINHAN, KOOKMIN         |
-| account_number     | VARCHAR(255) | NOT NULL                  | 토스페이먼츠/은행에서 발급된 가상계좌 번호                 |
-| status             | VARCHAR(255) | NOT NULL                  | 계좌 상태. ACTIVE, EXPIRED, CANCELLED, USED |
-| account_name       | VARCHAR(255) | NULL                      | 가상계좌 예금주명                               |
-| expires_at         | DATETIME     | NOT NULL                  | 해당 가상계좌의 입금 가능 만료 일시                    |
-| portone_payment_id | VARCHAR(255) | NULL                      | 발급 당시 PortOne 결제 식별자                    |
-| created_at         | DATETIME     | NOT NULL                  | 생성 일시                                   |
-| updated_at         | DATETIME     | NOT NULL                  | 수정 일시                                   |
-| created_by         | VARCHAR(255) | NULL                      | 생성자                                     |
-| updated_by         | VARCHAR(255) | NULL                      | 수정자                                     |
+| 컬럼명                | 데이터 타입       | 제약 조건                       | 설명                                                                                                                                                                                                        |
+|--------------------|--------------|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| id                 | BIGINT       | PK, AUTO_INCREMENT          | 가상계좌 고유 식별자                                                                                                                                                                                               |
+| payment_id         | BIGINT       | FK → payment.id, NOT NULL   | 해당 가상계좌가 속한 결제 건 ID (payment.id)                                                                                                                                                                          |
+| bank               | VARCHAR(255) | NOT NULL                    | 가상계좌 발급 은행. KOOKMIN(KB국민은행), SHINHAN(신한은행), WOORI(우리은행), HANA(하나은행), NONGHYUP(NH농협은행), IBK(IBK기업은행), BUSAN(부산은행), KYONGNAM(경남은행), KWANGJU(광주은행), DAEGU(iM뱅크/대구은행), SUHYUP(Sh수협은행), KFCC(새마을금고), POST(우체국) |
+| portone_payment_id | VARCHAR(255) | NULL                        | 가상계좌 발급 당시 사용한 PortOne 결제 식별자. 재발급 이전 결제 ID 추적에 사용                                                                                                                                                        |
+| account_number     | VARCHAR(255) | NOT NULL                    | PG 및 은행에서 발급한 가상계좌 번호                                                                                                                                                                                     |
+| status             | VARCHAR(255) | NOT NULL,  DEFAULT (ACTIVE) | 가상계좌 상태. ACTIVE(입금 가능), EXPIRED(입금기한 만료), CANCELLED(계좌 말소 또는 취소), USED(입금 완료로 사용된 계좌)                                                                                                                     |
+| account_name       | VARCHAR(255) | NULL                        | 가상계좌 예금주명                                                                                                                                                                                                 |
+| expires_at         | DATETIME     | NOT NULL                    | 해당 가상계좌의 입금 가능 만료 일시                                                                                                                                                                                      |
+| created_at         | DATETIME     | NOT NULL                    | 가상계좌 발급 정보 생성 일시                                                                                                                                                                                          |
+| updated_at         | DATETIME     | NOT NULL                    | 가상계좌 정보 마지막 수정 일시                                                                                                                                                                                         |
+| created_by         | VARCHAR(255) | NULL                        | 가상계좌 정보를 생성한 사용자 이름. 인증 정보가 없으면 SYSTEM                                                                                                                                                                    |
+| updated_by         | VARCHAR(255) | NULL                        | 가상계좌 정보를 마지막으로 수정한 사용자 이름. 인증 정보가 없으면 SYSTEM                                                                                                                                                              |
 
 - 은행은 PG 숫자 코드가 아닌 Bank Enum 이름으로 저장한다.
 - 재발급 이전 계좌와 발급 당시 외부 결제 ID를 보존한다.
@@ -797,32 +797,32 @@ erDiagram
 
 ### 2.18 payment_history (입금내역)
 
-| 컬럼명                       | 데이터 타입       | 제약 조건                             | 설명                             |
-|---------------------------|--------------|-----------------------------------|--------------------------------|
-| id                        | BIGINT       | PK, AUTO_INCREMENT                | 입금 내역 ID                       |
-| payment_id                | BIGINT       | FK → payment.id, NOT NULL, UNIQUE | 결제건 ID(Payment.id)             |
-| virtual_account_id        | BIGINT       | FK → virtual_account.id, NULL     | 가상계좌 ID(VirtualAccount.id)     |
-| transaction_id            | VARCHAR(255) | NULL, UNIQUE                      | portone 에서 생성된 실제 결제 시도/거래 식별값 |
-| paid_at                   | DATETIME     | NOT NULL                          | 실제 입금 완료 일시                    |
-| created_at                | DATETIME     | NOT NULL                          | 입금내역 DB 저장 일시                  |
-| webhook_remote_updated_at | DATETIME     | NULL                              | PG 웹훅 상태의 원격 갱신 시각             |
-| last_webhook_type         | VARCHAR(255) | NULL                              | 마지막 반영 웹훅 유형                   |
+| 컬럼명                       | 데이터 타입       | 제약 조건                             | 설명                                                      |
+|---------------------------|--------------|-----------------------------------|---------------------------------------------------------|
+| id                        | BIGINT       | PK, AUTO_INCREMENT                | 입금 내역 고유 식별자                                            |
+| payment_id                | BIGINT       | FK → payment.id, NOT NULL, UNIQUE | 해당 입금 내역이 속한 결제 건 ID (payment.id)                       |
+| virtual_account_id        | BIGINT       | FK → virtual_account.id, NULL     | 입금에 사용된 가상계좌 ID (virtual_account.id). 수동 입금의 경우 NULL 가능 |
+| transaction_id            | VARCHAR(255) | NULL, UNIQUE                      | PortOne에서 생성한 실제 결제 시도 또는 거래 식별자                        |
+| paid_at                   | DATETIME     | NOT NULL                          | 실제 입금 완료 일시                                             |
+| created_at                | DATETIME     | NOT NULL                          | 입금 내역이 DB에 저장된 일시                                       |
+| webhook_remote_updated_at | DATETIME     | NULL                              | PortOne에서 전달한 결제 정보의 최종 갱신 일시                           |
+| last_webhook_type         | VARCHAR(255) | NULL                              | 마지막으로 기록한 PortOne 웹훅 이벤트 유형                             |
 
 - 결제당 입금 이력은 최대 한 건이다. 외부 거래 식별자는 NULL 허용·UNIQUE이다.
 
 ### 2.19 payment_notification_request (결제 발송 이력)
 
-| 컬럼명        | 데이터 타입       | 제약 조건                            | 설명                                                 |
-|------------|--------------|----------------------------------|----------------------------------------------------|
-| id         | VARCHAR(36)  | PK                               | 클라이언트가 생성한 요청 UUID. 동일 요청 재전송 방지                   |
-| order_id   | BIGINT       | FK → customer_order.id, NOT NULL | 대상 수주                                              |
-| user_id    | BIGINT       | FK → user.id, NOT NULL           | 요청 직원                                              |
-| status     | VARCHAR(20)  | NOT NULL                         | PROCESSING, SENDING, SENT, FAILED, ISSUE_UNCERTAIN |
-| message    | VARCHAR(500) | NOT NULL                         | 사용자에게 표시할 처리 결과                                    |
-| created_at | DATETIME     | NOT NULL                         | 생성 일시                                              |
-| updated_at | DATETIME     | NOT NULL                         | 수정 일시                                              |
-| created_by | VARCHAR(255) | NULL                             | 생성자                                                |
-| updated_by | VARCHAR(255) | NULL                             | 수정자                                                |
+| 컬럼명        | 데이터 타입       | 제약 조건                                        | 설명                                                                                                                                  |
+|------------|--------------|----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| id         | VARCHAR(36)  | PK, NOT NULL                                 | 결제 안내 발송 요청 고유 식별자. UUID 형식 문자열                                                                                                     |
+| order_id   | BIGINT       | FK → customer_order.id, NOT NULL             | 결제 안내 대상 수주 ID (customer_order.id)                                                                                                  |
+| user_id    | BIGINT       | FK → user.id, NOT NULL                       | 결제 안내 발송을 요청한 사용자 ID (user.id)                                                                                                      |
+| status     | VARCHAR(20)  | NOT NULL, DEFAULT(PROCESSING)                | 결제 안내 발송 상태. PROCESSING(가상계좌 및 결제 안내 준비 중), SENDING(이메일 발송 진행 중), SENT(이메일 발송 완료), FAILED(발송 실패), ISSUE_UNCERTAIN(가상계좌 발급 결과 확인 필요) |
+| message    | VARCHAR(500) | NOT NULL,DEFAULT (`가상계좌와 결제 안내를 준비하고 있습니다.`) | 결제 안내 처리 상태 또는 발송 결과 메시지                                                                                                            |
+| created_at | DATETIME     | NOT NULL                                     | 결제 안내 발송 요청 생성 일시                                                                                                                   |
+| updated_at | DATETIME     | NOT NULL                                     | 결제 안내 요청 상태 마지막 수정 일시                                                                                                               |
+| created_by | VARCHAR(255) | NULL                                         | 발송 요청을 생성한 사용자 이름. 인증 정보가 없으면 SYSTEM                                                                                                |
+| updated_by | VARCHAR(255) | NULL                                         | 발송 요청 정보를 마지막으로 수정한 사용자 이름. 인증 정보가 없으면 SYSTEM                                                                                       |
 
 - 동일 UUID는 동일 발송 요청을 식별한다. 확정된 발송 결과 이력은 client_noti_log에 별도 저장한다.
 - 인덱스: idx_payment_notification_order_updated(order_id, updated_at).
@@ -853,25 +853,6 @@ erDiagram
 - `UNIQUE(carrier_code, tracking_number)`
 - 수주당 운송장은 최대 한 건이다.
 - order_id는 논리적 수주 참조이며 현재 엔티티는 단순 ID로 저장한다.
-
-| 컬럼명               | 데이터 타입       | 제약 조건                                                           | 설명                                                        |
-|-------------------|--------------|-----------------------------------------------------------------|-----------------------------------------------------------|
-| id                | BIGINT       | PK, AUTO_INCREMENT                                              | 운송장 고유 식별자                                                |
-| customer_order_id | BIGINT       | UK, FK → customer_order.id, NOT NULL                            | 어느 수주의 택배인지                                               |
-| carrier_code      | VARCHAR(255) | FK→ carrier.code, NOT NULL                                      | 택배사 코드 ex)04                                              |
-| tracking_number   | VARCHAR(255) | NOT NULL                                                        | 운송장 번호                                                    |
-| level             | INT          |                                                                 | 현재 진행단계 0 기록 없음 1 배송준비중 2 집화완료 3 배송중 4 지점도착 5 배송출발 6 배송완료 |
-| result            | VARCHAR(1)   |                                                                 | 조회결과. Y 또는 N                                              |
-| complete          | TINYINT      |                                                                 | 배송완료 여부                                                   |
-| estimate          | VARCHAR(255) |                                                                 | 배송예정시간                                                    |
-| started_at        | DATETIME     |                                                                 | 배송이 시작된 시각                                                |
-| delivered_at      | DATETIME     |                                                                 | 배송이 완료된 시각                                                |
-| created_at        | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP                             | 생성 일시                                                     |
-| updated_at        | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 수정 일시                                                     |
-| created_by        | VARCHAR(255) | NOT NULL                                                        | 생성한 사용자                                                   |
-| updated_by        | VARCHAR(255) | -                                                               | 수정한 사용자                                                   |
-
-- `UNIQUE(carrier_code, tracking_number)`
 
 ### 2.22 line(라인 테이블)
 
