@@ -135,6 +135,22 @@ class WorkOrderServiceTest {
     }
 
     @Test
+    @DisplayName("담당자 조건은 페이지를 자르기 전에 적용한다")
+    void listByAssigneeBeforePaging() {
+        Page<PageResponse> first = workOrderService.findAll(
+                null, null, null, null, null, null, 5L, PageRequest.of(0, 5));
+        Page<PageResponse> second = workOrderService.findAll(
+                null, null, null, null, null, null, 5L, PageRequest.of(1, 5));
+
+        assertThat(first.getTotalElements()).isEqualTo(6);
+        assertThat(first.getTotalPages()).isEqualTo(2);
+        assertThat(first.getContent()).hasSize(5);
+        assertThat(first.getContent()).allSatisfy(row -> assertThat(row.assignedName()).isEqualTo("이재원"));
+        assertThat(second.getContent()).hasSize(1);
+        assertThat(second.getContent().getFirst().assignedName()).isEqualTo("이재원");
+    }
+
+    @Test
     @DisplayName("없는 수주 ID는 조회 실패한다")
     void rejectUnknownOrderId() {
         assertThatThrownBy(() -> workOrderService.findAll(Long.MAX_VALUE, null, null, null, null, null, PageRequest.of(0, 5)))

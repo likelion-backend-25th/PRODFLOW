@@ -78,8 +78,9 @@ class AiQueryServiceTest {
         var schemas = aiMcpToolService.getDatabaseSchema();
 
         assertThat(schemas).extracting(schema -> schema.tableName().toLowerCase(Locale.ROOT))
-                .contains("work_order", "production_plan", "line", "status_history", "work_order_history")
-                .doesNotContain("user", "customer_order");
+                .contains("work_order", "production_plan", "line", "status_history", "work_order_history",
+                        "user", "customer_order")
+                .doesNotContain("ai_conversation", "ai_message", "refresh_token");
         assertThat(schemas)
                 .filteredOn(schema -> schema.tableName().equalsIgnoreCase("status_history"))
                 .singleElement()
@@ -119,10 +120,13 @@ class AiQueryServiceTest {
                 "SELECT work_no FROM work_order UNION SELECT work_no FROM work_order"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("단일 SELECT 쿼리만 실행할 수 있습니다.");
-        assertThatThrownBy(() -> aiQueryService.executeReadOnly("SELECT id FROM user"))
+        assertThatThrownBy(() -> aiQueryService.executeReadOnly("SELECT id FROM ai_conversation"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("조회가 허용되지 않은 테이블이 포함되어 있습니다.");
-        assertThatThrownBy(() -> aiQueryService.executeReadOnly("SELECT id FROM customer_order"))
+        assertThatThrownBy(() -> aiQueryService.executeReadOnly("SELECT id FROM ai_message"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("조회가 허용되지 않은 테이블이 포함되어 있습니다.");
+        assertThatThrownBy(() -> aiQueryService.executeReadOnly("SELECT id FROM refresh_token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("조회가 허용되지 않은 테이블이 포함되어 있습니다.");
         assertThatThrownBy(() -> aiQueryService.executeReadOnly(
