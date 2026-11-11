@@ -199,7 +199,7 @@ public class PaymentService {
         }
 
         // 이미 발급된 활성 가상계좌가 있다면 현금 입금과 중복될 위험이 있으므로
-        // PG 말소를 확인하기 전에는 수동입금을 허용하지 않는다.
+        // PG 말소를 확인하기 전에는 수동입금을 허용하지 않음
         if (payment != null) {
             virtualAccountRepository.findFirstByPayment_IdOrderByIdDesc(payment.getId())
                     .filter(account -> account.isActive() && !account.isExpired())
@@ -348,9 +348,8 @@ public class PaymentService {
         );
     }
 
-    /**
-     * 계좌 재발급 이전 이력도 최신순으로 조회한다. 외부 API 호출은 하지 않는다.
-     */
+
+    //계좌 재발급 이전 이력도 최신순으로 조회한다. 외부 API 호출은 하지 않음
     public List<VirtualAccountDto.Response> getVirtualAccountHistory(Long paymentId) {
         if (!paymentRepository.existsById(paymentId)) {
             throw new NoSuchElementException("결제를 찾을 수 없습니다.");
@@ -359,10 +358,9 @@ public class PaymentService {
                 .stream().map(VirtualAccountDto.Response::from).toList();
     }
 
-    /**
-     * 수주 등록/출고 등록 트랜잭션 안에서 호출한다.
-     * Payment만 먼저 저장하며, 외부 POST는 커밋된 뒤 시도한다.
-     */
+
+    //수주 등록/출고 등록 트랜잭션 안에서 호출
+    //Payment만 먼저 저장하며, 외부 POST는 커밋된 뒤 시도
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void prepareAndScheduleIssue(CustomerOrder order, PaymentType type) {
         if (type == PaymentType.BALANCE) {
@@ -371,6 +369,12 @@ public class PaymentService {
             if (deposit.getStatus() != PaymentStatus.PAID) {
                 throw new IllegalStateException("계약금 입금 완료 후 잔금 결제를 생성할 수 있습니다.");
             }
+        }
+        if ("CANCELLED".equals(order.getStatusCode().getCode())
+                || paymentRepository.findByOrder_IdOrderByIdAsc(order.getId()).stream()
+                .anyMatch(p -> p.getStatus() == PaymentStatus.ORDER_CANCEL_CLOSING)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "취소되었거나 취소 진행 중인 수주는 가상계좌를 발급할 수 없습니다.");
         }
         Payment existing = paymentRepository.findByOrder_IdAndPaymentType(order.getId(), type).orElse(null);
         if (existing != null) {
@@ -400,11 +404,127 @@ public class PaymentService {
         });
     }
 
-    /**
-     * 가상계좌 재발급: 기존 계좌의 말소가 PG에서 확인된 뒤에만 새 ID로 발급한다.
-     * 네트워크 불확실 시 새 계좌를 발급하지 않으며, 재요청은 GET 조회만 수행한다.
-     * 외부 API 호출 중 DB 트랜잭션/락을 유지하지 않는다.
-     */
+
+    // 기존 수주 취소 기능을 사용하는 곳이 있을 수 있으므로 유지
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    public void cancelUnpaidOrder(Long orderId, Long actorId) {
+        closeUnpaidOrderPayments(orderId, actorId);
+        paymentStore.finishUnpaidOrderCancellation(orderId, actorId);
+    }
+
+    // 결제·가상계좌만 말소한다.
+    // 수주·견적·상태 이력은 CustomerOrderCancelService에서 처리한다.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
+    public void closeUnpaidOrderPayments(Long orderId, Long actorId) {
+        User actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new AuthenticationCredentialsNotFoundException(
+                        "취소 처리자를 찾을 수 없습니다."));
+
+        if (actor.getStatus() != UserStatus.ACTIVE
+                || actor.isMustChangePassword()
+                || (actor.getRole() != UserRole.SUPER_ADMIN
+                && actor.getRole() != UserRole.ORDER_MANAGER)) {
+            throw new AccessDeniedException("수주 취소 권한이 없습니다.");
+        }
+
+        List<PaymentStore.OrderCancelTarget> targets =
+                paymentStore.beginUnpaidOrderCancellation(orderId);
+
+        for (PaymentStore.OrderCancelTarget target : targets) {
+            String oldId = target.portonePaymentId();
+            PortOneDto.PaymentSnapshot snapshot;
+
+            try {
+                snapshot = portOneClient.getPayment(oldId);
+
+                Payment stored = paymentRepository.findById(target.paymentId())
+                        .orElseThrow(() -> new NoSuchElementException(
+                                "결제를 찾을 수 없습니다."));
+
+                validate(stored, snapshot);
+            } catch (Exception ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "PortOne 상태를 확인하지 못해 수주 취소를 확정하지 않았습니다. PG 상태를 확인하세요.",
+                        ex
+                );
+            }
+
+            // 이미 입금된 결제는 환불 절차가 필요하다.
+            if (snapshot.paidAt() != null
+                    || "PAID".equals(snapshot.status())
+                    || "PARTIAL_CANCELLED".equals(snapshot.status())) {
+
+                if ("PAID".equals(snapshot.status())) {
+                    paymentStore.applyWebhook(
+                            target.paymentId(),
+                            snapshot,
+                            "OrderCancelCheck"
+                    );
+                }
+
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "이미 입금된 결제입니다. 환불 절차 없이 수주를 자동 취소할 수 없습니다."
+                );
+            }
+
+            // PG에서 이미 종료된 결제
+            if ("CANCELLED".equals(snapshot.status())
+                    || "FAILED".equals(snapshot.status())) {
+
+                paymentStore.confirmOrderPaymentClosed(
+                        orderId,
+                        target.paymentId(),
+                        oldId
+                );
+                continue;
+            }
+
+            // 최초 말소 요청일 때만 PortOne 말소 API 호출
+            if ("VIRTUAL_ACCOUNT_ISSUED".equals(snapshot.status())
+                    && target.newlyClaimed()) {
+
+                PortOneDto.CloseVirtualAccountResponse closed;
+
+                try {
+                    closed = portOneClient.closeVirtualAccount(oldId);
+                } catch (Exception ex) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "계좌 말소 결과가 불확실합니다. 수주는 아직 취소되지 않았고 중복 말소는 시도하지 않습니다.",
+                            ex
+                    );
+                }
+
+                if (closed == null || closed.closedAt() == null) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "PortOne 말소 완료 시간이 없어 수주 취소를 확정하지 않았습니다."
+                    );
+                }
+
+                paymentStore.confirmOrderPaymentClosed(
+                        orderId,
+                        target.paymentId(),
+                        oldId
+                );
+                continue;
+            }
+
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "PortOne 가상계좌 말소를 확인하지 못했습니다. 수동 확인 후 재시도하세요."
+            );
+        }
+    }
+
+
+    // 가상계좌 재발급: 기존 계좌의 말소가 PG에서 확인된 뒤에만 새 ID로 발급
+    // 네트워크 불확실 시 새 계좌를 발급하지 않으며, 재요청은 GET 조회만 수행
+    // 외부 API 호출 중 DB 트랜잭션/락을 유지하지 않음
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
     public PaymentDto.IssueResponse reissueVirtualAccount(Long paymentId) {
@@ -465,13 +585,18 @@ public class PaymentService {
         return paymentStore.getIssueResponse(paymentId);
     }
 
-    /**
-     * 외부 POST는 별도 DB 트랜잭션에서 발급 의도를 커밋한 뒤 실행한다.
-     */
+
+    // 외부 POST는 별도 DB 트랜잭션에서 발급 의도를 커밋한 뒤 실행한다.
+
     public void issuePayment(Long paymentId) {
         boolean firstAttempt = paymentStore.claimIssue(paymentId);
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new NoSuchElementException("결제 정보를 찾을 수 없습니다."));
+        if (payment.getStatus() == PaymentStatus.ORDER_CANCEL_CLOSING
+                || payment.getStatus() == PaymentStatus.CANCELLED
+                || ("CANCELLED".equals(payment.getOrder().getStatusCode().getCode()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "취소 중이거나 취소된 수주에는 계좌를 발급할 수 없습니다.");
+        }
         if (payment.getStatus() == PaymentStatus.PAID || payment.getStatus() == PaymentStatus.WAITING) {
             return;
         }
@@ -523,9 +648,9 @@ public class PaymentService {
         );
     }
 
-    /**
-     * 운영자 재동기화 또는 웹훅에서 사용한다. 절대 새로운 발급 POST를 보내지 않는다.
-     */
+
+    // 운영자 재동기화 또는 웹훅에서 사용한다. 절대 새로운 발급 POST를 보내지 않음
+
     public PaymentDto.IssueResponse synchronizePayment(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new NoSuchElementException("결제를 찾을 수 없습니다."));
@@ -538,9 +663,9 @@ public class PaymentService {
         return paymentStore.getIssueResponse(paymentId);
     }
 
-    /**
-     * 웹훅 본문은 알림으로만 취급하고, 서버 API 재조회 결과만 DB에 반영한다.
-     */
+
+    // 웹훅 본문은 알림으로만 취급하고, 서버 API 재조회 결과만 DB에 반영
+
     public void handleWebhook(PortOneDto.Webhook webhook) {
         if (webhook == null || webhook.data() == null || webhook.data().paymentId() == null) {
             return;
