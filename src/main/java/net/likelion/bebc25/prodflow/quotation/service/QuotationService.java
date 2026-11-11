@@ -236,7 +236,9 @@ public class QuotationService {
             long balanceAmount = totalAmount - depositAmount;
 
             // 견적 정보, 품목 목록, 계산한 금액을 상세 응답 DTO로 변환
-            return QuotationDto.DetailResponse.from(quotation, items, null,
+            CustomerOrder customerOrder = customerOrderRepository.findByQuotationId(quotation.getId())
+                    .orElse(null);
+            return QuotationDto.DetailResponse.from(quotation, items, customerOrder,
                     supplyAmount, vatAmount, totalAmount, depositAmount, balanceAmount);
 
         } catch (ArithmeticException ex) {
