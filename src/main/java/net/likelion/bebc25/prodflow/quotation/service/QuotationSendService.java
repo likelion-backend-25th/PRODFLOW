@@ -67,7 +67,7 @@ public class QuotationSendService {
         String failure = null;
         try {
             mailService.sendAttachment(context.recipient(),
-                    "[PRODFLOW] " + context.clientCompany() + " 견적서 안내 (" + context.quotationNo() + ")",
+                    "[PRODFLOW] 견적서 송부드립니다 — " + context.quotationNo(),
                     createMailBody(context),
                     context.quotationNo() + ".pdf", context.pdf());
         } catch (RuntimeException ex) {
@@ -134,21 +134,20 @@ public class QuotationSendService {
                 안녕하세요, %s 담당자님.
                 PRODFLOW입니다.
 
-                요청하신 내용에 대한 견적서를 첨부하여 보내드립니다.
+                요청하신 제품의 견적서를 첨부하여 보내드립니다.
+                아래 내용과 첨부파일을 확인 부탁드립니다.
 
-                ■ 견적 안내
+                ■ 견적 정보
                 · 견적번호: %s
                 · 견적금액: %s원 (VAT 포함)
                 · 예상 납기일: %s
-                · 견적 유효기간: %s까지
+                · 견적 유효기한: %s까지
 
-                품목별 수량과 단가 등 상세 내용은 첨부된 PDF를 확인해 주세요.
-                내용 변경이나 추가 문의가 있으시면 본 메일로 회신 부탁드립니다.
+                품목별 수량과 단가는 첨부된 견적서를 참고해 주시기 바랍니다.
+                예상 납기는 수주 등록 시 생산 상황에 따라 조정될 수 있습니다.
 
-                예상 납기는 견적 시점의 생산 상황을 기준으로 산정되었으며,
-                실제 수주 등록 시 생산 일정에 따라 조정될 수 있습니다.
+                견적 내용의 변경이나 문의 사항은 본 메일로 회신 부탁드립니다.
 
-                검토 부탁드립니다.
                 감사합니다.
 
                 PRODFLOW 드림

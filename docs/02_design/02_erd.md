@@ -330,6 +330,7 @@ erDiagram
       varchar id PK
       bigint order_id FK
       bigint user_id FK
+      varchar kind
       varchar status
       varchar message
       datetime created_at
@@ -812,19 +813,20 @@ erDiagram
 
 ### 2.19 payment_notification_request (결제 발송 이력)
 
-| 컬럼명        | 데이터 타입       | 제약 조건                                        | 설명                                                                                                                                  |
-|------------|--------------|----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| id         | VARCHAR(36)  | PK, NOT NULL                                 | 결제 안내 발송 요청 고유 식별자. UUID 형식 문자열                                                                                                     |
-| order_id   | BIGINT       | FK → customer_order.id, NOT NULL             | 결제 안내 대상 수주 ID (customer_order.id)                                                                                                  |
-| user_id    | BIGINT       | FK → user.id, NOT NULL                       | 결제 안내 발송을 요청한 사용자 ID (user.id)                                                                                                      |
-| status     | VARCHAR(20)  | NOT NULL, DEFAULT(PROCESSING)                | 결제 안내 발송 상태. PROCESSING(가상계좌 및 결제 안내 준비 중), SENDING(이메일 발송 진행 중), SENT(이메일 발송 완료), FAILED(발송 실패), ISSUE_UNCERTAIN(가상계좌 발급 결과 확인 필요) |
-| message    | VARCHAR(500) | NOT NULL,DEFAULT (`가상계좌와 결제 안내를 준비하고 있습니다.`) | 결제 안내 처리 상태 또는 발송 결과 메시지                                                                                                            |
-| created_at | DATETIME     | NOT NULL                                     | 결제 안내 발송 요청 생성 일시                                                                                                                   |
-| updated_at | DATETIME     | NOT NULL                                     | 결제 안내 요청 상태 마지막 수정 일시                                                                                                               |
-| created_by | VARCHAR(255) | NULL                                         | 발송 요청을 생성한 사용자 이름. 인증 정보가 없으면 SYSTEM                                                                                                |
-| updated_by | VARCHAR(255) | NULL                                         | 발송 요청 정보를 마지막으로 수정한 사용자 이름. 인증 정보가 없으면 SYSTEM                                                                                       |
+| 컬럼명        | 데이터 타입       | 제약 조건                            | 설명                                                                            |
+|------------|--------------|----------------------------------|-------------------------------------------------------------------------------|
+| id         | VARCHAR(36)  | PK                               | 발송 요청 UUID. 계약금은 클라이언트, 출고는 서버에서 생성                                           |
+| order_id   | BIGINT       | FK → customer_order.id, NOT NULL | 대상 수주                                                                         |
+| user_id    | BIGINT       | FK → user.id, NOT NULL           | 요청 직원                                                                         |
+| kind       | VARCHAR(20)  | NOT NULL, DEFAULT DEPOSIT        | 요청 종류. DEPOSIT(계약금), SHIPMENT(출고)                                             |
+| status     | VARCHAR(20)  | NOT NULL                         | PROCESSING, SENDING, SENT, FAILED, ISSUE_UNCERTAIN, MAIL_SENT, SEND_UNCERTAIN |
+| message    | VARCHAR(500) | NOT NULL                         | 사용자에게 표시할 처리 결과                                                               |
+| created_at | DATETIME     | NOT NULL                         | 생성 일시                                                                         |
+| updated_at | DATETIME     | NOT NULL                         | 수정 일시                                                                         |
+| created_by | VARCHAR(255) | NULL                             | 생성자                                                                           |
+| updated_by | VARCHAR(255) | NULL                             | 수정자                                                                           |
 
-- 동일 UUID는 동일 발송 요청을 식별한다. 확정된 발송 결과 이력은 client_noti_log에 별도 저장한다.
+- 동일 UUID는 동일 발송 요청을 식별한다. 계약금·출고 요청은 kind로 구분한다. 확정된 발송 결과 이력은 client_noti_log에 별도 저장한다.
 - 인덱스: idx_payment_notification_order_updated(order_id, updated_at).
 
 ### 2.20 carrier(택배사)
@@ -847,11 +849,11 @@ erDiagram
 | result          | VARCHAR(1)   | NULL                        | 조회결과. Y 또는 N                                              |
 | complete        | BOOLEAN      | NULL                        | 배송 완료 여부                                                  |
 | estimate        | VARCHAR(255) | NULL                        | 배송예정시간                                                    |
-| started_at      | DATETIME     | NULL                        | 배송이 시작된 시각                                                |
+| started_at      | DATETIME     | NULL                        | 출고 확정 시각. 계좌·메일 준비 중에는 NULL                               |
 | delivered_at    | DATETIME     | NULL                        | 배송이 완료된 시각                                                |
 
 - `UNIQUE(carrier_code, tracking_number)`
-- 수주당 운송장은 최대 한 건이다.
+- 수주당 운송장은 최대 한 건이다. started_at이 NULL이면 출고 준비 중이며 배송조회 대상에서 제외한다.
 - order_id는 논리적 수주 참조이며 현재 엔티티는 단순 ID로 저장한다.
 
 ### 2.22 line(라인 테이블)

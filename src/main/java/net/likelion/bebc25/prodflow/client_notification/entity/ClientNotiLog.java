@@ -79,6 +79,15 @@ public class ClientNotiLog {
         return log;
     }
 
+    // 배송 시작 및 잔금 안내는 계약금 안내와 발송 이력을 구분한다.
+    public static ClientNotiLog shipping(
+            CustomerOrder order, User sender, String recipient, ClientNotiStatus status, String errorMessage
+    ) {
+        ClientNotiLog log = deposit(order, sender, recipient, status, errorMessage);
+        log.kind = "SHIPPING";
+        return log;
+    }
+
     // 견적 이메일 발송 결과 생성
     public static ClientNotiLog quotation(
             Quotation quotation, User sender, String recipient, ClientNotiStatus status, String errorMessage

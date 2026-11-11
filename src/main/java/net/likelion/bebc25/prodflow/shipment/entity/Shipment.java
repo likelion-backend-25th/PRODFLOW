@@ -76,6 +76,17 @@ public class Shipment {
         return shipment;
     }
 
+    // 계좌·메일 준비 중에는 운송장만 보존하고 배송 시작 시각은 기록하지 않는다.
+    public static Shipment prepare(Long orderId, Carrier carrier, String trackingNumber) {
+        return start(orderId, carrier, trackingNumber, null);
+    }
+
+    public void confirmDispatch(LocalDateTime startedAt) {
+        if (this.startedAt == null) {
+            this.startedAt = startedAt;
+        }
+    }
+
     public void applyTracking(
             Integer level,
             String result,
