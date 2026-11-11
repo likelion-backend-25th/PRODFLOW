@@ -10,8 +10,7 @@ import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductRepository;
-import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
-import net.likelion.bebc25.prodflow.payment.service.PaymentService;
+import net.likelion.bebc25.prodflow.shipment.service.ShipmentDispatchService;
 import net.likelion.bebc25.prodflow.shipment.dto.ShipmentDto;
 import net.likelion.bebc25.prodflow.shipment.dto.ShipmentDto.CreateRequest;
 import net.likelion.bebc25.prodflow.shipment.dto.ShipmentDto.OrderResponse;
@@ -73,12 +72,11 @@ class ShipmentServiceTest {
     @Mock
     UserRepository userRepository;
 
-    // 추가: 잔금 결제 생성 요청을 Mock으로 처리
-    @Mock
-    PaymentService paymentService;
-
     @Mock
     WorkOrderRepository workOrderRepository;
+
+    @Mock
+    ShipmentDispatchService shipmentDispatchService;
 
     @InjectMocks
     ShipmentService shipmentService;
@@ -88,6 +86,15 @@ class ShipmentServiceTest {
         User user = mock(User.class);
         when(user.getName()).thenReturn("서도윤");
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+    }
+
+    @Test
+    @DisplayName("기존 출고 API 진입점에서 단계별 출고 서비스의 결과를 반환한다")
+    void delegatesDispatch() {
+        CreateRequest request = new CreateRequest(3L, "04", "530099990001");
+        Response expected = new Response(10L, 3L, "PF-3", "SHIPPING", "04", "택배", "530099990001", LocalDateTime.now());
+        when(shipmentDispatchService.dispatch(request, 1L)).thenReturn(expected);
+        assertThat(shipmentService.register(request, 1L)).isEqualTo(expected);
     }
 
     @Test
@@ -133,54 +140,7 @@ class ShipmentServiceTest {
         ));
     }
 
-    @Test
-    @DisplayName("출고대기 수주에 운송장을 등록하면 배송중이 되고 하이픈은 빠진다")
-    void registerShipment() {
-        CommonCode ready = code("READY_TO_SHIP");
-        CommonCode shipping = code("SHIPPING");
 
-        CustomerOrder order = order(3L, "READY_TO_SHIP");
-        Carrier carrier = carrier();
-
-        when(order.getStatusCode()).thenReturn(ready, shipping);
-
-        when(carrierRepository.findById("04"))
-                .thenReturn(Optional.of(carrier));
-
-        when(commonCodeRepository.findByCodeGroup_GroupCodeAndCodeAndStatus(
-                "ORDER_STATUS", "SHIPPING", CodeStatus.ACTIVE
-        )).thenReturn(Optional.of(shipping));
-
-        when(shipmentRepository.save(any())).thenAnswer(invocation -> {
-            Shipment shipment = invocation.getArgument(0);
-            ReflectionTestUtils.setField(shipment, "id", 10L);
-            return shipment;
-        });
-
-        Response response = shipmentService.register(
-                new CreateRequest(3L, "04", "5300-9999-0001"),
-                1L
-        );
-
-        assertThat(response.orderStatus()).isEqualTo("SHIPPING");
-        assertThat(response.trackingNumber())
-                .isEqualTo("530099990001");
-        assertThat(response.startedAt()).isNotNull();
-
-        verify(order).changeProgress(shipping);
-
-        // 추가: 운송장 등록 후 잔금 결제 생성 요청 검증
-        verify(paymentService).prepareAndScheduleIssue(
-                order,
-                PaymentType.BALANCE
-        );
-
-        verify(statusHistoryRepository).save(argThat(history ->
-                history.getEntity() == HistoryEntityType.ORDER
-                        && "READY_TO_SHIP".equals(history.getFromStatus())
-                        && "SHIPPING".equals(history.getToStatus())
-        ));
-    }
 
     @Test
     @DisplayName("포장중 목록·건수는 전부 포장완료인 수주만 포함한다")
@@ -276,62 +236,11 @@ class ShipmentServiceTest {
                 .hasMessage("모든 작업이 포장완료된 수주만 출고대기로 바꿀 수 있습니다.");
     }
 
-    @Test
-    @DisplayName("출고대기가 아닌 수주는 운송장을 등록할 수 없다")
-    void rejectWhenNotReadyToShip() {
-        order(1L, "PACKING");
 
-        assertThatThrownBy(() ->
-                shipmentService.register(
-                        new CreateRequest(1L, "04", "530099990002"),
-                        1L
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("출고대기 수주만 운송장을 등록할 수 있습니다.");
-    }
 
-    @Test
-    @DisplayName("이미 운송장이 있는 수주는 다시 등록할 수 없다")
-    void rejectWhenShipmentExists() {
-        order(5L, "READY_TO_SHIP");
 
-        when(shipmentRepository.existsByOrderId(5L))
-                .thenReturn(true);
 
-        assertThatThrownBy(() ->
-                shipmentService.register(
-                        new CreateRequest(5L, "05", "450011122233"),
-                        1L
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("이미 운송장이 등록된 수주입니다.");
-    }
 
-    @Test
-    @DisplayName("같은 택배사의 운송장 번호는 다른 수주에도 쓸 수 없다")
-    void rejectDuplicateTrackingNumber() {
-        order(3L, "READY_TO_SHIP");
-
-        Carrier carrier = carrier();
-
-        when(carrierRepository.findById("04"))
-                .thenReturn(Optional.of(carrier));
-
-        when(shipmentRepository.existsByCarrier_CodeAndTrackingNumber(
-                "04", "530012345671"
-        )).thenReturn(true);
-
-        assertThatThrownBy(() ->
-                shipmentService.register(
-                        new CreateRequest(3L, "04", "530012345671"),
-                        1L
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("같은 택배사에 이미 등록된 운송장 번호입니다.");
-    }
 
     @Test
     @DisplayName("선택한 수주에 저장된 배송 정보만 조회하고 상태를 변경하지 않는다")

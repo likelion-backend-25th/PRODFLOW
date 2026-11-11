@@ -13,12 +13,8 @@ import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
 import net.likelion.bebc25.prodflow.customer_order.repository.CustomerOrderRepository;
 import net.likelion.bebc25.prodflow.customer_order.repository.OrderProductRepository;
-import net.likelion.bebc25.prodflow.payment.enums.PaymentType;
-import net.likelion.bebc25.prodflow.payment.service.PaymentService;
 import net.likelion.bebc25.prodflow.shipment.dto.ShipmentDto;
-import net.likelion.bebc25.prodflow.shipment.entity.Carrier;
 import net.likelion.bebc25.prodflow.shipment.entity.Shipment;
-import net.likelion.bebc25.prodflow.shipment.repository.CarrierRepository;
 import net.likelion.bebc25.prodflow.shipment.repository.ShipmentRepository;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
@@ -28,9 +24,10 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
-import java.time.LocalDateTime;
 import java.util.*;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -48,11 +45,10 @@ public class ShipmentService {
     private final CustomerOrderRepository customerOrderRepository;
     private final OrderProductRepository orderProductRepository;
     private final ShipmentRepository shipmentRepository;
-    private final CarrierRepository carrierRepository;
     private final CommonCodeRepository commonCodeRepository;
     private final StatusHistoryRepository statusHistoryRepository;
     private final UserRepository userRepository;
-    private final PaymentService paymentService;
+    private final ShipmentDispatchService shipmentDispatchService;
     private final WorkOrderRepository workOrderRepository;
 
     // 배송 관리 화면용 목록. 탭별로 수주를 모으고 상단 건수도 같이 내려준다.
@@ -169,56 +165,10 @@ public class ShipmentService {
         return ShipmentDto.ReadyToShipResponse.from(order);
     }
 
-    // 출고대기 수주에 운송장을 등록하고 배송중으로 바꾼다.
-    @Transactional
+    // 기존 API 진입점은 유지하고 계좌·메일·출고 확정을 전용 서비스에서 처리한다.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ShipmentDto.Response register(ShipmentDto.CreateRequest request, Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NoSuchElementException("등록한 직원을 찾을 수 없습니다."));
-
-        if (request.orderId() == null) {
-            throw new IllegalArgumentException("수주를 선택해 주세요.");
-        }
-
-        CustomerOrder order = customerOrderRepository.findById(request.orderId())
-                .orElseThrow(() -> new NoSuchElementException("수주를 찾을 수 없습니다."));
-
-        String currentStatus = order.getStatusCode().getCode();
-        if (!TAB_READY_TO_SHIP.equals(currentStatus)) {
-            throw new IllegalArgumentException("출고대기 수주만 운송장을 등록할 수 있습니다.");
-        }
-        if (shipmentRepository.existsByOrderId(order.getId())) {
-            throw new IllegalArgumentException("이미 운송장이 등록된 수주입니다.");
-        }
-
-        String carrierCode = request.carrierCode() == null ? "" : request.carrierCode().trim();
-        if (carrierCode.isEmpty()) {
-            throw new IllegalArgumentException("택배사를 선택해 주세요.");
-        }
-        Carrier carrier = carrierRepository.findById(carrierCode)
-                .orElseThrow(() -> new IllegalArgumentException("등록되지 않은 택배사입니다."));
-
-        String trackingNumber = normalizeTrackingNumber(request.trackingNumber());
-        if (shipmentRepository.existsByCarrier_CodeAndTrackingNumber(carrier.getCode(), trackingNumber)) {
-            throw new IllegalArgumentException("같은 택배사에 이미 등록된 운송장 번호입니다.");
-        }
-
-        CommonCode shipping = commonCodeRepository
-                .findByCodeGroup_GroupCodeAndCodeAndStatus(ORDER_STATUS, TAB_SHIPPING, CodeStatus.ACTIVE)
-                .orElseThrow(() -> new IllegalArgumentException("배송중 상태 코드를 찾을 수 없습니다."));
-
-        Shipment shipment = shipmentRepository.save(
-                Shipment.start(order.getId(), carrier, trackingNumber, LocalDateTime.now())
-        );
-        order.changeProgress(shipping);
-        statusHistoryRepository.save(new StatusHistory(
-                HistoryEntityType.ORDER,
-                order.getId(),
-                currentStatus,
-                shipping.getCode(),
-                user
-        ));
-        paymentService.prepareAndScheduleIssue(order, PaymentType.BALANCE);
-        return ShipmentDto.Response.from(shipment, order);
+        return shipmentDispatchService.dispatch(request, userId);
     }
 
     // 화면의 배송 완료 버튼. 운송장을 완료로 두고 수주도 COMPLETED로 바꾼다.
@@ -445,14 +395,4 @@ public class ShipmentService {
         return firstName + " 외 " + (products.size() - 1) + "건";
     }
 
-    private String normalizeTrackingNumber(String raw) {
-        if (raw == null) {
-            throw new IllegalArgumentException("운송장 번호를 입력해 주세요.");
-        }
-        String digits = raw.replace("-", "").replace(" ", "");
-        if (digits.isEmpty() || !digits.chars().allMatch(Character::isDigit) || digits.length() > 50) {
-            throw new IllegalArgumentException("운송장 번호는 숫자만 입력해 주세요.");
-        }
-        return digits;
-    }
 }
