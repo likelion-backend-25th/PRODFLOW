@@ -3,43 +3,55 @@ package net.likelion.bebc25.prodflow.customer_order.controller;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import net.likelion.bebc25.prodflow.customer_order.controller.CustomerOrderController;
-import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto;
-import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDetailDto;
-import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
-import net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
-import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderService;
-import net.likelion.bebc25.prodflow.global.exception.GlobalExceptionHandler;
-import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
-import net.likelion.bebc25.prodflow.common.dto.PageResponse;
-import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderListDto;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderListTab;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderListSortType;
 import org.springframework.web.server.ResponseStatusException;
 
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
+import net.likelion.bebc25.prodflow.customer_order.controller.CustomerOrderController;
+import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDetailDto;
+import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto;
+import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
+import net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderListSortType;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderListTab;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
+import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderCancelService;
+import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderService;
+import net.likelion.bebc25.prodflow.global.exception.GlobalExceptionHandler;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
+
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class CustomerOrderControllerTest {
     private final CustomerOrderService service = mock(CustomerOrderService.class);
+    private final CustomerOrderCancelService cancelService = mock(CustomerOrderCancelService.class);
     private MockMvc mvc;
     private final String body = """
             {"quotationId":17,"items":[{"quotationItemId":31,"quantity":100}],
@@ -54,8 +66,9 @@ class CustomerOrderControllerTest {
         when(principal.getUserId()).thenReturn(7L);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, null));
-        mvc = MockMvcBuilders.standaloneSetup(new CustomerOrderController(service))
-                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver(), new PageableHandlerMethodArgumentResolver())
+        mvc = MockMvcBuilders.standaloneSetup(new CustomerOrderController(service, cancelService))
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver(),
+                        new PageableHandlerMethodArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
@@ -66,6 +79,26 @@ class CustomerOrderControllerTest {
     }
 
     // 수주 등록 응답 검증
+    @Test
+    void cancelsOrderWithReasonAndAuthenticatedActor() throws Exception {
+        mvc.perform(MockMvcRequestBuilders
+                        .patch("/api/v1/orders/14/cancel").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"거래처 요청\"}"))
+                .andExpect(status().isOk());
+        verify(cancelService).cancel(eq(14L), argThat(request -> request.reason().equals("거래처 요청")), eq(7L));
+    }
+
+    @Test
+    void rejectsBlankOrTooLongCancellationReason() throws Exception {
+        for (String reason : List.of("", "   ", "가".repeat(256))) {
+            mvc.perform(MockMvcRequestBuilders
+                            .patch("/api/v1/orders/14/cancel").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\":\"" + reason + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(cancelService);
+    }
+
     @Test
     void createsOrderWithLocationAndInitialStatuses() throws Exception {
         when(service.create(any(), eq(7L))).thenReturn(new CustomerOrderDto.CreateResponse(1L, "PF-20261106-1",
@@ -85,7 +118,7 @@ class CustomerOrderControllerTest {
     // 잘못된 등록 요청 검증
     @Test
     void rejectsInvalidQuantityAddressReceiverAndChannelBeforeSaving() throws Exception {
-        for (String invalid : java.util.List.of(body.replace("\"quantity\":100", "\"quantity\":99"),
+        for (String invalid : List.of(body.replace("\"quantity\":100", "\"quantity\":99"),
                 body.replace("\"useCompanyAddress\":true", "\"useCompanyAddress\":false"),
                 body.replace("수신자", ""), body.replace("EMAIL", "PUSH"))) {
             mvc.perform(post("/api/v1/orders").contentType(MediaType.APPLICATION_JSON).content(invalid))
@@ -98,7 +131,7 @@ class CustomerOrderControllerTest {
     @Test
     void listsOrdersWithCommonCodeFilterAndDefaultPageSize() throws Exception {
         when(service.getOrders(any(), any(Pageable.class)))
-                .thenReturn(new PageResponse<>(java.util.List.of(), 0, 8, 0, 0));
+                .thenReturn(new PageResponse<>(List.of(), 0, 8, 0, 0));
         mvc.perform(get("/api/v1/orders").param("statusCodeId", "7").param("keyword", "한빛"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.size").value(8));
         verify(service).getOrders(argThat(condition -> condition.tab() == OrderListTab.OPEN
@@ -128,7 +161,7 @@ class CustomerOrderControllerTest {
         CustomerOrderDetailDto.Response response = new CustomerOrderDetailDto.Response(
                 1L, "PF-DETAIL-001", 17L, "QT-DETAIL-001", 7L, "등록자", null, null,
                 ConfirmationStatus.PENDING, 6L, "WAITING", "대기", OrderPaymentStatus.UNPAID,
-                client, java.util.List.of(item), false, 100000L, 10000L, 110000L, 100L,
+                client, List.of(item), false, 100000L, 10000L, 110000L, 100L,
                 dueDate, dueDate, dueDate.minusDays(7), dueDate.minusDays(3), null,
                 dueDate.minusDays(10), "서울시 배송 주소", "홍수신", "010-3333-4444",
                 NotifyChannel.EMAIL, "등록 메모", null);
@@ -214,7 +247,8 @@ class CustomerOrderControllerTest {
     // 중복 수주 등록 응답 검증
     @Test
     void duplicateOrderReturnsConflict() throws Exception {
-        when(service.create(any(), eq(7L))).thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "이미 등록된 수주입니다."));
+        when(service.create(any(), eq(7L))).thenThrow(new ResponseStatusException(HttpStatus.CONFLICT,
+                "이미 등록된 수주입니다."));
         mvc.perform(post("/api/v1/orders").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("HTTP_409"));
     }

@@ -1,27 +1,30 @@
 package net.likelion.bebc25.prodflow.customer_order.service;
 
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
 import jakarta.persistence.EntityManager;
-import net.likelion.bebc25.prodflow.commoncode.entity.CodeGroup;
-import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
-import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
-import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderListDto;
-import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
-import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderListSortType;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderListTab;
-import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
-import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderService;
+
 import org.junit.jupiter.api.Test;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.List;
+import net.likelion.bebc25.prodflow.commoncode.entity.CodeGroup;
+import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
+import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
+import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderListDto;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
+import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderListSortType;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderListTab;
+import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
+import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,7 +37,7 @@ class CustomerOrderQueryTest {
 
     // 탭·페이지·전체 건수 검증
     @Test
-    void pagesOpenAndDoneWithoutCancelledOrders() {
+    void pagesOpenOrdersAndIncludesCancelledOrdersInDone() {
         CustomerOrderListDto.SearchCondition open = condition(OrderListTab.OPEN, null, null);
         assertThat(service.getOrders(open, PageRequest.of(0, 8)).getTotalElements()).isEqualTo(9);
         assertThat(service.getOrders(open, PageRequest.of(0, 8)).getContent()).hasSize(8)
@@ -43,7 +46,9 @@ class CustomerOrderQueryTest {
         assertThat(service.getOrders(open, PageRequest.of(99, 8)).getTotalElements()).isEqualTo(9);
         assertThat(service.getOrders(open, PageRequest.of(99, 8)).getContent()).isEmpty();
         assertThat(service.getOrders(condition(OrderListTab.DONE, null, null), PageRequest.of(0, 8)).getContent())
-                .hasSize(3).allSatisfy(row -> assertThat(row.status()).isEqualTo("COMPLETED"));
+                .hasSize(4).allSatisfy(row -> assertThat(row.status()).isIn("COMPLETED", "CANCELLED"));
+        assertThat(service.getOrders(condition(OrderListTab.DONE, null, null), PageRequest.of(0, 8))
+                .getTotalElements()).isEqualTo(service.getSummary().doneCount());
     }
 
     // 그룹 ID 2의 진행 상태 검색 검증
@@ -64,7 +69,8 @@ class CustomerOrderQueryTest {
                 .singleElement().satisfies(row -> assertThat(row.status()).isEqualTo("PAUSE"));
         assertThatThrownBy(() -> service.getOrders(condition(OrderListTab.OPEN, null, 1L), PageRequest.of(0, 8)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("그룹 ID 2");
-        assertThatThrownBy(() -> service.getOrders(condition(OrderListTab.OPEN, null, Long.MAX_VALUE), PageRequest.of(0, 8)))
+        assertThatThrownBy(() -> service.getOrders(condition(OrderListTab.OPEN, null, Long.MAX_VALUE), PageRequest
+                .of(0, 8)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -74,18 +80,22 @@ class CustomerOrderQueryTest {
         CommonCode code = CommonCode.create(em.find(CodeGroup.class, 2L), "CUSTOM", "추가 진행 상태", 11);
         em.persist(code);
         em.find(CustomerOrder.class, 1L).changeProgress(code);
-        assertThat(service.getOrders(condition(OrderListTab.OPEN, null, code.getId()), PageRequest.of(0, 8)).getContent())
+        assertThat(service.getOrders(condition(OrderListTab.OPEN, null, code.getId()), PageRequest.of(0, 8))
+                .getContent())
                 .singleElement().satisfies(row -> assertThat(row.statusName()).isEqualTo("추가 진행 상태"));
         ReflectionTestUtils.setField(code, "status", CodeStatus.INACTIVE);
-        assertThat(service.getStatuses()).extracting(CustomerOrderListDto.StatusResponse::id).doesNotContain(code.getId());
+        assertThat(service.getStatuses()).extracting(CustomerOrderListDto.StatusResponse::id).doesNotContain(code
+                .getId());
         em.find(CustomerOrder.class, 1L).changeProgress(em.find(CommonCode.class, 1L));
-        assertThat(service.getOrders(condition(OrderListTab.OPEN, null, null), PageRequest.of(0, 20)).getTotalElements()).isEqualTo(8);
+        assertThat(service.getOrders(condition(OrderListTab.OPEN, null, null), PageRequest.of(0, 20))
+                .getTotalElements()).isEqualTo(8);
     }
 
     // 검색·필터 조합과 품목 중복 방지 검증
     @Test
     void combinesFiltersAndSearchesSnapshotNamesWithoutDuplicateOrders() {
-        assertThat(service.getOrders(condition(OrderListTab.OPEN, " 케이스 ", null), PageRequest.of(0, 20)).getTotalElements()).isEqualTo(9);
+        assertThat(service.getOrders(condition(OrderListTab.OPEN, " 케이스 ", null), PageRequest.of(0, 20))
+                .getTotalElements()).isEqualTo(9);
         assertThat(service.getOrders(
                 condition(OrderListTab.OPEN, "PF-20261106-1", null), PageRequest.of(0, 8)).getContent())
                 .singleElement().satisfies(row -> {
@@ -98,7 +108,8 @@ class CustomerOrderQueryTest {
         assertThat(service.getOrders(filtered, PageRequest.of(0, 8)).getContent())
                 .extracting(CustomerOrderListDto.Response::id).containsExactly(9L);
         for (String literal : List.of("%", "_", "!", "없는 검색어")) {
-            assertThat(service.getOrders(condition(OrderListTab.OPEN, literal, null), PageRequest.of(0, 8)).getContent()).isEmpty();
+            assertThat(service.getOrders(condition(OrderListTab.OPEN, literal, null), PageRequest.of(0, 8))
+                    .getContent()).isEmpty();
         }
     }
 
@@ -115,14 +126,14 @@ class CustomerOrderQueryTest {
                 .setParameter("date", month.plusMonths(1).atStartOfDay()).executeUpdate();
         em.clear();
         CustomerOrderListDto.SearchCondition done = new CustomerOrderListDto.SearchCondition(OrderListTab.DONE,
-                null, null, null, null, OrderListSortType.COMPLETED_AT);
+                null, ConfirmationStatus.CONFIRMED, null, null, OrderListSortType.COMPLETED_AT);
         assertThat(service.getOrders(done, PageRequest.of(0, 3)).getContent())
                 .extracting(CustomerOrderListDto.Response::id).containsExactly(8L, 7L, 5L);
         CustomerOrderListDto.SummaryResponse summary = service.getSummary();
         assertThat(summary.waiting()).isEqualTo(2);
         assertThat(summary.doneThisMonth()).isEqualTo(1);
         assertThat(summary.openCount()).isEqualTo(9);
-        assertThat(summary.doneCount()).isEqualTo(3);
+        assertThat(summary.doneCount()).isEqualTo(4);
         em.createQuery("update Shipment s set s.deliveredAt = null where s.orderId = 8").executeUpdate();
         em.clear();
         assertThat(service.getOrders(done, PageRequest.of(0, 3)).getContent())
@@ -132,6 +143,27 @@ class CustomerOrderQueryTest {
 
     // 전체 검색 결과 CSV 검증
     @Test
+    void filtersCompletedAndCancelledOrdersAndExportsCancelledRows() {
+        assertThat(service.getOrders(condition(OrderListTab.DONE, null, 15L), PageRequest.of(0, 8)).getContent())
+                .singleElement().satisfies(row -> {
+                    assertThat(row.id()).isEqualTo(11L);
+                    assertThat(row.status()).isEqualTo("CANCELLED");
+                    assertThat(row.confirmationStatus()).isEqualTo(ConfirmationStatus.CANCELLED);
+                });
+        assertThat(service.getOrders(condition(OrderListTab.OPEN, null, 15L), PageRequest.of(0, 8)).getContent())
+                .isEmpty();
+        assertThat(service.getOrders(condition(OrderListTab.DONE, null, 12L), PageRequest.of(0, 8)).getContent())
+                .hasSize(3).allSatisfy(row -> assertThat(row.status()).isEqualTo("COMPLETED"));
+        CustomerOrderListDto.SearchCondition completedOnly = new CustomerOrderListDto.SearchCondition(OrderListTab.DONE,
+                null, ConfirmationStatus.CONFIRMED, null, null, OrderListSortType.COMPLETED_AT);
+        assertThat(service.getOrders(completedOnly, PageRequest.of(0, 3)).getContent())
+                .hasSize(3).allSatisfy(row -> assertThat(row.status()).isEqualTo("COMPLETED"));
+        String csv = new String(service.export(condition(OrderListTab.DONE, null, 15L)), StandardCharsets.UTF_8);
+        assertThat(csv.lines().count()).isEqualTo(2);
+        assertThat(csv).contains("PF-20261030-11");
+    }
+
+    @Test
     void exportsAllMatchingRowsAndEscapesSpreadsheetCells() {
         String csv = new String(service.export(condition(OrderListTab.OPEN, null, null)), StandardCharsets.UTF_8);
         assertThat(csv).startsWith("\uFEFF");
@@ -139,13 +171,15 @@ class CustomerOrderQueryTest {
         em.createQuery("update OrderProduct p set p.productName = :name where p.id = 1")
                 .setParameter("name", "=SUM(1,2)\"테스트").executeUpdate();
         em.clear();
-        String filtered = new String(service.export(condition(OrderListTab.OPEN, "=SUM", null)), StandardCharsets.UTF_8);
+        String filtered = new String(service.export(condition(OrderListTab.OPEN, "=SUM", null)), StandardCharsets
+                .UTF_8);
         assertThat(filtered.lines().count()).isEqualTo(2);
         assertThat(filtered).contains("\"'=SUM(1,2)\"\"테스트");
     }
 
     // 기본 검색 조건 생성
     private CustomerOrderListDto.SearchCondition condition(OrderListTab tab, String keyword, Long statusCodeId) {
-        return new CustomerOrderListDto.SearchCondition(tab, keyword, null, statusCodeId, null, OrderListSortType.CREATED_AT);
+        return new CustomerOrderListDto.SearchCondition(tab, keyword, null, statusCodeId, null, OrderListSortType
+                .CREATED_AT);
     }
 }

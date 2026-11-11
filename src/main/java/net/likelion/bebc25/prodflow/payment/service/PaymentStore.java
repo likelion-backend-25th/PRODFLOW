@@ -20,6 +20,8 @@ import net.likelion.bebc25.prodflow.payment.enums.*;
 import net.likelion.bebc25.prodflow.payment.repository.PaymentHistoryRepository;
 import net.likelion.bebc25.prodflow.payment.repository.PaymentRepository;
 import net.likelion.bebc25.prodflow.payment.repository.VirtualAccountRepository;
+import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import net.likelion.bebc25.prodflow.work_order.service.WorkOrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,9 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -46,13 +46,11 @@ public class PaymentStore {
     private final LineRepository lineRepository;
     private final WorkOrderService workOrderService;
     private final StatusHistoryRepository statusHistoryRepository;
+    private final UserRepository userRepository;
 
-    /**
-     * 만료일이 지난 계좌의 DB 상태를 주기적으로 갱신한다.
-     * Spring Boot 애플리케이션에 @EnableScheduling이 이미 존재한다.
-     * 실제 입금 완료/말소 시의 USED/CANCELLED 상태는 덮어쓰지 않는다.
-     */
-    @Scheduled(fixedDelayString = "${payment.virtual-account-expire-check-ms:3600000}")
+    //  만료일이 지난 계좌의 DB 상태를 주기적으로 갱신
+    //  실제 입금 완료/말소 시의 USED/CANCELLED 상태는 덮어쓰지 않음
+    @Scheduled(fixedDelayString = "${payment.virtual-account-expire-check-ms:60000}")
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void expireDueVirtualAccounts() {
         virtualAccountRepository.expireActiveAccounts(
@@ -67,8 +65,17 @@ public class PaymentStore {
     // 같은 결제에 중복 POST를 보내지 않기 위해 락 + 상태 체크를 수행한다.
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean claimIssue(Long id) {
+        // 수주 취소와 발급 claim이 경합하지 않도록 수주 -> 결제 순서로 락을 잡는다.
+        // Payment 엔티티를 먼저 로딩하면 락 대기 후에도 오래된 상태를 사용할 수 있다.
+        Long orderId = paymentRepository.findOrderIdByPaymentId(id)
+                .orElseThrow(() -> new NoSuchElementException("결제를 찾을 수 없습니다."));
+        CustomerOrder order = customerOrderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new NoSuchElementException("수주를 찾을 수 없습니다."));
         Payment payment = lockedPayment(id);
-        if (payment.getStatus() != PaymentStatus.READY) {
+        if ("CANCELLED".equals(order.getStatusCode().getCode())
+                || payment.getStatus() != PaymentStatus.READY
+                || paymentRepository.findByOrder_IdOrderByIdAsc(order.getId()).stream()
+                .anyMatch(p -> p.getStatus() == PaymentStatus.ORDER_CANCEL_CLOSING)) {
             return false;
         }
         payment.requestIssue();
@@ -80,9 +87,153 @@ public class PaymentStore {
         lockedPayment(id).issueUncertain();
     }
 
-    /**
-     * 최초 요청만 말소 API를 호출할 수 있도록 먼저 DB에 재발급 의도를 커밋한다.
-     */
+
+    //수주 취소 의도를 먼저 커밋한다. PG 호출은 이 트랜잭션 밖에서 수행한다.
+    //READY이며 계좌가 없는 결제는 아직 PG 발급을 요청하지 않았으므로 즉시 취소한다.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public List<OrderCancelTarget> beginUnpaidOrderCancellation(Long orderId) {
+        CustomerOrder order = customerOrderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "수주를 찾을 수 없습니다."));
+        if ("CANCELLED".equals(order.getStatusCode().getCode())) {
+            return List.of(); // 재호출 멱등 처리
+        }
+        if (!"WAITING".equals(order.getStatusCode().getCode())
+                || order.getPaymentStatus() != OrderPaymentStatus.UNPAID) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "미입금 대기 수주만 자동 취소할 수 있습니다. 입금 후 취소는 환불 절차가 필요합니다.");
+        }
+
+        List<OrderCancelTarget> targets = new ArrayList<>();
+        for (Payment candidate : paymentRepository.findByOrder_IdOrderByIdAsc(orderId)) {
+            Payment payment = lockedPayment(candidate.getId());
+            if (paymentHistoryRepository.existsByPayment_Id(payment.getId())
+                    || payment.getStatus() == PaymentStatus.PAID
+                    || payment.getStatus() == PaymentStatus.PARTIAL_CANCELLED) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "입금 이력이 있는 수주는 자동 취소할 수 없습니다. 환불 절차를 확인하세요.");
+            }
+            List<VirtualAccount> accounts = virtualAccountRepository
+                    .findByPayment_IdOrderByIdDesc(payment.getId());
+            VirtualAccount latest = accounts.isEmpty() ? null : accounts.getFirst();
+            // 재발급 이력의 예전 계좌가 아직 말소되지 않았다면 자동 취소하지 않는다.
+            for (int i = 1; i < accounts.size(); i++) {
+                if (accounts.get(i).getStatus() != VirtualAccountStatus.CANCELLED) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "이전 가상계좌에 미확인 상태가 있어 수동 확인이 필요합니다.");
+                }
+            }
+            if (payment.getPaymentMethod() != PaymentMethod.VA) {
+                if (payment.getStatus() != PaymentStatus.READY
+                        && payment.getStatus() != PaymentStatus.CANCELLED) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "수동 입금 결제의 상태를 확인한 뒤 취소하세요.");
+                }
+                payment.cancel();
+                continue;
+            }
+            if (payment.getStatus() == PaymentStatus.READY && latest == null) {
+                payment.cancel();
+                continue;
+            }
+            if (payment.getStatus() == PaymentStatus.CANCELLED
+                    && (latest == null || latest.getStatus() == VirtualAccountStatus.CANCELLED)) {
+                continue;
+            }
+            if (payment.getStatus() == PaymentStatus.REISSUE_CLOSING
+                    || payment.getStatus() == PaymentStatus.REQUESTED
+                    || payment.getStatus() == PaymentStatus.ISSUE_UNCERTAIN
+                    || payment.getStatus() == PaymentStatus.PENDING
+                    || payment.getStatus() == PaymentStatus.PAY_PENDING) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "가상계좌 발급·재발급 결과가 확정되지 않았습니다. 먼저 결제 상태를 동기화하세요.");
+            }
+            if (payment.getStatus() != PaymentStatus.WAITING
+                    && payment.getStatus() != PaymentStatus.FAILED
+                    && payment.getStatus() != PaymentStatus.CANCELLED
+                    && payment.getStatus() != PaymentStatus.ORDER_CANCEL_CLOSING) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "현재 결제 상태에서는 자동 취소할 수 없습니다.");
+            }
+            if (payment.getPortonePaymentId() == null || payment.getPortonePaymentId().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "PortOne 결제 ID가 없습니다. 수동 확인이 필요합니다.");
+            }
+            boolean newlyClaimed = payment.getStatus() != PaymentStatus.ORDER_CANCEL_CLOSING;
+            if (newlyClaimed) {
+                payment.updateStatus(PaymentStatus.ORDER_CANCEL_CLOSING);
+            }
+            targets.add(new OrderCancelTarget(payment.getId(), payment.getPortonePaymentId(), newlyClaimed));
+        }
+        return List.copyOf(targets);
+    }
+
+    public record OrderCancelTarget(Long paymentId, String portonePaymentId, boolean newlyClaimed) {
+    }
+
+    //PortOne 종료 상태 또는 실제 계좌 말소 응답을 확인한 결제만 취소로 확정
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void confirmOrderPaymentClosed(Long orderId, Long paymentId, String expectedPortoneId) {
+        CustomerOrder order = customerOrderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "수주를 찾을 수 없습니다."));
+        if (!"WAITING".equals(order.getStatusCode().getCode())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "수주 상태가 변경되어 취소를 중단했습니다.");
+        }
+        Payment payment = lockedPayment(paymentId);
+        if (!payment.getOrder().getId().equals(orderId)
+                || payment.getStatus() != PaymentStatus.ORDER_CANCEL_CLOSING
+                || !Objects.equals(payment.getPortonePaymentId(), expectedPortoneId)
+                || paymentHistoryRepository.existsByPayment_Id(paymentId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "입금 발생 또는 결제 상태 변경으로 취소할 수 없습니다.");
+        }
+        VirtualAccount latest = virtualAccountRepository.findRecentByPayment_IdForUpdate(paymentId).orElse(null);
+        if (latest != null) {
+            if (latest.getStatus() == VirtualAccountStatus.USED) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용한 가상계좌는 말소할 수 없습니다.");
+            }
+            latest.recordOriginalPortonePaymentId(expectedPortoneId);
+            latest.cancel();
+        }
+        payment.cancel();
+    }
+
+    //모든 결제의 PG 말소를 확정한 다음에만 수주 상태와 이력을 변경
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void finishUnpaidOrderCancellation(Long orderId, Long actorId) {
+        CustomerOrder order = customerOrderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "수주를 찾을 수 없습니다."));
+        if ("CANCELLED".equals(order.getStatusCode().getCode())) {
+            return;
+        }
+        if (!"WAITING".equals(order.getStatusCode().getCode())
+                || order.getPaymentStatus() != OrderPaymentStatus.UNPAID) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "수주 상태가 변경되어 자동 취소할 수 없습니다.");
+        }
+        for (Payment candidate : paymentRepository.findByOrder_IdOrderByIdAsc(orderId)) {
+            Payment payment = lockedPayment(candidate.getId());
+            if (paymentHistoryRepository.existsByPayment_Id(payment.getId())
+                    || payment.getStatus() != PaymentStatus.CANCELLED) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "아직 입금 대기 또는 말소 확인 중인 결제건이 있습니다.");
+            }
+            VirtualAccount latest = virtualAccountRepository.findFirstByPayment_IdOrderByIdDesc(payment.getId()).orElse(null);
+            if (latest != null && latest.getStatus() != VirtualAccountStatus.CANCELLED) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "가상계좌 말소가 확정되지 않았습니다.");
+            }
+        }
+        CommonCode cancelled = commonCodeRepository.findByCodeGroup_GroupCodeAndCodeAndStatus(
+                        "ORDER_STATUS", "CANCELLED", CodeStatus.ACTIVE)
+                .orElseThrow(() -> new IllegalStateException("CANCELLED 수주 상태 코드가 없습니다."));
+        User actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new NoSuchElementException("취소 처리자를 찾을 수 없습니다."));
+        String before = order.getStatusCode().getCode();
+        order.changeProgress(cancelled);
+        StatusHistory history = new StatusHistory(HistoryEntityType.ORDER, order.getId(),
+                before, "CANCELLED", actor);
+        history.writeNote("미입금 수주 취소: PortOne 가상계좌 말소 확인 완료");
+        statusHistoryRepository.save(history);
+    }
+
+    //최초 요청만 말소 API를 호출할 수 있도록 먼저 DB에 재발급 의도를 커밋
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReissueClaim beginReissue(Long paymentId, int dueDays) {
         Payment payment = lockedPayment(paymentId);
@@ -126,9 +277,7 @@ public class PaymentStore {
     public record ReissueClaim(String oldPortonePaymentId, boolean newlyClaimed, boolean alreadyClosed) {
     }
 
-    /**
-     * PG 말소 응답/종결 상태를 확인한 후에만 호출한다.
-     */
+    // PG 말소 응답/종결 상태를 확인한 후에만 호출
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void confirmReissueClosed(Long id, String expectedOldId, OffsetDateTime closedAt) {
         Payment payment = lockedPayment(id);
@@ -148,9 +297,7 @@ public class PaymentStore {
         payment.confirmReissueClosed(closedAt);
     }
 
-    /**
-     * PG 말소 확인이 기록된 경우에만 기존 계좌를 보존하고 새 ID로 전환한다.
-     */
+    //PG 말소 확인이 기록된 경우에만 기존 계좌를 보존하고 새 ID로 전환
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void finishReissue(Long id, String expectedOldId) {
         Payment payment = lockedPayment(id);
@@ -174,9 +321,7 @@ public class PaymentStore {
         payment.switchToNewPortonePaymentId(newId);
     }
 
-    /**
-     * PG의 상태를 우리 내부 통계/수주 흐름에서 사용하는 상태로 정규화한다.
-     */
+    // PG의 상태를 우리 내부 통계/수주 흐름에서 사용하는 상태로 정규화한다.
     public static PaymentStatus mapPortOneStatus(String status) {
         if (status == null) {
             throw new IllegalArgumentException("PortOne 결제 상태가 비어 있습니다.");
@@ -193,10 +338,9 @@ public class PaymentStore {
         };
     }
 
-    /**
-     * 트랜잭션 경계는 PG API 호출 바깥에 둔다. 결제/계좌/입금내역/수주/작업지시를 함께 커밋한다.
-     * 같은 PAID 웹훅을 재수신해도 새 이력과 작업지시를 생성하지 않는다.
-     */
+
+    // 트랜잭션 경계는 PG API 호출 바깥에 둔다. 결제/계좌/입금내역/수주/작업지시를 함께 커밋
+    // 같은 PAID 웹훅을 재수신해도 새 이력과 작업지시를 생성하지 않음
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Payment applyWebhook(Long id, PortOneDto.PaymentSnapshot snapshot, String type) {
         PaymentStatus remoteStatus = mapPortOneStatus(snapshot.status());
@@ -215,6 +359,21 @@ public class PaymentStore {
         Payment payment = lockedPayment(id);
         if (payment.getPaymentMethod() != PaymentMethod.VA) {
             return payment; // 현금 입금과 충돌하는 외부 웹훅 무시
+        }
+        // 취소 대기/완료 상태를 늦게 도착한 가상계좌 발급 웹훅이 되돌리지 못하게 한다.
+        if ("CANCELLED".equals(payment.getOrder().getStatusCode().getCode())) {
+            if (remoteStatus == PaymentStatus.PAID) {
+                throw new IllegalStateException("취소된 수주에서 PortOne 입금이 확인되었습니다. 수동 정산 확인이 필요합니다.");
+            }
+            return payment;
+        }
+        if (payment.getStatus() == PaymentStatus.ORDER_CANCEL_CLOSING
+                && remoteStatus != PaymentStatus.PAID) {
+            return payment;
+        }
+        if (payment.getStatus() == PaymentStatus.CANCELLED && remoteStatus != PaymentStatus.PAID) {
+            // 완료된 말소 상태를 늦게 도착한 발급 웹훅이 WAITING으로 되돌리지 못하게 한다.
+            return payment;
         }
         PaymentHistory history = paymentHistoryRepository.getByPayment_IdForUpdate(id).orElse(null);
         if (history != null && history.getWebhookRemoteUpdatedAt() != null

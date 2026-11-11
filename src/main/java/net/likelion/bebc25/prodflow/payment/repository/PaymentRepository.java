@@ -29,6 +29,10 @@ public interface PaymentRepository extends
             PaymentType paymentType
     );
 
+    // 발급 claim 시 수주 행을 결제 행보다 먼저 잠그기 위한 ID 단독 조회.
+    @Query("SELECT p.order.id FROM Payment p WHERE p.id = :paymentId")
+    Optional<Long> findOrderIdByPaymentId(@Param("paymentId") Long paymentId);
+
     // PortOne 결제 ID로 조회
     Optional<Payment> findByPortonePaymentId(
             String portonePaymentId

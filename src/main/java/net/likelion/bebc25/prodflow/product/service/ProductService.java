@@ -2,6 +2,7 @@ package net.likelion.bebc25.prodflow.product.service;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.commoncode.repository.CommonCodeRepository;
 import net.likelion.bebc25.prodflow.commoncode.service.CommonCodeService;
@@ -14,8 +15,10 @@ import net.likelion.bebc25.prodflow.product.dto.ProductDto.Response;
 import net.likelion.bebc25.prodflow.product.entity.Product;
 import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
 import net.likelion.bebc25.prodflow.product.repository.ProductRepository;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,21 +78,12 @@ public class ProductService {
     }
 
     //목록 조회
-    public List<Response> getList(ProductStatus status) {
-        List<Product> products;
+    public PageResponse<Response> getList(ProductStatus status, Pageable pageable) {
+        Page<Product> products = status == null
+                ? productRepository.findAllBy(pageable)
+                : productRepository.findByStatus(status, pageable);
 
-        if (status == null) {
-            products = productRepository.findAll();
-        } else {
-            products = productRepository.findByStatus(status);
-        }
-        List<Response> responses = new ArrayList<>();
-        for (Product product : products) {
-            responses.add(Response.from(product));
-        }
-
-
-        return responses;
+        return PageResponse.from(products.map(Response::from));
     }
 
     //단건
@@ -106,17 +100,13 @@ public class ProductService {
     }
 
 
-    public List<Response> productSearch(String keyword, ProductStatus status) {
+    public PageResponse<Response> productSearch(String keyword, ProductStatus status, Pageable pageable) {
         if (keyword == null || keyword.isBlank()) {
-            return getList(status);
+            return getList(status, pageable);
         }
 
-        List<Product> products = productRepository.search(keyword, status);
-        List<Response> responses = new ArrayList<>();
-        for (Product product : products) {
-            responses.add(Response.from(product));
-        }
-        return responses;
+        Page<Product> products = productRepository.search(keyword.trim(), status, pageable);
+        return PageResponse.from(products.map(Response::from));
     }
 
     @Transactional

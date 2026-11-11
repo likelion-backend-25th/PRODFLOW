@@ -60,6 +60,8 @@ erDiagram
   customer_order |o--o{ client_noti_log : "customer_order_id"
   quotation |o--o{ client_noti_log : "quotation_id"
   user ||--o{ client_noti_log : "sent_by"
+  customer_order ||--o{ payment_notification_request : "order_id"
+  user ||--o{ payment_notification_request : "user_id"
   user ||--o{ ai_conversation : "user_id"
   ai_conversation ||--o{ ai_message : "conversation_id"
 
@@ -397,6 +399,18 @@ erDiagram
       varchar error_message "실패 사유. SENT이면 비움"
   }
 
+  payment_notification_request {
+      varchar id PK "발송 요청 UUID. VARCHAR(36), 동일 요청 재전송 방지"
+      bigint order_id FK "대상 수주 ID. NOT NULL"
+      bigint user_id FK "요청 직원 ID. NOT NULL"
+      varchar status "PROCESSING, SENDING, SENT, FAILED, ISSUE_UNCERTAIN"
+      varchar message "사용자에게 표시할 처리 결과. 최대 500자"
+      datetime created_at "요청 생성 시각. 공통 감사 필드"
+      datetime updated_at "마지막 변경 시각. 공통 감사 필드"
+      varchar created_by "요청 생성자. NULL 허용"
+      varchar updated_by "마지막 수정자. NULL 허용"
+  }
+
   ai_conversation {
       bigint id PK "대화방 고유 식별자"
       bigint user_id FK "대화한 회원 ID"
@@ -628,7 +642,7 @@ erDiagram
 | address             | VARCHAR(255) | NOT NULL                                              | 거래처 주소                                                                                                                                                              |
 | user_id             | BIGINT       | FK, NOT NULL                                          | 이 수주를 등록한 직원. 수주 관리자                                                                                                                                                |
 | requested_due_date  | DATE         | NOT NULL                                              | 희망 납기일. 견적의 희망 납기를 가져오고 등록 후 변경하지 않음                                                                                                                                |
-| estimated_due_date  | DATE         | NOT NULL                                              | 최종 등록 납기일. 견적 예상 납기가 가능하면 유지하고, 변경 시 화면에서 선택한 날짜를 서버에서 재검증해 저장. 승인 견적은 변경하지 않음 |
+| estimated_due_date  | DATE         | NOT NULL                                              | 최종 등록 납기일. 견적 예상 납기가 가능하면 유지하고, 변경 시 화면에서 선택한 날짜를 서버에서 재검증해 저장. 승인 견적은 변경하지 않음                                                                                      |
 | planned_start_date  | DATE         | NOT NULL                                              | 생산 시작 예정일                                                                                                                                                           |
 | planned_end_date    | DATE         | NOT NULL                                              | 생산 완료 예정일                                                                                                                                                           |
 | end_date            | DATE         | NULL                                                  | 실제 생산 완료일                                                                                                                                                           |
@@ -650,7 +664,8 @@ erDiagram
 
 - 견적 하나에는 수주가 없거나 한 건만 연결된다. `quotation_id`의 UNIQUE 제약으로 취소 수주를 포함한 중복 연결을 방지한다.
 - 등록 API는 견적 품목 ID와 수량을 받아 품목별 100개 이상·견적 수량 이하를 검증하고 단가·VAT·거래처 스냅샷은 승인 견적에서 가져온다. 동의 체크값은 API와 DB에 저장하지 않는다.
-- 회사 주소 배송이면 거래처 주소를 조회하고, 직접 배송이면 우편번호·도로명·상세 주소를 받아 `shipping_address` 문자열로 저장한다. 결제 건·가상계좌 생성은 현재 수주 등록 API 범위에서 제외한다.
+- 회사 주소 배송이면 거래처 주소를 조회하고, 직접 배송이면 우편번호·도로명·상세 주소를 받아 `shipping_address` 문자열로 저장한다. 결제 건·가상계좌 생성은 현재 수주 등록 API 범위에서
+  제외한다.
 - 수주 확정 상태는 `confirmation_status`에 저장한다. 진행 상태가 바뀌면 같이 고친다. 대기는 `PENDING`(예정), 취소는 `CANCELLED`(취소), 그 외는 `CONFIRMED`(확정)
   이다.
 - 입금 상태는 `payment` 테이블을 JOIN하여 조회한다.
@@ -725,7 +740,7 @@ erDiagram
 |--------------------|--------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | id                 | BIGINT       | PK, AUTO_INCREMENT                                              | 견적서 고유 ID                                                                                                                           |
 | quotation_no       | VARCHAR(255) | UNIQUE, NOT NULL                                                | 견적번호                                                                                                                                |
-| pdf_object_key | VARCHAR(255) | NULL 허용 | 업로드 완료한 PDF의 S3 객체 키. 최초 저장·수정·재생성 시작·실패 시 NULL. NULL이면 조회 불가. |
+| pdf_object_key     | VARCHAR(255) | NULL 허용                                                         | 업로드 완료한 PDF의 S3 객체 키. 최초 저장·수정·재생성 시작·실패 시 NULL. NULL이면 조회 불가.                                                                      |
 | client_id          | BIGINT       | FK, NOT NULL                                                    | 거래처 ID                                                                                                                              |
 | client_name        | VARCHAR(255) | NOT NULL                                                        | 거래처 측 담당자 이름                                                                                                                        |
 | client_email       | VARCHAR(255) | NOT NULL                                                        | 거래처 이메일                                                                                                                             |
@@ -980,3 +995,25 @@ erDiagram
 - 토요일과 일요일은 날짜의 요일로 계산한다. 일반 주말은 넣지 않지만, API가 반환한 공휴일은 주말과 겹쳐도 이 테이블에 저장한다.
 - 백엔드는 그해 공휴일을 외부 API에서 한 번 받아 이 테이블에 저장한다. 사람이 행을 추가하거나 삭제하지 않는다. API가 준 날짜만 휴일이다.
 - 납기 계산은 `holiday_date`와 같은 날에 수량을 넣지 않는다. 생산 완료 뒤 3일(포장 1일, 배송 2일)을 셀 때도 이 날짜를 건너뛴다.
+
+### 2.29 payment_notification_request (계약금 안내 발송 요청)
+
+| 컬럼명        | 데이터 타입       | 제약 조건        | 설명                                                 |
+|------------|--------------|--------------|----------------------------------------------------|
+| id         | VARCHAR(36)  | PK           | 클라이언트가 생성한 요청 UUID. 동일 요청 재전송 방지                   |
+| order_id   | BIGINT       | FK, NOT NULL | 대상 수주. CustomerOrder와 LAZY 다대일 연관관계                |
+| user_id    | BIGINT       | FK, NOT NULL | 요청 직원. User와 LAZY 다대일 연관관계                         |
+| status     | VARCHAR(20)  | NOT NULL     | PROCESSING, SENDING, SENT, FAILED, ISSUE_UNCERTAIN |
+| message    | VARCHAR(500) | NOT NULL     | 사용자에게 표시할 처리 결과                                    |
+| created_at | DATETIME     | NOT NULL     | 요청 생성 시각. BaseTimeEntity 공통 감사 필드                  |
+| updated_at | DATETIME     | NOT NULL     | 마지막 변경 시각. BaseTimeEntity 공통 감사 필드                 |
+| created_by | VARCHAR(255) | NULL         | 요청 생성자. BaseTimeEntity 공통 감사 필드                    |
+| updated_by | VARCHAR(255) | NULL         | 마지막 수정자. BaseTimeEntity 공통 감사 필드                   |
+
+- `(order_id, updated_at)` 인덱스로 수주의 최근 요청을 조회한다.
+- 수주 행 잠금으로 같은 수주의 발송 요청 접수를 직렬화한다. 외부 전송 중에는 수주 잠금을 유지하지 않는다.
+- `PROCESSING`·`SENDING` 요청이 있으면 다른 요청으로 발송하지 않는다. 메일 전송 후 결과 기록 장애 시 `SENDING`을 유지하며 운영자가 실제 전송 여부를 확인한다.
+- 메일의 확정 성공·실패는 기존 `client_noti_log`에 `kind=DEPOSIT`, `channel=EMAIL`로 별도 저장한다.
+- 현재 개발용 JPA 스키마 생성 설정으로 신규 테이블이 생성된다. 스키마 자동 생성이 꺼진 환경은 배포 전 위 테이블·인덱스 생성이 필요하다.
+- 기존 발송 요청 테이블이 있는 환경은 감사 컬럼을 추가하고 과거 행의 생성 시각·생성자 등을 보완한 뒤 NOT NULL 제약을 적용해야 한다. 외래키 적용 전 수주·직원 참조의 무결성도 확인한다. 기존 요청의
+  updated_at과 공통 감사 필드의 시간대 기준을 맞추며, 기존 데이터 삭제나 스키마 재생성으로 대체하지 않는다.

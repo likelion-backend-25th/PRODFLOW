@@ -33,6 +33,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -215,11 +216,11 @@ class ShipmentServiceTest {
                 eq(List.of(3L, 30L)), eq(List.of("PACK_DONE"))
         )).thenReturn(List.of(30L));
 
-        ShipmentDto.ListResponse response = shipmentService.findList("PACKING");
+        ShipmentDto.ListResponse response = shipmentService.findList("PACKING", PageRequest.of(0, 10));
 
-        assertThat(response.items()).hasSize(1);
-        assertThat(response.items().get(0).orderId()).isEqualTo(3L);
-        assertThat(response.items().get(0).readyToShipEligible()).isTrue();
+        assertThat(response.page().getContent()).hasSize(1);
+        assertThat(response.page().getContent().get(0).orderId()).isEqualTo(3L);
+        assertThat(response.page().getContent().get(0).readyToShipEligible()).isTrue();
         assertThat(response.counts().packing()).isEqualTo(1L);
     }
 

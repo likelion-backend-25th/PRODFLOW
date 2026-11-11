@@ -1,53 +1,79 @@
 package net.likelion.bebc25.prodflow.quotation.service;
 
+import java.io.InputStream;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.Map;
 import jakarta.persistence.EntityManager;
-import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
-import net.likelion.bebc25.prodflow.client.entity.Client;
-import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
-import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
-import net.likelion.bebc25.prodflow.common.domain.Address;
-import net.likelion.bebc25.prodflow.commoncode.entity.CodeGroup;
-import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
-import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
-import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
-import net.likelion.bebc25.prodflow.line.entity.Line;
-import net.likelion.bebc25.prodflow.product.entity.Product;
-import net.likelion.bebc25.prodflow.product.enums.ProductStatus;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationRescheduleDto;
-import net.likelion.bebc25.prodflow.quotation.dto.QuotationItemDto;
-import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
-import net.likelion.bebc25.prodflow.quotation.repository.QuotationItemRepository;
-import net.likelion.bebc25.prodflow.quotation.repository.QuotationRepository;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationService;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfService;
-import net.likelion.bebc25.prodflow.quotation.controller.QuotationController;
-import net.likelion.bebc25.prodflow.quotation.service.QuotationRescheduleService;
-import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
-import net.likelion.bebc25.prodflow.user.entity.User;
-import net.likelion.bebc25.prodflow.user.enums.UserRole;
+
+import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.NoSuchElementException;
+import net.likelion.bebc25.prodflow.client_notification.repository.ClientNotiLogRepository;
+import net.likelion.bebc25.prodflow.client.entity.Client;
+import net.likelion.bebc25.prodflow.client.repository.ClientRepository;
+import net.likelion.bebc25.prodflow.common.domain.Address;
+import net.likelion.bebc25.prodflow.common.storage.StorageClient;
+import net.likelion.bebc25.prodflow.commoncode.entity.CodeGroup;
+import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
+import net.likelion.bebc25.prodflow.commoncode.enums.CodeStatus;
+import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto;
+import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
+import net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct;
+import net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel;
+import net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderService;
+import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
+import net.likelion.bebc25.prodflow.line.entity.Line;
+import net.likelion.bebc25.prodflow.mail.service.MailService;
+import net.likelion.bebc25.prodflow.product.entity.Product;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationDto;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationItemDto;
+import net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto;
+import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
+import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
+import net.likelion.bebc25.prodflow.quotation.repository.QuotationItemRepository;
+import net.likelion.bebc25.prodflow.quotation.repository.QuotationRepository;
+import net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationRescheduleService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationSendService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationService;
+import net.likelion.bebc25.prodflow.quotation.service.QuotationStatusService;
+import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.user.enums.UserRole;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 
 // 커밋·외부 연동 테스트의 공통 준비. 일반 롤백 테스트와 별도로 실행.
 @SpringBootTest
@@ -59,27 +85,27 @@ abstract class QuotationIntegrationTestSupport {
     @Autowired
     QuotationService service;
     @Autowired
-    net.likelion.bebc25.prodflow.customer_order.service.CustomerOrderService orderService;
+    CustomerOrderService orderService;
     @Autowired
-    net.likelion.bebc25.prodflow.quotation.schedule.QuotationScheduleService orderScheduleService;
+    QuotationScheduleService orderScheduleService;
     @Autowired
     QuotationPdfService pdfService;
     @Autowired
-    net.likelion.bebc25.prodflow.quotation.service.QuotationPdfStorageService pdfStorageService;
-    @org.springframework.test.context.bean.override.mockito.MockitoBean
-    net.likelion.bebc25.prodflow.common.storage.StorageClient storageClient;
-    @org.springframework.test.context.bean.override.mockito.MockitoBean
-    net.likelion.bebc25.prodflow.mail.service.MailService mailService;
+    QuotationPdfStorageService pdfStorageService;
+    @MockitoBean
+    StorageClient storageClient;
+    @MockitoBean
+    MailService mailService;
     @Autowired
-    net.likelion.bebc25.prodflow.quotation.service.QuotationSendService sendService;
+    QuotationSendService sendService;
     @Autowired
-    net.likelion.bebc25.prodflow.client_notification.repository.ClientNotiLogRepository notificationRepository;
-    protected final java.util.Map<String, net.likelion.bebc25.prodflow.common.storage.StorageClient.StoredFile> files
-            = new java.util.concurrent.ConcurrentHashMap<>();
+    ClientNotiLogRepository notificationRepository;
+    protected final Map<String, StorageClient.StoredFile> files
+            = new ConcurrentHashMap<>();
     @Autowired
     QuotationRescheduleService rescheduleService;
     @Autowired
-    net.likelion.bebc25.prodflow.quotation.service.QuotationStatusService statusService;
+    QuotationStatusService statusService;
     @Autowired
     Validator validator;
     @Autowired
@@ -95,28 +121,30 @@ abstract class QuotationIntegrationTestSupport {
     @BeforeEach
     void setUp() {
         files.clear();
-        org.mockito.Mockito.doAnswer(this::storePdf).when(storageClient).upload(
-                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong(),
-                org.mockito.ArgumentMatchers.anyMap());
-        org.mockito.Mockito.when(storageClient.read(org.mockito.ArgumentMatchers.anyString()))
+        doAnswer(this::storePdf).when(storageClient).upload(
+                anyString(), any(),
+                anyString(), anyLong(),
+                anyMap());
+        when(storageClient.read(anyString()))
                 .thenAnswer(invocation -> {
-                    var file = files.get(invocation.getArgument(0, String.class));
+                    StorageClient.StoredFile file = files.get(invocation.getArgument(0, String.class));
                     if (file == null) {
                         throw new IllegalStateException("저장된 파일 없음");
                     }
                     return file;
                 });
-        org.mockito.Mockito.when(storageClient.createPresignedGetUrl(
-                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+        when(storageClient.createPresignedGetUrl(
+                anyString(), any()))
                 .thenReturn("https://example.com/preview.pdf");
         CustomUserDetails principal = tx().execute(status -> {
             // 공통 설정에서 적재한 시드도 외래키의 자식부터 정리한다.
-            for (String entity : new String[]{"PaymentHistory", "VirtualAccount", "Payment", "Shipment",
+            for (String entity : new String[]{"PaymentNotificationRequest", "PaymentHistory", "VirtualAccount",
+                    "Payment", "Shipment",
                     "WorkOrderHistory", "LineNotification", "OrderNotification", "LineCapacityLog",
                     "AiMessage", "AiConversation", "StatusHistory", "RefreshToken", "ProductDrawing",
                     "ClientNotiLog", "ProductionPlan", "WorkOrder", "OrderProduct", "CustomerOrder",
-                    "QuotationItem", "Quotation", "Client", "Product", "Line", "CommonCode", "CodeGroup", "User", "Holiday"}) {
+                    "QuotationItem", "Quotation", "Client", "Product", "Line", "CommonCode", "CodeGroup", "User",
+                            "Holiday"}) {
                 em.createQuery("delete from " + entity).executeUpdate();
             }
             User user = User.builder().name("서도윤").email("writer@example.com")
@@ -150,28 +178,28 @@ abstract class QuotationIntegrationTestSupport {
                 UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
     }
 
-
-    protected Object storePdf(org.mockito.invocation.InvocationOnMock invocation) throws java.io.IOException {
-        java.io.InputStream input = invocation.getArgument(1);
-        java.util.Map<String, String> metadata = invocation.getArgument(4);
+    protected Object storePdf(org.mockito.invocation.InvocationOnMock invocation) throws IOException {
+        InputStream input = invocation.getArgument(1);
+        Map<String, String> metadata = invocation.getArgument(4);
         files.put(invocation.getArgument(0),
-                new net.likelion.bebc25.prodflow.common.storage.StorageClient.StoredFile(
-                        input.readAllBytes(), java.util.Map.copyOf(metadata)));
+                new StorageClient.StoredFile(
+                        input.readAllBytes(), Map.copyOf(metadata)));
         return null;
     }
 
     protected void assertSendConflict(Long quotationId,
-            net.likelion.bebc25.prodflow.quotation.dto.QuotationSendDto.Request request) {
+            QuotationSendDto.Request request) {
         assertThatThrownBy(() -> sendService.send(quotationId, request, userId))
-                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                .isInstanceOfSatisfying(ResponseStatusException.class,
                         failure -> assertThat(failure.getStatusCode().value()).isEqualTo(409));
-        assertThat(quotationRepository.findById(quotationId).orElseThrow().getStatus()).isEqualTo(QuotationStatus.DRAFT);
+        assertThat(quotationRepository.findById(quotationId).orElseThrow().getStatus()).isEqualTo(QuotationStatus
+                .DRAFT);
     }
 
     protected Long createStatusFixture(QuotationStatus source, LocalDate validUntil) {
-        var draft = service.create(request(List.of(item(100, 1000L))), userId);
+        QuotationDto.DetailResponse draft = service.create(request(List.of(item(100, 1000L))), userId);
         tx().executeWithoutResult(status -> {
-            var quotation = em.find(Quotation.class, draft.id());
+            Quotation quotation = em.find(Quotation.class, draft.id());
             ReflectionTestUtils.setField(quotation, "status", source);
             ReflectionTestUtils.setField(quotation, "validUntil", validUntil);
             quotation.changePdfObjectKey("quotations/status-test.pdf");
@@ -179,8 +207,8 @@ abstract class QuotationIntegrationTestSupport {
         return draft.id();
     }
 
-    protected void assertStatusConflict(org.assertj.core.api.ThrowableAssert.ThrowingCallable action) {
-        assertThatThrownBy(action).isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+    protected void assertStatusConflict(ThrowableAssert.ThrowingCallable action) {
+        assertThatThrownBy(action).isInstanceOfSatisfying(ResponseStatusException.class,
                 failure -> assertThat(failure.getStatusCode().value()).isEqualTo(409));
     }
 
@@ -200,13 +228,13 @@ abstract class QuotationIntegrationTestSupport {
     }
 
     protected List<Object> registerConcurrently(
-            net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto.CreateRequest first,
-            net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto.CreateRequest second) throws Exception {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        var start = new java.util.concurrent.CountDownLatch(1);
-        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
-            List<java.util.concurrent.Future<Object>> futures = new java.util.ArrayList<>();
-            for (var request : List.of(first, second)) {
+            CustomerOrderDto.CreateRequest first,
+            CustomerOrderDto.CreateRequest second) throws Exception {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            List<Future<Object>> futures = new ArrayList<>();
+            for (CustomerOrderDto.CreateRequest request : List.of(first, second)) {
                 futures.add(executor.submit(() -> {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     try {
@@ -220,20 +248,21 @@ abstract class QuotationIntegrationTestSupport {
                 }));
             }
             start.countDown();
-            return List.of(futures.get(0).get(20, java.util.concurrent.TimeUnit.SECONDS),
-                    futures.get(1).get(20, java.util.concurrent.TimeUnit.SECONDS));
+            return List.of(futures.get(0).get(20, TimeUnit.SECONDS),
+                    futures.get(1).get(20, TimeUnit.SECONDS));
         }
     }
 
     protected QuotationDto.DetailResponse approvedForOrder() {
         tx().executeWithoutResult(status -> {
-            if (em.createQuery("select count(c) from CommonCode c where c.codeGroup.groupCode = 'ORDER_STATUS'", Long.class)
+            if (em.createQuery("select count(c) from CommonCode c where c.codeGroup.groupCode = 'ORDER_STATUS'",
+                    Long.class)
                     .getSingleResult() == 0) {
-                var group = instantiate(CodeGroup.class);
+                CodeGroup group = instantiate(CodeGroup.class);
                 ReflectionTestUtils.setField(group, "groupCode", "ORDER_STATUS");
                 ReflectionTestUtils.setField(group, "groupName", "수주 상태");
                 em.persist(group);
-                var code = instantiate(CommonCode.class);
+                CommonCode code = instantiate(CommonCode.class);
                 ReflectionTestUtils.setField(code, "codeGroup", group);
                 ReflectionTestUtils.setField(code, "code", "WAITING");
                 ReflectionTestUtils.setField(code, "name", "대기");
@@ -242,22 +271,22 @@ abstract class QuotationIntegrationTestSupport {
                 em.persist(code);
             }
         });
-        var quote = createSentQuotation(List.of(item(200, 1000L)));
+        QuotationDto.DetailResponse quote = createSentQuotation(List.of(item(200, 1000L)));
         tx().executeWithoutResult(status -> em.find(Quotation.class, quote.id()).approve());
         return service.getQuotationById(quote.id());
     }
 
-    protected net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto.CreateRequest orderRequest(
+    protected CustomerOrderDto.CreateRequest orderRequest(
             QuotationDto.DetailResponse quote, int quantity, LocalDate dueDate, boolean companyAddress,
-            net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto.ShippingAddress address) {
-        return new net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto.CreateRequest(quote.id(),
-                List.of(new net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDto.ItemRequest(
+            CustomerOrderDto.ShippingAddress address) {
+        return new CustomerOrderDto.CreateRequest(quote.id(),
+                List.of(new CustomerOrderDto.ItemRequest(
                         quote.items().getFirst().id(), quantity)), dueDate, companyAddress, address,
-                "수신자", "010-1234-5678", net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel.EMAIL, "업무 메모");
+                "수신자", "010-1234-5678", NotifyChannel.EMAIL, "업무 메모");
     }
 
     protected QuotationDto.DetailResponse createSentQuotation(List<QuotationItemDto.CreateRequest> items) {
-        var created = service.create(request(items), userId);
+        QuotationDto.DetailResponse created = service.create(request(items), userId);
         tx().executeWithoutResult(status -> em.find(Quotation.class, created.id()).sent());
         return service.getQuotationById(created.id());
     }
@@ -266,7 +295,8 @@ abstract class QuotationIntegrationTestSupport {
     }
 
     protected QuotationDto.CreateRequest newClientRequest(String company, List<QuotationItemDto.CreateRequest> items) {
-        var client = new QuotationDto.ClientRequest(company, "신규 담당자", "new@example.com", "010-1111-2222",
+        QuotationDto.ClientRequest client = new QuotationDto.ClientRequest(company, "신규 담당자", "new@example.com",
+                "010-1111-2222",
                 "12345", "서울 테스트로 1", "3층");
         return new QuotationDto.CreateRequest(null, dueDate(), null, false, items, client);
     }
@@ -289,7 +319,7 @@ abstract class QuotationIntegrationTestSupport {
 
     protected static <T> T instantiate(Class<T> type) {
         try {
-            var constructor = type.getDeclaredConstructor();
+            Constructor<T> constructor = type.getDeclaredConstructor();
             constructor.setAccessible(true);
             return constructor.newInstance();
         } catch (ReflectiveOperationException ex) {
