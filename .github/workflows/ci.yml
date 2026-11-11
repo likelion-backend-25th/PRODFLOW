@@ -41,6 +41,17 @@ jobs:
       - name: Gradle 실행 권한 부여
         run: chmod +x gradlew
 
+      - name: 시스템 프롬프트 배치
+        env:
+          PRODFLOW_SYSTEM_PROMPT: ${{ secrets.PRODFLOW_SYSTEM_PROMPT }}
+        run: |
+          mkdir -p src/main/resources/prompts
+          if [ -z "$PRODFLOW_SYSTEM_PROMPT" ]; then
+            echo "PRODFLOW_SYSTEM_PROMPT 시크릿이 없습니다."
+            exit 1
+          fi
+          printf '%s' "$PRODFLOW_SYSTEM_PROMPT" > src/main/resources/prompts/prodflow-system.txt
+
       - name: Gradle 빌드 및 테스트 수행
         run: ./gradlew test --no-daemon --info --stacktrace --scan
         env:
@@ -76,3 +87,4 @@ jobs:
           # AI API 인증키
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PRODFLOW_SYSTEM_PROMPT: ${{ secrets.PRODFLOW_SYSTEM_PROMPT }}
