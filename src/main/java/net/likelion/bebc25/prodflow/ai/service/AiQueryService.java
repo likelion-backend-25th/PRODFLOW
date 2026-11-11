@@ -55,38 +55,66 @@ public class AiQueryService {
 
     // AI가 조회할 수 있는 테이블
     private static final Set<String> ALLOWED_TABLES = Set.of(
-            // 작업지시 및 생산계획
-            "work_order",
-            "production_plan",
-
-            // 생산라인
-            "line",
-
-            // 수주 품목 및 제품
-            "order_product",
-            "product",
-
-            // 공통 상태 코드
+            "carrier",
+            "client",
+            "client_noti_log",
+            "code_group",
             "common_code",
-
-            // 상태 변경 이력
+            "customer_order",
+            "holiday",
+            "line",
+            "line_capacity_log",
+            "line_notification",
+            "order_notification",
+            "order_product",
+            "payment",
+            "payment_history",
+            "product",
+            "product_drawing",
+            "production_plan",
+            "quotation",
+            "quotation_item",
+            "shipment",
             "status_history",
-
-            // 작업지시 변경 이력
-            "work_order_history",
-
-            // 라인 생산능력 변경 이력
-            "line_capacity_log"
+            "user",
+            "virtual_account",
+            "work_order",
+            "work_order_history"
     );
 
     // 조회 과정에서 허용하는 일반적인 SQL 함수
     private static final Set<String> SAFE_FUNCTIONS = Set.of(
+            // 집계
             "count", "sum", "avg", "min", "max",
-            "coalesce", "ifnull",
-            "upper", "lower", "concat",
+            "group_concat",
+
+            // NULL 및 조건 처리
+            "coalesce", "ifnull", "nullif", "if",
+
+            // 문자열
+            "upper", "lower",
+            "concat", "concat_ws",
+            "substring", "left", "right",
+            "length", "char_length",
+            "trim", "ltrim", "rtrim",
+            "replace",
+
+            // 숫자 계산
             "round", "abs",
+            "floor", "ceil", "ceiling",
+            "mod", "greatest", "least",
+
+            // 날짜
             "date", "year", "month", "day",
-            "date_format"
+            "date_format", "str_to_date",
+            "datediff", "timestampdiff",
+            "date_add", "date_sub",
+            "dayofweek", "weekday",
+            "week", "quarter", "last_day",
+            "now", "current_date",
+
+            // 통계
+            "stddev_pop", "variance"
     );
 
     // AI 조회 전용 DB 연결

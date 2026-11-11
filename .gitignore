@@ -47,3 +47,4 @@ out/
 
 AGENTS.md
 docs/02_design/05_quotation_pdf.md
+src/main/resources/prompts/prodflow-system.txt
