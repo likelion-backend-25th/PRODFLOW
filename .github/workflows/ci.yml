@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TZ: Asia/Seoula
+      TZ: Asia/Seoul
 
     services:
       mysql:
