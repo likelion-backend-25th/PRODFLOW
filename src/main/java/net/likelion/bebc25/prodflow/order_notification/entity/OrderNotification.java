@@ -32,7 +32,7 @@ public class OrderNotification {
     @JoinColumn(name = "customer_order_id", nullable = true)
     private CustomerOrder customerOrder;
 
-    // 알림 수신자: 해당 수주의 담당 직원
+    // 알림 수신자: 수주 담당 직원 또는 활성 최고관리자
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "target_id", nullable = false)
     private User target;
