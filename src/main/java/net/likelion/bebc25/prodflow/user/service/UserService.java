@@ -212,7 +212,7 @@ public class UserService {
     }
 
     public List<UserDto.Response> findByOrderManager() {
-        return userRepository.findByRole(UserRole.ORDER_MANAGER).stream()
+        return userRepository.findAllByRoleAndStatus(UserRole.ORDER_MANAGER, UserStatus.ACTIVE).stream()
                 .map(UserDto.Response::from)
                 .toList();
     }
