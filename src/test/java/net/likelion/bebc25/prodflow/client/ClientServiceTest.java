@@ -535,22 +535,25 @@ public class ClientServiceTest {
     }
 
     @Test
-    @DisplayName("한 달 전을 기준으로 신규 거래처 수와 수주가 있는 거래처 수를 반환한다")
-    void countGreaterThanOneMonth() {
+    @DisplayName("전체 거래처 수와 최근 한 달간 등록 및 수주가 있는 거래처 수를 반환한다")
+    void countClients() {
         // given
+        given(clientRepository.count()).willReturn(12L);
         given(clientRepository.countByCreatedAtGreaterThan(any(LocalDateTime.class))).willReturn(3L);
         given(customerOrderRepository.countRecentOrderClients(any(LocalDateTime.class))).willReturn(7L);
 
         // when
         LocalDateTime earliestCutoff = LocalDateTime.now().minusMonths(1);
-        ClientDto.CountRecentMonthResponse response = clientService.countGreaterThanOneMonth();
+        ClientDto.CountResponse response = clientService.countClients();
         LocalDateTime latestCutoff = LocalDateTime.now().minusMonths(1);
 
         // then
+        assertThat(response.countAll()).isEqualTo(12L);
         assertThat(response.countByCreatedAt()).isEqualTo(3L);
         assertThat(response.countByOrder()).isEqualTo(7L);
 
         ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(clientRepository).count();
         verify(clientRepository).countByCreatedAtGreaterThan(cutoff.capture());
         assertThat(cutoff.getValue()).isBetween(earliestCutoff, latestCutoff);
         verify(customerOrderRepository).countRecentOrderClients(cutoff.getValue());
