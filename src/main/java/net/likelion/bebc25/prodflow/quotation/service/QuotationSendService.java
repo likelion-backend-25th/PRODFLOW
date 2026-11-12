@@ -170,7 +170,10 @@ public class QuotationSendService {
     private void validateSchedule(QuotationDto.DetailResponse draft, LocalDate today) {
         QuotationScheduleResult latest;
         try {
-            latest = scheduleService.calculate(draft.totalQuantity(), draft.requestedDueDate(), today);
+            latest = draft.plannedStartDate().isBefore(today.plusDays(3))
+                    ? scheduleService.calculateFromStart(draft.totalQuantity(), draft.requestedDueDate(),
+                            today, draft.plannedStartDate())
+                    : scheduleService.calculate(draft.totalQuantity(), draft.requestedDueDate(), today);
         } catch (IllegalArgumentException ex) {
             throw conflict("현재 생산 조건으로 납기를 지킬 수 없습니다. 납기와 PDF를 다시 확인해주세요.");
         }

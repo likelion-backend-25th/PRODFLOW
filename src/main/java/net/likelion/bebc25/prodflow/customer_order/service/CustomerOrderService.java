@@ -171,7 +171,10 @@ public class CustomerOrderService {
         String shippingAddress = resolveShippingAddress(request, quotation.getClient().getAddress());
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
-        QuotationScheduleResult schedule = scheduleService.calculate(totalQuantity, request.dueDate(), today);
+        boolean sameDayStart = Boolean.TRUE.equals(request.sameDayStart());
+        QuotationScheduleResult schedule = sameDayStart
+                ? scheduleService.calculate(totalQuantity, request.dueDate(), today, true)
+                : scheduleService.calculate(totalQuantity, request.dueDate(), today);
 
         CustomerOrder order = new CustomerOrder(
                 "TEMP-" + UUID.randomUUID(),
@@ -186,7 +189,7 @@ public class CustomerOrderService {
                 schedule.estimatedDueDate(),
                 schedule.plannedStartDate(),
                 schedule.plannedEndDate(),
-                today.plusDays(3),
+                sameDayStart ? today : today.plusDays(3),
                 shippingAddress,
                 request.receiverName(),
                 request.receiverPhone(),

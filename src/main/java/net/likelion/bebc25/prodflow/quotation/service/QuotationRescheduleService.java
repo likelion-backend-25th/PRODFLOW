@@ -45,8 +45,9 @@ public class QuotationRescheduleService {
         Quotation quotation = findEligibleQuotation(quotationId, today);
         long totalQuantity = totalQuantity(quotation.getId());
 
-        QuotationSchedulePreviewResult result = scheduleService.previewSchedule(
-                totalQuantity, request.requestedDueDate(), today);
+        QuotationSchedulePreviewResult result = quotation.getPlannedStartDate().equals(today)
+                ? scheduleService.previewSchedule(totalQuantity, request.requestedDueDate(), today, true)
+                : scheduleService.previewSchedule(totalQuantity, request.requestedDueDate(), today);
         return QuotationScheduleDto.Response.from(result, request.requestedDueDate());
     }
 
@@ -58,7 +59,9 @@ public class QuotationRescheduleService {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         Quotation quotation = findEligibleQuotation(quotationId, today);
         long totalQuantity = totalQuantity(quotation.getId());
-        QuotationScheduleResult schedule = scheduleService.calculate(totalQuantity, request.requestedDueDate(), today);
+        QuotationScheduleResult schedule = quotation.getPlannedStartDate().equals(today)
+                ? scheduleService.calculate(totalQuantity, request.requestedDueDate(), today, true)
+                : scheduleService.calculate(totalQuantity, request.requestedDueDate(), today);
 
         quotation.changeSchedule(request.requestedDueDate(), schedule.estimatedDueDate(),
                 schedule.plannedStartDate(), schedule.plannedEndDate());
