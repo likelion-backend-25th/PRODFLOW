@@ -3,22 +3,22 @@
 ## 목차
 
 - [1. ProdFlow 프로젝트 개요](#1-prodflow-프로젝트-개요)
-  - [1.1 서비스 소개](#11-서비스-소개)
-  - [1.2 핵심 기술 스택](#12-핵심-기술-스택)
-  - [1.3 팀 구성 및 도메인별 역할 분담](#13-팀-구성-및-도메인별-역할-분담)
+    - [1.1 서비스 소개](#11-서비스-소개)
+    - [1.2 핵심 기술 스택](#12-핵심-기술-스택)
+    - [1.3 팀 구성 및 도메인별 역할 분담](#13-팀-구성-및-도메인별-역할-분담)
 - [2. 필수 산출물 요약 목록](#2-필수-산출물-요약-목록)
-  - [2.1 기획 단계 산출물 (Planning)](#21-기획-단계-산출물-planning)
-  - [2.2 설계 단계 산출물 (Design)](#22-설계-단계-산출물-design)
-  - [2.3 구현 및 운영 보고 산출물 (Reports)](#23-구현-및-운영-보고-산출물-reports)
+    - [2.1 기획 단계 산출물 (Planning)](#21-기획-단계-산출물-planning)
+    - [2.2 설계 단계 산출물 (Design)](#22-설계-단계-산출물-design)
+    - [2.3 구현 및 운영 보고 산출물 (Reports)](#23-구현-및-운영-보고-산출물-reports)
 - [3. 필수 산출물 정의 및 작성 기준](#3-필수-산출물-정의-및-작성-기준)
-  - [3.1 프로젝트 기획서 (Project Proposal)](#31-프로젝트-기획서-project-proposal)
-  - [3.2 요구사항 기능 명세서 (PRD)](#32-요구사항-기능-명세서-prd)
-  - [3.3 코드 컨벤션 정의서 (Code Convention Document)](#33-코드-컨벤션-정의서-code-convention-document)
-  - [3.4 시스템 아키텍처 구성도 (System Architecture Diagram)](#34-시스템-아키텍처-구성도-system-architecture-diagram)
-  - [3.5 데이터베이스 ERD (Entity Relationship Diagram)](#35-데이터베이스-erd-entity-relationship-diagram)
-  - [3.6 화면 설계서 (UI Wireframe)](#36-화면-설계서-ui-wireframe)
-  - [3.7 REST API 명세서 및 더미 데이터 규격서 (API Specification)](#37-rest-api-명세서-및-더미-데이터-규격서-api-specification)
-  - [3.8 트러블슈팅 및 기술 문제 해결 기록 (Troubleshooting Log)](#38-트러블슈팅-및-기술-문제-해결-기록-troubleshooting-log)
+    - [3.1 프로젝트 기획서 (Project Proposal)](#31-프로젝트-기획서-project-proposal)
+    - [3.2 요구사항 기능 명세서 (PRD)](#32-요구사항-기능-명세서-prd)
+    - [3.3 코드 컨벤션 정의서 (Code Convention Document)](#33-코드-컨벤션-정의서-code-convention-document)
+    - [3.4 시스템 아키텍처 구성도 (System Architecture Diagram)](#34-시스템-아키텍처-구성도-system-architecture-diagram)
+    - [3.5 데이터베이스 ERD (Entity Relationship Diagram)](#35-데이터베이스-erd-entity-relationship-diagram)
+    - [3.6 화면 설계서 (UI Wireframe)](#36-화면-설계서-ui-wireframe)
+    - [3.7 REST API 명세서 및 더미 데이터 규격서 (API Specification)](#37-rest-api-명세서-및-더미-데이터-규격서-api-specification)
+    - [3.8 트러블슈팅 및 기술 문제 해결 기록 (Troubleshooting Log)](#38-트러블슈팅-및-기술-문제-해결-기록-troubleshooting-log)
 
 ---
 
@@ -26,18 +26,21 @@
 
 ## 1.1 서비스 소개
 
-ProdFlow는 생산시설 임직원이 견적, 수주, 생산 예정, 출고, 배송, 잔금까지 한 흐름으로 다루고, 끝난 수주의 계획과 상태 이력을 남기는 **내부 생산·수주 관리 플랫폼**입니다. 외부 회원가입과 거래처용 화면은 없으며, 최고 관리자가 발급한 내부 계정으로만 접근합니다.
+ProdFlow는 생산시설 임직원이 견적, 수주, 생산 예정, 출고, 배송, 잔금까지 한 흐름으로 다루고, 끝난 수주의 계획과 상태 이력을 남기는 **내부 생산·수주 관리 플랫폼**입니다. 외부 회원가입과 거래처용
+화면은 없으며, 최고 관리자가 발급한 내부 계정으로만 접근합니다.
 
 - 최고 관리자(`SUPER_ADMIN`): 계정 추가·수정·삭제, 기준정보·라인, 수주·생산 전 범위 업무
 - 수주 관리자(`ORDER_MANAGER`): 견적·수주·거래처·품목 등록·수정, 라인 등록·생산능력 변경, 작업 담당자 변경
 - 생산 현장 관리자(`PRODUCTION_MANAGER`): 배정된 작업의 시작·일시정지·생산 중지·포장, 라인 가동·점검·고장
 - 업무 조회 담당(`INQUIRY_MANAGER`): 조회만 가능. 등록·수정·상태 변경 없음
 
-핵심 흐름은 견적 작성 → 거래처 승인 → 수주 등록 → 계약금 입금 → 작업지시·라인 배정 → 생산·포장·출고·배송 → 잔금 확인이며, 대시보드·내부 알림·AI 업무 조회로 현황을 확인합니다. 공장 설비와 연결되어 있지 않아 실제 생산량·불량 수량은 수집하지 않습니다.
+핵심 흐름은 견적 작성 → 거래처 승인 → 수주 등록 → 계약금 입금 → 작업지시·라인 배정 → 생산·포장·출고·배송 → 잔금 확인이며, 대시보드·내부 알림·AI 업무 조회로 현황을 확인합니다. 공장 설비와 연결되어
+있지 않아 실제 생산량·불량 수량은 수집하지 않습니다.
 
 ## 1.2 핵심 기술 스택
 
-- 백엔드: Java 25, Spring Boot 4.1.x, Gradle 9.x, Spring Data JPA, Hibernate, QueryDSL 7.x, OpenFeign, Spring Security 7.x, JJWT 0.13, springdoc OpenAPI
+- 백엔드: Java 25, Spring Boot 4.1.x, Gradle 9.x, Spring Data JPA, Hibernate, QueryDSL 7.x, OpenFeign, Spring Security 7.x,
+  JJWT 0.13, springdoc OpenAPI
 - 프론트엔드: React 19.x, TypeScript 6.x, Vite 8.x, Tailwind CSS 4.x, Zustand 5.x, React Router 8.x, Axios
 - 데이터베이스: MySQL 9.x (운영), H2 Database (테스트)
 - 인프라 및 DevOps: AWS EC2, RDS(MySQL), S3, CloudFront, Docker, Docker Compose, GitHub Actions CI/CD (`main` 푸시 시 배포)
@@ -45,14 +48,14 @@ ProdFlow는 생산시설 임직원이 견적, 수주, 생산 예정, 출고, 배
 
 ## 1.3 팀 구성 및 도메인별 역할 분담
 
-| 이름 | 직책 | 담당 도메인 | 세부 구현 내용 |
-|---|---|---|---|
-| 유동훈 | PM | 생산품목, 배송 조회 | 프로젝트 일정·범위 조율, 생산품목·기종·단가·도면, 품목 자동완성·모달 등록, 운송장·배송조회·SMS/이메일 배송 알림 |
-| 이승언 | PL | 견적서 및 수주 관리 | 도메인 간 기술 연계, 견적·수주 등록, 납기 계산·재산정, VAT·총액·상태, 승인 견적 기반 수주 채움 |
-| 김두희 | 팀원 | 거래처 | 거래처 등록·조회·수정, 주소 검색, 엑셀 대량 등록, 견적 작성 시 거래처 자동완성·없는 거래처 등록 |
-| 박병찬 | 팀원 | 생산·라인, AI 챗봇 | 작업지시·생산계획·라인·담당자 배정, 작업 상태·변경 이력, AI 업무 조회·대화 관리 |
-| 윤승영 | 팀원 | 대시보드 통계 | 수주 건수·계획 생산량·품목별 분포·납기·입금 현황, 일정 캘린더, 내부 알림 |
-| 임민교 | 팀원 | 사용자, 입금 | 인증·권한·계정 상태, 계약금·잔금 결제 건·가상계좌·입금 등록·확인 |
+| 이름  | 직책 | 담당 도메인       | 세부 구현 내용                                                            |
+|-----|----|--------------|---------------------------------------------------------------------|
+| 유동훈 | PM | 생산품목, 배송 조회  | 프로젝트 일정·범위 조율, 생산품목·기종·단가·도면, 품목 자동완성·모달 등록, 운송장·배송조회·SMS/이메일 배송 알림 |
+| 이승언 | PL | 견적서 및 수주 관리  | 도메인 간 기술 연계, 견적·수주 등록, 납기 계산·재산정, VAT·총액·상태, 승인 견적 기반 수주 채움         |
+| 김두희 | 팀원 | 거래처          | 거래처 등록·조회·수정, 주소 검색, 엑셀 대량 등록, 견적 작성 시 거래처 자동완성·없는 거래처 등록           |
+| 박병찬 | 팀원 | 생산·라인, AI 챗봇 | 작업지시·생산계획·라인·담당자 배정, 작업 상태·변경 이력, AI 업무 조회·대화 관리                    |
+| 윤승영 | 팀원 | 대시보드 통계      | 수주 건수·계획 생산량·품목별 분포·납기·입금 현황, 일정 캘린더, 내부 알림                         |
+| 임민교 | 팀원 | 사용자, 입금      | 인증·권한·계정 상태, 계약금·잔금 결제 건·가상계좌·입금 등록·확인                              |
 
 담당 도메인은 위 표를 유지하며, 각 팀원은 화면·REST API·DB까지 수직 슬라이스로 구현합니다.
 
@@ -64,27 +67,31 @@ ProdFlow를 체계적으로 구축하기 위해 작성된 단계별 필수 산�
 
 ## 2.1 기획 단계 산출물 (Planning)
 
-| 산출물 번호 | 산출물 문서명 | 주요 내용 | 파일 링크 |
-|---|---|---|---|
-| 01 | 프로젝트 기획서 | 서비스 기획 배경, 업무 흐름, 주요 기능 요약 및 팀 구성 | [docs/01_planning/01_proposal.md](01_planning/01_proposal.md) |
-| 02 | 요구사항 기능 명세서 (PRD) | 도메인별 요구사항 ID, RBAC 권한 매트릭스, 우선순위 | [docs/01_planning/02_prd.md](01_planning/02_prd.md) |
-| 03 | 코드 컨벤션 정의서 | Java/Spring Boot 서식, 네이밍, 레이어드 아키텍처, Git 협업 규약 | [docs/01_planning/03_convention.md](01_planning/03_convention.md) |
-| 04 | 비즈니스 프로세스 | 견적→수주→계약금→작업지시→배송→잔금 업무 규칙·상태 전이 | [docs/01_planning/04_business_process.md](01_planning/04_business_process.md) |
+| 산출물 번호 | 산출물 문서명           | 주요 내용                                          | 파일 링크                                                                         |
+|--------|-------------------|------------------------------------------------|-------------------------------------------------------------------------------|
+| 01     | 프로젝트 기획서          | 서비스 기획 배경, 업무 흐름, 주요 기능 요약 및 팀 구성              | [docs/01_planning/01_proposal.md](01_planning/01_proposal.md)                 |
+| 02     | 요구사항 기능 명세서 (PRD) | 도메인별 요구사항 ID, RBAC 권한 매트릭스, 우선순위               | [docs/01_planning/02_prd.md](01_planning/02_prd.md)                           |
+| 03     | 코드 컨벤션 정의서        | Java/Spring Boot 서식, 네이밍, 레이어드 아키텍처, Git 협업 규약 | [docs/01_planning/03_convention.md](01_planning/03_convention.md)             |
+| 04     | 비즈니스 프로세스         | 견적→수주→계약금→작업지시→배송→잔금 업무 규칙·상태 전이               | [docs/01_planning/04_business_process.md](01_planning/04_business_process.md) |
 
 ## 2.2 설계 단계 산출물 (Design)
 
-| 산출물 번호 | 산출물 문서명 | 주요 내용 | 파일 링크 |
-|---|---|---|---|
-| 01 | 시스템 아키텍처 구성도 | React SPA, Spring Boot REST, MySQL, AWS, 외부 연동 흐름 | [docs/02_design/01_architecture.md](02_design/01_architecture.md) |
-| 02 | 데이터베이스 ERD | 핵심 엔티티·FK 관계 및 Mermaid ERD | [docs/02_design/02_erd.md](02_design/02_erd.md) |
-| 03 | 화면 설계서 (UI Wireframe) | 로그인·대시보드·거래처·품목·견적·수주·입금·작업지시·라인·배송·AI 화면 | [docs/02_design/03_ui_wireframe.md](02_design/03_ui_wireframe.md) |
-| 04 | REST API 명세서 및 더미 데이터 규격서 | HTTP Method, URI, 요청/응답 JSON, Mock 규격 | [docs/02_design/04_api_specification.md](02_design/04_api_specification.md) |
+| 산출물 번호 | 산출물 문서명                   | 주요 내용                                             | 파일 링크                                                                       |
+|--------|---------------------------|---------------------------------------------------|-----------------------------------------------------------------------------|
+| 01     | 시스템 아키텍처 구성도              | React SPA, Spring Boot REST, MySQL, AWS, 외부 연동 흐름 | [docs/02_design/01_architecture.md](02_design/01_architecture.md)           |
+| 02     | 데이터베이스 ERD                | 핵심 엔티티·FK 관계 및 Mermaid ERD                        | [docs/02_design/02_erd.md](02_design/02_erd.md)                             |
+| 03     | 화면 설계서 (UI Wireframe)     | 로그인·대시보드·거래처·품목·견적·수주·입금·작업지시·라인·배송·AI 화면         | [docs/02_design/03_ui_wireframe.md](02_design/03_ui_wireframe.md)           |
+| 04     | REST API 명세서 및 더미 데이터 규격서 | HTTP Method, URI, 요청/응답 JSON, Mock 규격             | [docs/02_design/04_api_specification.md](02_design/04_api_specification.md) |
 
 ## 2.3 구현 및 운영 보고 산출물 (Reports)
 
-| 산출물 번호 | 산출물 문서명 | 주요 내용 | 파일 링크 |
-|---|---|---|---|
-| 01 | 트러블슈팅 및 기술 문제 해결 기록 | 개발·배포 중 발생한 기술 이슈의 원인·해결·시사점 | [docs/03_reports/troubleshooting.md](03_reports/troubleshooting.md) |
+| 산출물 번호 | 산출물 문서명                       | 주요 내용                          | 파일 링크                                                                               |
+|--------|-------------------------------|--------------------------------|-------------------------------------------------------------------------------------|
+| 01     | 트러블슈팅 목차                      | 개별 보고서와 별도로 두고, 각 문제 문서로 연결    | [docs/03_reports/troubleshooting.md](03_reports/troubleshooting.md)                 |
+| 02     | 작업지시서와 생산라인 관계 설계             | 작업지시서 한 장과 생산라인 하나의 연결         | [docs/03_reports/01_work_order_design.md](03_reports/work_order_line_design.md)     |
+| 03     | 작업지시서 담당자별 목록 페이징 오류          | 담당자 필터와 페이징 순서로 인한 건수 불일치      | [docs/03_reports/02_pagination_problem.md](03_reports/work_order_pagination.md)     |
+| 04     | MCP 호출 시 JWT 인증 오류            | MCP 요청의 JWT 누락과 오류 디스패치 중복 처리  | [docs/03_reports/03_mcp_jwt_auth_problem.md](03_reports/mcp_jwt_authentication.md)  |
+| 05     | MCP SQL 예외의 Gemini JSON 파싱 오류 | SQL 차단 예외가 도구 응답 파싱 실패로 이어진 문제 | [docs/03_reports/04_ai_sql_response_problem.md](03_reports/mcp_sql_json_parsing.md) |
 
 ---
 
@@ -127,7 +134,8 @@ ProdFlow를 체계적으로 구축하기 위해 작성된 단계별 필수 산�
 
 ### 3.2.3 필수 포함 항목 및 작성 방법
 
-- 요구사항 식별 ID: `USER-01`, `CLIENT-01`, `PRODUCT-01`, `ORDER-01`, `Quotation-01`, `PLAN-01`, `LINE-01`, `DELIVERY-01`, `PAYMENT-01`, `STAT-01`, `AI-01` 등 도메인별 고유 코드 부여
+- 요구사항 식별 ID: `USER-01`, `CLIENT-01`, `PRODUCT-01`, `ORDER-01`, `Quotation-01`, `PLAN-01`, `LINE-01`, `DELIVERY-01`,
+  `PAYMENT-01`, `STAT-01`, `AI-01` 등 도메인별 고유 코드 부여
 - 구분: 사용자, 거래처, 품목관리, 견적, 수주, 생산관리, 라인, 배송, 입금, 통계, AI 등 도메인 명시
 - 기능명 및 대상 역할: `SUPER_ADMIN`, `ORDER_MANAGER`, `PRODUCTION_MANAGER`, `INQUIRY_MANAGER` 구분
 - 우선순위: 1순위(필수 구현), 2순위(주요 권장), 3순위(추가 선택) 구분
@@ -142,7 +150,8 @@ ProdFlow를 체계적으로 구축하기 위해 작성된 단계별 필수 산�
 
 ### 3.3.1 정의
 
-팀원 전체가 하나의 개발자가 작성한 것처럼 일관된 코딩 스타일, 네이밍 규칙, 디렉토리 구조, 백엔드 레이어드 아키텍처 원칙(DTO/Entity 엄격 분리, 생성자 주입, 트랜잭션 경계 설정), Git 협업 규약을 명문화하여 준수하기 위한 개발 표준 규약 문서.
+팀원 전체가 하나의 개발자가 작성한 것처럼 일관된 코딩 스타일, 네이밍 규칙, 디렉토리 구조, 백엔드 레이어드 아키텍처 원칙(DTO/Entity 엄격 분리, 생성자 주입, 트랜잭션 경계 설정), Git 협업 규약을
+명문화하여 준수하기 위한 개발 표준 규약 문서.
 
 ### 3.3.2 작성 필요성 및 목적
 
@@ -153,7 +162,8 @@ ProdFlow를 체계적으로 구축하기 위해 작성된 단계별 필수 산�
 ### 3.3.3 필수 포함 항목
 
 - 기본 언어 서식: 들여쓰기(공백 4칸), 최대 줄 너비(120자), K&R 중괄호 스타일, 와일드카드 import 금지
-- 식별자 명명 규칙: 도메인 중심 패키지(`net.likelion.bebc25.prodflow.*`), 클래스 역할별 접미사(Controller, Service, Repository, Dto, Entity), 메서드 동사 규칙, 데이터베이스 스네이크 케이스
+- 식별자 명명 규칙: 도메인 중심 패키지(`net.likelion.bebc25.prodflow.*`), 클래스 역할별 접미사(Controller, Service, Repository, Dto, Entity),
+  메서드 동사 규칙, 데이터베이스 스네이크 케이스
 - 레이어드 아키텍처 및 구현 표준: 계층별 책임 분리, DTO와 Entity의 엄격한 분리, 불변 생성자 주입, 선언적 트랜잭션 최적화, 전역 예외 처리 표준
 - 깃 협업 및 리뷰 컨벤션: Conventional Commits 커밋 규격, 브랜치 전략(`dev`, `feature/*`, `fix/*`), PR 자가 점검 체크리스트
 
@@ -165,7 +175,8 @@ ProdFlow를 체계적으로 구축하기 위해 작성된 단계별 필수 산�
 
 ### 3.4.1 정의
 
-React SPA 클라이언트부터 Spring Boot REST API, MySQL 데이터베이스, AWS 클라우드 인프라, PortOne 결제/입금, 배송조회·공휴일·주소 API 및 AI 업무 조회 서비스 간의 전체적인 시스템 구조와 데이터 흐름을 시각화한 구성도.
+React SPA 클라이언트부터 Spring Boot REST API, MySQL 데이터베이스, AWS 클라우드 인프라, PortOne 결제/입금, 배송조회·공휴일·주소 API 및 AI 업무 조회 서비스 간의
+전체적인 시스템 구조와 데이터 흐름을 시각화한 구성도.
 
 ### 3.4.2 작성 필요성 및 목적
 
@@ -199,28 +210,32 @@ React SPA 클라이언트부터 Spring Boot REST API, MySQL 데이터베이스, 
 ### 3.5.3 필수 포함 항목
 
 - 테이블명 및 컬럼 명세: PK, FK, Not Null, Unique, Default 제약조건 명시
-- 핵심 도메인 테이블 예시: `user`, `refresh_token`, `client`, `code_group`, `common_code`, `product`, `product_drawing`, `quotation`, `quotation_item`, `customer_order`, `order_product`, `payment`, `virtual_account`, `payment_history`, `work_order`, `production_plan`, `work_order_history`, `line`, `carrier`, `shipment`, `holiday`, `ai_conversation`, `ai_message` 등
+- 핵심 도메인 테이블 예시: `user`, `refresh_token`, `client`, `code_group`, `common_code`, `product`, `product_drawing`,
+  `quotation`, `quotation_item`, `customer_order`, `order_product`, `payment`, `virtual_account`, `payment_history`,
+  `work_order`, `production_plan`, `work_order_history`, `line`, `carrier`, `shipment`, `holiday`, `ai_conversation`,
+  `ai_message` 등
 - 작성 방식: 마크다운 내부 Mermaid `erDiagram` 문법으로 시각적 다이어그램 렌더링
 
 ### 3.5.4 Mermaid ERD 주요 문법
 
-- Mermaid ERD 공식 문법 문서: [https://docs.mermaidviewer.com/diagrams/er.html](https://docs.mermaidviewer.com/diagrams/er.html)
+- Mermaid ERD 공식 문법
+  문서: [https://docs.mermaidviewer.com/diagrams/er.html](https://docs.mermaidviewer.com/diagrams/er.html)
 - Mermaid ERD 관계 표현 기호 규칙:
-  - 1:1 관계 (필수 1 대 1): `||--||` (양쪽 모두 1개 필수)
-  - 1:1 관계 (필수 1 대 선택 0 또는 1): `||--o|` (한쪽은 1개 필수, 반대쪽은 0개 또는 1개)
-  - 1:N 관계 (필수 1 대 1 이상 N): `||--|{` (한쪽은 1개 필수, 반대쪽은 1개 이상 필수)
-  - 1:N 관계 (필수 1 대 0 이상 N): `||--o{` (한쪽은 1개 필수, 반대쪽은 0개 이상 선택)
-  - N:M 관계 (1 이상 N 대 1 이상 M): `}|--|{` (양쪽 모두 1개 이상 필수)
-  - N:M 관계 (1 이상 N 대 0 이상 M): `}|--o{` (한쪽은 1개 이상 필수, 반대쪽은 0개 이상 선택)
+    - 1:1 관계 (필수 1 대 1): `||--||` (양쪽 모두 1개 필수)
+    - 1:1 관계 (필수 1 대 선택 0 또는 1): `||--o|` (한쪽은 1개 필수, 반대쪽은 0개 또는 1개)
+    - 1:N 관계 (필수 1 대 1 이상 N): `||--|{` (한쪽은 1개 필수, 반대쪽은 1개 이상 필수)
+    - 1:N 관계 (필수 1 대 0 이상 N): `||--o{` (한쪽은 1개 필수, 반대쪽은 0개 이상 선택)
+    - N:M 관계 (1 이상 N 대 1 이상 M): `}|--|{` (양쪽 모두 1개 이상 필수)
+    - N:M 관계 (1 이상 N 대 0 이상 M): `}|--o{` (한쪽은 1개 이상 필수, 반대쪽은 0개 이상 선택)
 - 관계선 기호 가이드:
-  - `||`: 정확히 1개 (Exactly one)
-  - `|{`: 1개 이상 (One or more)
-  - `o{`: 0개 이상 (Zero or more)
-  - `o|`: 0개 또는 1개 (Zero or one)
+    - `||`: 정확히 1개 (Exactly one)
+    - `|{`: 1개 이상 (One or more)
+    - `o{`: 0개 이상 (Zero or more)
+    - `o|`: 0개 또는 1개 (Zero or one)
 - 기호 구성 요소 해설:
-  - Straight Line (`|`): 최소 1개 이상 존재해야 함 (Mandatory 필수 조건)
-  - Circle (`o`): 0개일 수 있음 (Optional 선택 조건, 없어도 됨)
-  - Crow Foot (`}` 또는 `{`): 다수 (Many, N개)를 의미
+    - Straight Line (`|`): 최소 1개 이상 존재해야 함 (Mandatory 필수 조건)
+    - Circle (`o`): 0개일 수 있음 (Optional 선택 조건, 없어도 됨)
+    - Crow Foot (`}` 또는 `{`): 다수 (Many, N개)를 의미
 
 - 데이터베이스 ERD: [docs/02_design/02_erd.md](02_design/02_erd.md)
 
@@ -248,8 +263,8 @@ React SPA 클라이언트부터 Spring Boot REST API, MySQL 데이터베이스, 
 - tldraw 웹사이트: [https://www.tldraw.com/](https://www.tldraw.com/)
 - Excalidraw 웹사이트: [https://excalidraw.com/](https://excalidraw.com/)
 - 제작 팁:
-  - 복잡한 픽셀 단위 작업 대신 사각형 박스와 텍스트를 활용한 초간단 와이어프레임 또는 종이 손스케치를 캡처하여 활용
-  - 이미지 파일은 `docs/images/` 폴더에 저장하고 마크다운에서 상대 경로로 링크하여 관리
+    - 복잡한 픽셀 단위 작업 대신 사각형 박스와 텍스트를 활용한 초간단 와이어프레임 또는 종이 손스케치를 캡처하여 활용
+    - 이미지 파일은 `docs/images/` 폴더에 저장하고 마크다운에서 상대 경로로 링크하여 관리
 
 - 화면 설계서: [docs/02_design/03_ui_wireframe.md](02_design/03_ui_wireframe.md)
 
@@ -293,7 +308,8 @@ React SPA 클라이언트부터 Spring Boot REST API, MySQL 데이터베이스, 
 ### 3.8.2 작성 필요성 및 목적
 
 - 문제 재발 방지: 작성된 해결 기록을 공유하여 팀원들이 동일한 버그로 시간을 낭비하는 현상 차단
-- 기술적 자산화: JPA N+1/페치 조인, JWT·RBAC, PortOne 입금 멱등 처리, S3 도면 업로드, Docker/GitHub Actions 배포, AI 조회 SQL 검증 등 실무 수준의 기술 문제 해결 경험을 면접 및 포트폴리오 핵심 자산으로 활용
+- 기술적 자산화: JPA N+1/페치 조인, JWT·RBAC, PortOne 입금 멱등 처리, S3 도면 업로드, Docker/GitHub Actions 배포, AI 조회 SQL 검증 등 실무 수준의 기술 문제
+  해결 경험을 면접 및 포트폴리오 핵심 자산으로 활용
 
 ### 3.8.3 필수 포함 항목 및 작성 템플릿
 
