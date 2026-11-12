@@ -95,7 +95,9 @@ public class QuotationService {
         }
 
         // 최종 저장 시 납기 재계산
-        QuotationScheduleResult schedule = scheduleService.calculate(totalQuantity, request.requestedDueDate(), today);
+        QuotationScheduleResult schedule = Boolean.TRUE.equals(request.sameDayStart())
+                ? scheduleService.calculate(totalQuantity, request.requestedDueDate(), today, true)
+                : scheduleService.calculate(totalQuantity, request.requestedDueDate(), today);
 
         // 거래처 조회. 신규 거래처면 이 트랜잭션 안에서 함께 저장
         Client client = findOrCreateClient(request, user);
@@ -172,7 +174,9 @@ public class QuotationService {
         long totalQuantity = request.items().stream().mapToLong(QuotationItemDto.CreateRequest::quantity).sum();
 
         // 수정 시점의 생산 조건으로 납기를 계산. 불가능하면 수정 트랜잭션을 롤백한다.
-        QuotationScheduleResult schedule = scheduleService.calculate(totalQuantity, request.requestedDueDate(), today);
+        QuotationScheduleResult schedule = Boolean.TRUE.equals(request.sameDayStart())
+                ? scheduleService.calculate(totalQuantity, request.requestedDueDate(), today, true)
+                : scheduleService.calculate(totalQuantity, request.requestedDueDate(), today);
         // 기존 거래처를 연결하거나 신규 거래처를 같은 수정 트랜잭션에서 등록한다.
         Client client = findOrCreateClient(request, editor);
 

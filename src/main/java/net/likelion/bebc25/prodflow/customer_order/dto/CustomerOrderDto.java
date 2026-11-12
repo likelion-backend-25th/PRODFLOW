@@ -1,8 +1,8 @@
 package net.likelion.bebc25.prodflow.customer_order.dto;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -11,16 +11,15 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
-import jakarta.validation.Valid;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
-import io.swagger.v3.oas.annotations.media.Schema;
-
 import net.likelion.bebc25.prodflow.common.entity.StatusHistory;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.customer_order.enums.ConfirmationStatus;
 import net.likelion.bebc25.prodflow.customer_order.enums.NotifyChannel;
 import net.likelion.bebc25.prodflow.customer_order.enums.OrderPaymentStatus;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 
 public class CustomerOrderDto {
     public record CancelRequest(
@@ -65,8 +64,22 @@ public class CustomerOrderDto {
             @NotBlank @Size(max = 255) String receiverName,
             @NotBlank @Pattern(regexp = "[0-9+() -]{8,50}") String receiverPhone,
             @NotNull NotifyChannel notifyChannel,
-            @Size(max = 255) String memo
+            @Size(max = 255) String memo,
+            Boolean sameDayStart
     ) {
+        public CreateRequest(
+                Long quotationId,
+                List<ItemRequest> items,
+                LocalDate dueDate,
+                Boolean useCompanyAddress,
+                ShippingAddress shippingAddress,
+                String receiverName,
+                String receiverPhone, NotifyChannel notifyChannel, String memo
+        ) {
+            this(quotationId, items, dueDate, useCompanyAddress, shippingAddress, receiverName,
+                    receiverPhone, notifyChannel, memo, null);
+        }
+
         // 직접 배송지 입력 여부 확인
         @AssertTrue(message = "직접 배송 시 우편번호, 도로명 주소, 상세 주소를 입력해주세요.")
         @Schema(hidden = true)

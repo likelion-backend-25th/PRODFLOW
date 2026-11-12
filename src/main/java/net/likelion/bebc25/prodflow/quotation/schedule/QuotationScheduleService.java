@@ -31,16 +31,41 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
 
     // 선택 납기의 생산 일정 계산
     public QuotationScheduleResult calculate(long quantity, LocalDate requestedDueDate, LocalDate today) {
+        return calculate(quantity, requestedDueDate, today, false);
+    }
+
+    public QuotationScheduleResult calculate(long quantity, LocalDate requestedDueDate, LocalDate today,
+                                             boolean sameDayStart) {
         if (requestedDueDate == null) {
             throw new IllegalArgumentException("희망 납기일을 입력해주세요.");
         }
 
-        QuotationSchedulePreviewResult result = previewSchedule(quantity, requestedDueDate, today);
+        QuotationSchedulePreviewResult result = previewSchedule(quantity, requestedDueDate, today, sameDayStart);
+        if (sameDayStart && !result.earliestSchedule().plannedStartDate().equals(today)) {
+            throw new IllegalArgumentException("오늘은 착수할 수 없습니다. 당일 착수 요청을 해제하고 일반 일정을 확인해주세요.");
+        }
         if (result.selectedSchedule() == null) {
             throw new IllegalArgumentException("희망 납기를 지킬 수 없습니다. 가능한 가장 빠른 납기일: "
                     + result.earliestSchedule().estimatedDueDate());
         }
         return result.selectedSchedule();
+    }
+
+    // 저장된 시작일을 유지한 채 PDF 발송 시 생산 가능 여부 검증
+    public QuotationScheduleResult calculateFromStart(long quantity, LocalDate requestedDueDate,
+                                                       LocalDate today, LocalDate plannedStartDate) {
+        if (plannedStartDate == null || plannedStartDate.isBefore(today)) {
+            throw new IllegalArgumentException("생산 시작 예정일이 지났습니다. 일정을 다시 확인해주세요.");
+        }
+        ProductionCalendar calendar = createCalendar(today);
+        calendar.checkCalculationLimit(requestedDueDate);
+        Map<LocalDate, Long> plan = calendar.planFromStart(quantity, calendar.nextWorkingDay(plannedStartDate));
+        LocalDate start = Collections.min(plan.keySet());
+        LocalDate end = Collections.max(plan.keySet());
+        if (!start.equals(plannedStartDate) || requestedDueDate.isBefore(calendar.addWorkingDays(end, 3))) {
+            throw new IllegalArgumentException("저장된 생산 일정으로 착수할 수 없습니다. 일정을 다시 확인해주세요.");
+        }
+        return new QuotationScheduleResult(requestedDueDate, start, end);
     }
 
     // 생산 계산용 캘린더 생성
@@ -74,12 +99,17 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
 
     // 최단·선택 납기 일정 계산
     public QuotationSchedulePreviewResult previewSchedule(long quantity, LocalDate requestedDueDate, LocalDate today) {
+        return previewSchedule(quantity, requestedDueDate, today, false);
+    }
+
+    public QuotationSchedulePreviewResult previewSchedule(long quantity, LocalDate requestedDueDate, LocalDate today,
+                                                           boolean sameDayStart) {
         ProductionCalendar calendar = createCalendar(today);
         if (requestedDueDate != null) {
             calendar.checkCalculationLimit(requestedDueDate);
         }
 
-        LocalDate firstDate = calendar.nextWorkingDay(today.plusDays(3));
+        LocalDate firstDate = calendar.nextWorkingDay(sameDayStart ? today : today.plusDays(3));
 
         Map<LocalDate, Long> earliestPlan = calendar.planFromStart(quantity, firstDate);
 
@@ -89,6 +119,17 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
         LocalDate earliestDueDate = calendar.addWorkingDays(earliestEndDate, 3);
         QuotationScheduleResult earliestSchedule = new QuotationScheduleResult(
                 earliestDueDate, earliestStartDate, earliestEndDate);
+
+        // 당일 요청은 오늘 시작해야 하며, 늦은 납기를 선택해도 생산을 뒤로 밀지 않는다.
+        if (sameDayStart) {
+            if (!earliestStartDate.equals(today)
+                    || (requestedDueDate != null && requestedDueDate.isBefore(earliestDueDate))) {
+                return new QuotationSchedulePreviewResult(earliestSchedule, null);
+            }
+            return new QuotationSchedulePreviewResult(earliestSchedule,
+                    new QuotationScheduleResult(requestedDueDate == null ? earliestDueDate : requestedDueDate,
+                            earliestStartDate, earliestEndDate));
+        }
 
         // 날짜를 선택하지 않았으면 가장 빠른 일정을 반환
         if (requestedDueDate == null) {
@@ -137,8 +178,13 @@ public class QuotationScheduleService { // 생산 능력과 기존 수주의 생
             if (startDate.isBefore(today)) {
                 startDate = today;
             }
-            Map<LocalDate, Long> plan = calendar.planProduction(remainingQuantity,
-                    calendar.nextWorkingDay(startDate), order.getEstimatedDueDate());
+            // 저장된 시작일이 있으면 그 날부터 예약한다. 늦은 납기 때문에 당일 예약이 밀리지 않게 한다.
+            Map<LocalDate, Long> plan = order.getPlannedStartDate() == null
+                    ? calendar.planProduction(remainingQuantity,
+                            calendar.nextWorkingDay(startDate), order.getEstimatedDueDate())
+                    : calendar.planFromStart(remainingQuantity,
+                            calendar.nextWorkingDay(order.getPlannedStartDate().isBefore(startDate)
+                                    ? startDate : order.getPlannedStartDate()));
             for (Map.Entry<LocalDate, Long> day : plan.entrySet()) {
                 calendar.reserve(day.getKey(), day.getValue());
             }

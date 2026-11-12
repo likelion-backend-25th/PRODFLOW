@@ -60,6 +60,19 @@ class QuotationSchedulePreviewControllerTest {
     }
 
     @Test
+    void sameDayOptionIsPassedWithoutCreatingQuotation() throws Exception {
+        when(schedules.previewSchedule(eq(300L), isNull(), any(LocalDate.class), eq(true)))
+                .thenReturn(new QuotationSchedulePreviewResult(earliest, earliest));
+        mvc.perform(post(URL).with(user("수주관리자").roles("ORDER_MANAGER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" + ITEMS + ",\"sameDayStart\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.feasible").value(true));
+        verify(schedules).previewSchedule(eq(300L), isNull(), any(LocalDate.class), eq(true));
+        verifyNoInteractions(quotations);
+    }
+
+    @Test
     void selectedDateIsPassedToCalculationAndItsScheduleIsReturned() throws Exception {
         LocalDate requested = LocalDate.of(2026, 11, 20);
         var selected = new QuotationScheduleResult(requested, requested.minusDays(3), requested.minusDays(3));
