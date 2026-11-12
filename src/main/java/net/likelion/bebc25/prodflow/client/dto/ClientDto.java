@@ -105,12 +105,13 @@ public class ClientDto {
         }
     }
 
-    public record CountRecentMonthResponse(
+    public record CountResponse(
+            Long countAll,
             Long countByOrder,
             Long countByCreatedAt
     ) {
-        public static CountRecentMonthResponse from(Long countByOrder, Long countByCreatedAt) {
-            return new CountRecentMonthResponse(countByOrder, countByCreatedAt);
+        public static CountResponse from(Long countAll, Long countByOrder, Long countByCreatedAt) {
+            return new CountResponse(countAll, countByOrder, countByCreatedAt);
         }
     }
 }

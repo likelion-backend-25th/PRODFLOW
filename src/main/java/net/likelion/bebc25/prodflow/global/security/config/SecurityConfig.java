@@ -157,6 +157,11 @@ public class SecurityConfig {
                                 "/api/v1/users/me"
                         ).authenticated()
 
+                        // 수주 관리자 조회 API (거래처 등록에서 사용)
+                        .requestMatchers(
+                                "/api/v1/users/order"
+                        ).hasAnyRole("SUPER_ADMIN", "ORDER_MANAGER")
+
                         // 직원 관리 API
                         // 최고 관리자만 직원 목록 조회, 등록, 수정, 삭제 가능
                         .requestMatchers(
