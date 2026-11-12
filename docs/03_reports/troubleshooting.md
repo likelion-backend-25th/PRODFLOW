@@ -12,4 +12,4 @@
 
 ### [MCP 도구의 SQL 실행 예외로 인한 Gemini JSON 파싱 오류](mcp_sql_json_parsing.md)
 
-### [동시 수주 등록 시 생산 물량이 중복 예약된 문제](order_registration_lock.md)
+### [생산품목 도면 S3 미리보기 URL 노출 설계](product_drawing_presigned_url.md)
