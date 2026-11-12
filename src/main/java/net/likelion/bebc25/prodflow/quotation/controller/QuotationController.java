@@ -195,51 +195,6 @@ public class QuotationController {
         return ResponseEntity.noContent().build();
     }
 
-    // PDF 생성 없이 신규 견적 초안 저장
-    @Operation(summary = "견적 초안 저장",
-            description = "입력값과 납기를 검증하고 견적과 품목을 DRAFT로 저장한다. PDF 생성이나 이메일 발송은 수행하지 않는다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "초안 저장 완료 및 견적 상세 반환"),
-            @ApiResponse(responseCode = "400", description = "입력값 또는 업무 규칙 오류", content = @Content),
-            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
-            @ApiResponse(responseCode = "403", description = "권한 또는 계정 조건 미충족", content = @Content),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 거래처 또는 품목", content = @Content)
-    })
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
-    @PostMapping
-    public ResponseEntity<QuotationDto.DetailResponse> createDraft(
-            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Valid @RequestBody QuotationDto.CreateRequest request
-    ) {
-        QuotationDto.DetailResponse response = quotationService.create(request, userDetails.getUserId());
-        return ResponseEntity.created(URI.create("/api/v1/quotations/" + response.id()))
-                .header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(response);
-    }
-
-    // PDF 생성 없이 기존 견적 초안 수정 저장
-    @Operation(summary = "견적 초안 수정 저장",
-            description = "전체 입력으로 DRAFT를 수정하고 금액과 납기를 다시 계산한다. "
-                    + "ID·견적번호·최초 작성자를 유지하며 기존 PDF를 무효화한다. PDF 생성이나 이메일 발송은 수행하지 않는다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "초안 수정 완료 및 견적 상세 반환"),
-            @ApiResponse(responseCode = "400", description = "입력값·초안 상태 또는 업무 규칙 오류", content = @Content),
-            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
-            @ApiResponse(responseCode = "403", description = "권한 또는 계정 조건 미충족", content = @Content),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 견적·거래처 또는 품목", content = @Content)
-    })
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ORDER_MANAGER')")
-    @PutMapping("/{quotationId}")
-    public ResponseEntity<QuotationDto.DetailResponse> updateDraft(
-            @PathVariable Long quotationId,
-            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Valid @RequestBody QuotationDto.CreateRequest request
-    ) {
-        QuotationDto.DetailResponse response = quotationService.updateDraft(
-                quotationId, request, userDetails.getUserId());
-        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store").body(response);
-    }
-
     // 견적 초안 저장 및 PDF 준비
     @Operation(summary = "견적 초안 저장 및 PDF 생성",
             description = "초안을 저장·커밋한 뒤 PDF를 S3에 저장하고 미리보기 URL을 JSON으로 반환한다. "
