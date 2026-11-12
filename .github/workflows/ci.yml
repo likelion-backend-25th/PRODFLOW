@@ -3,13 +3,9 @@ name: CI Pipeline
 on:
   push:
     branches: [ "main", "dev" ]
-    paths-ignore:
-      - "docs/**"
 
   pull_request:
     branches: [ "main", "dev" ]
-    paths-ignore:
-      - "docs/**"
 
 jobs:
   build-and-test:
