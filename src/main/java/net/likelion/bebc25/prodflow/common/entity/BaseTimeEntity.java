@@ -32,7 +32,7 @@ public abstract class BaseTimeEntity { // 추상 클래스 new 생성 안됨
 
     // Entity 최초 저장될 때 일시와 사용자의 이름이 존재하지 않으면 자동으로 주입
     @PrePersist
-    public void prePersistTime() {
+    public void prePersist() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
