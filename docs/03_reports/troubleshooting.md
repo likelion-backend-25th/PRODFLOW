@@ -12,4 +12,6 @@
 
 ### [MCP 도구의 SQL 실행 예외로 인한 Gemini JSON 파싱 오류](mcp_sql_json_parsing.md)
 
+### [PortOne API 응답 유실로 인한 가상계좌 중복 발급 문제](portone_virtual_account_duplicate_issuance.md)
+
 ### [생산품목 도면 S3 미리보기 URL 노출 설계](product_drawing_presigned_url.md)
