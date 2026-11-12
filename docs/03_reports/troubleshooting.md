@@ -10,4 +10,6 @@
 
 ### [MCP 호출 시 JWT 인증 오류 및 Spring Security 오류 디스패치 문제](mcp_jwt_authentication.md)
 
-### [MCP 도구의 SQL 실행 예외로 인한 Gemini JSON 파싱 오류](mcp_sql_json_parsing.md) 
+### [MCP 도구의 SQL 실행 예외로 인한 Gemini JSON 파싱 오류](mcp_sql_json_parsing.md)
+
+### [PortOne API 응답 유실로 인한 가상계좌 중복 발급 문제](portone_virtual_account_duplicate_issuance.md)
