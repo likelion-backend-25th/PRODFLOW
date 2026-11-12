@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import net.likelion.bebc25.prodflow.common.dto.PageResponse;
 import net.likelion.bebc25.prodflow.global.security.principal.CustomUserDetails;
 import net.likelion.bebc25.prodflow.user.dto.UserDto;
-import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.user.service.UserService;
 import org.springframework.data.domain.Pageable;
@@ -137,7 +136,7 @@ public class UserController {
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping("/order")
-    public ResponseEntity<List<User>> findByOrderManager() {
+    public ResponseEntity<List<UserDto.Response>> findByOrderManager() {
         return ResponseEntity.ok(userService.findByOrderManager());
     }
 }
