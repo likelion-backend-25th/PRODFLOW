@@ -2,6 +2,7 @@ package net.likelion.bebc25.prodflow.ai.service;
 
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
+import lombok.extern.slf4j.Slf4j;
 import net.likelion.bebc25.prodflow.ai.dto.AiDto;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -25,6 +26,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
+@Slf4j
 @Service
 public class AiModelService {
 
@@ -34,9 +36,15 @@ public class AiModelService {
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
     private final String systemPrompt;
 
+    // 모델에 전달하는 대화와 이전 SQL 조회 결과 크기 제한
+    private static final int MAX_HISTORY_MESSAGES = 4;
+    private static final int MAX_RESULT_LENGTH = 2000;
+    private static final int MAX_OUTPUT_TOKENS = 2048;
+
     // application.yml에 설정한 MCP 서버 주소
     @Value("${prodflow.mcp.url:http://127.0.0.1:8080}")
     private String mcpUrl;
+    private AiDto.AskResponse askResponse;
 
     public AiModelService(
             GoogleGenAiChatModel geminiModel,
@@ -70,10 +78,7 @@ public class AiModelService {
         AiDto.AskExecution result =
                 askWithDetails(request, accessToken, List.of());
 
-        return new AiDto.AskResponse(
-                result.model(),
-                result.answer()
-        );
+        return askResponse;
     }
 
 
@@ -83,6 +88,7 @@ public class AiModelService {
             List<AiDto.HistoryMessage> history
     ) {
         String model = request.model();
+        log.info("AI 요청 모델: {}", model);
 
         // 요청한 AI 모델 선택
         ChatClient selectedClient = switch (model) {
@@ -131,13 +137,13 @@ public class AiModelService {
 
                         String resultJson = item.resultJson();
 
-                        // 과도한 토큰 사용 방지
-                        int maxLength = 8000;
 
-                        if (resultJson.length() > maxLength) {
-                            resultJson = resultJson.substring(0, maxLength)
+                        // 이전 SQL 결과의 모델 입력 크기 제한 (문자 수 기준)
+                        if (resultJson.length() > MAX_RESULT_LENGTH) {
+                            resultJson = resultJson.substring(0, MAX_RESULT_LENGTH)
                                     + "\n[이전 SQL 조회 결과 일부 생략]";
                         }
+
 
                         content += """
                                 
@@ -267,10 +273,19 @@ public class AiModelService {
                 }
             }
 
-            // 5. AI 모델에 시스템 프롬프트와 MCP Tool 제공
+            // 5. 이전 대화는 최근 8개 메시지만 사용
+            List<AiDto.HistoryMessage> recentHistory =
+                    history == null
+                            ? List.of()
+                            : history.subList(
+                            Math.max(0, history.size() - MAX_HISTORY_MESSAGES),
+                            history.size()
+                    );
+
+            // AI 모델에 시스템 프롬프트와 MCP Tool 제공
             var prompt = chatClient.prompt()
                     .system(systemPrompt)
-                    .messages(convertHistory(history))
+                    .messages(convertHistory(recentHistory))
                     .user(question)
                     .tools(recordingCallbacks);
 
@@ -279,26 +294,59 @@ public class AiModelService {
                 prompt.options(
                         GoogleGenAiChatOptions.builder()
                                 .model(model)
+                                .maxOutputTokens(MAX_OUTPUT_TOKENS)
                 );
             } else if (model.startsWith("openai/gpt-oss-")) {
                 prompt.options(
                         OpenAiChatOptions.builder()
                                 .model(model)
+                                .maxCompletionTokens(MAX_OUTPUT_TOKENS)
+                                .maxRetries(0)
+                                .replayReasoningContent(false)
+
                 );
             }
 
-            // 7. MCP Tool 실행 후 최종 AI 답변 반환
-            String answer = prompt.call().content();
+
+            // 7. MCP Tool 실행 후 AI 응답 및 토큰 사용량 확인
+            log.info("AI API 호출 시작 - 모델: {}", model);
+
+            var response = prompt.call().chatResponse();
+
+            if (response == null || response.getResult() == null) {
+                throw new IllegalStateException("AI 응답을 받지 못했습니다.");
+            }
+
+            // 토큰 사용량 로그 출력
+            var usage = response.getMetadata().getUsage();
+
+            if (usage != null) {
+                log.info("AI 토큰 사용량 - 모델: {}, 입력: {}, 출력: {}, 전체: {}",
+                        model,
+                        usage.getPromptTokens(),
+                        usage.getCompletionTokens(),
+                        usage.getTotalTokens());
+            }
+
+            // 최종 AI 답변 추출
+            String answer = response.getResult()
+                    .getOutput()
+                    .getText();
+
+            // SQL 조회 결과 수집
             AiMcpResultCapture.SqlResult sqlResult =
-                    queryCapture == null ? null : queryCapture.getLastResult();
+                    queryCapture == null
+                            ? null
+                            : queryCapture.getLastResult();
 
             return new AiDto.AskExecution(
                     model,
                     answer,
                     sqlResult == null ? null : sqlResult.generatedSql(),
-                    sqlResult == null ? null : sqlResult.resultJson());
-
+                    sqlResult == null ? null : sqlResult.resultJson()
+            );
         }
     }
 }
+
 
