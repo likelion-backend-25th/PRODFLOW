@@ -306,6 +306,67 @@ class QuotationScheduleServiceTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("2028-12-31");
     }
 
+    @Test
+    void sameDayStartKeepsTodayEvenWhenRequestedDeliveryIsLater() {
+        var result = service.calculate(250, date(20), today, true);
+        assertThat(result.plannedStartDate()).isEqualTo(today);
+        assertThat(result.plannedEndDate()).isEqualTo(date(4));
+        assertThat(result.estimatedDueDate()).isEqualTo(date(20));
+    }
+
+    @Test
+    void sameDayStartRequiresOnlyPartOfTheQuantityToFitToday() {
+        CustomerOrder existing = order(1L, date(20));
+        when(existing.getDepositDueDate()).thenReturn(today);
+        when(existing.getPlannedStartDate()).thenReturn(today);
+        when(repository.findActiveOrders()).thenReturn(List.of(existing));
+        OrderProduct existingItem = item(existing, 60);
+        when(repository.findOrderProducts(List.of(1L))).thenReturn(List.of(existingItem));
+
+        var result = service.calculate(100, date(20), today, true);
+        assertThat(result.plannedStartDate()).isEqualTo(today);
+        assertThat(result.plannedEndDate()).isEqualTo(date(3));
+    }
+
+    @Test
+    void sameDayReservationsPreventDoubleBookingDespiteLateDelivery() {
+        CustomerOrder existing = order(1L, date(20));
+        when(existing.getDepositDueDate()).thenReturn(today);
+        when(existing.getPlannedStartDate()).thenReturn(today);
+        when(repository.findActiveOrders()).thenReturn(List.of(existing));
+        OrderProduct existingItem = item(existing, 100);
+        when(repository.findOrderProducts(List.of(1L))).thenReturn(List.of(existingItem));
+
+        assertThat(service.previewSchedule(100, null, today, true).selectedSchedule()).isNull();
+        assertThatThrownBy(() -> service.calculate(100, date(20), today, true))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("당일 착수 요청을 해제");
+        assertThat(service.calculate(100, date(20), today).plannedStartDate()).isAfter(today);
+    }
+
+    @Test
+    void sameDayStartDoesNotSilentlyMoveWeekendOrHolidayToNextWorkingDay() {
+        assertThat(service.previewSchedule(100, null, date(7), true).selectedSchedule()).isNull();
+        when(repository.findHolidays()).thenReturn(List.of(today));
+        assertThat(service.previewSchedule(100, null, today, true).selectedSchedule()).isNull();
+        assertThatThrownBy(() -> service.calculate(100, date(20), today, true))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("오늘은 착수할 수 없습니다");
+    }
+
+    @Test
+    void savedStartValidationRejectsExpiredOrOccupiedStartWithoutMovingIt() {
+        assertThat(service.calculateFromStart(100, date(20), today, today).plannedStartDate()).isEqualTo(today);
+        assertThatThrownBy(() -> service.calculateFromStart(100, date(20), today.plusDays(1), today))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("생산 시작 예정일이 지났습니다");
+        CustomerOrder existing = order(1L, date(20));
+        when(existing.getDepositDueDate()).thenReturn(today);
+        when(existing.getPlannedStartDate()).thenReturn(today);
+        when(repository.findActiveOrders()).thenReturn(List.of(existing));
+        OrderProduct existingItem = item(existing, 100);
+        when(repository.findOrderProducts(List.of(1L))).thenReturn(List.of(existingItem));
+        assertThatThrownBy(() -> service.calculateFromStart(100, date(20), today, today))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("저장된 생산 일정");
+    }
+
     private LocalDate date(int day) {
         return LocalDate.of(2026, 11, day);
     }

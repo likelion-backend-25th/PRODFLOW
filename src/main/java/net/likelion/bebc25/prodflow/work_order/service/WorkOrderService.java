@@ -767,7 +767,7 @@ public class WorkOrderService {
         if (workOrder.getUser() == null) {
             throw new IllegalArgumentException("담당자를 배정한 후 생산을 시작해주세요.");
         }
-        if (workOrder.getPlannedStartDate().isAfter(LocalDate.now())) {
+        if (workOrder.getPlannedStartDate().isAfter(LocalDate.now(ZoneId.of("Asia/Seoul")))) {
             throw new IllegalArgumentException("생산 시작 예정일 전에는 시작할 수 없습니다.");
         }
         String orderStatus = workOrder.getOrderProduct().getCustomerOrder().getStatusCode().getCode();

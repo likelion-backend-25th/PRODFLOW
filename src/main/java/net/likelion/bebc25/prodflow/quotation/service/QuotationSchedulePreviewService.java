@@ -41,11 +41,9 @@ public class QuotationSchedulePreviewService {
 
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
-        QuotationSchedulePreviewResult result = scheduleService.previewSchedule(
-                totalQuantity,
-                request.requestedDueDate(),
-                today
-        );
+        QuotationSchedulePreviewResult result = Boolean.TRUE.equals(request.sameDayStart())
+                ? scheduleService.previewSchedule(totalQuantity, request.requestedDueDate(), today, true)
+                : scheduleService.previewSchedule(totalQuantity, request.requestedDueDate(), today);
         return QuotationScheduleDto.Response.from(result, request.requestedDueDate());
     }
 

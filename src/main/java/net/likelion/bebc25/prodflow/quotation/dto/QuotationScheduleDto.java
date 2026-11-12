@@ -16,8 +16,12 @@ public class QuotationScheduleDto {
     public record Request(
             @NotEmpty(message = "품목을 하나 이상 선택해주세요.")
             List<@NotNull(message = "납기 계산 품목은 비어 있을 수 없습니다.") @Valid ItemRequest> items,
-            LocalDate requestedDueDate
+            LocalDate requestedDueDate,
+            Boolean sameDayStart
     ) {
+        public Request(List<ItemRequest> items, LocalDate requestedDueDate) {
+            this(items, requestedDueDate, false);
+        }
     }
 
     public record ItemRequest(
