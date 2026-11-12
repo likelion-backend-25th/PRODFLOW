@@ -16,6 +16,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import net.likelion.bebc25.prodflow.client_notification.enums.PaymentNotificationStatus;
+import net.likelion.bebc25.prodflow.client_notification.enums.PaymentNotificationKind;
+import org.hibernate.annotations.ColumnDefault;
 import net.likelion.bebc25.prodflow.common.entity.BaseTimeEntity;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.user.entity.User;
@@ -39,6 +41,11 @@ public class PaymentNotificationRequest extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @ColumnDefault("'DEPOSIT'")
+    private PaymentNotificationKind kind = PaymentNotificationKind.DEPOSIT;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private PaymentNotificationStatus status;
 
     @Column(nullable = false, length = 500)
@@ -54,5 +61,12 @@ public class PaymentNotificationRequest extends BaseTimeEntity {
     public void complete(PaymentNotificationStatus status, String message) {
         this.status = status;
         this.message = message;
+    }
+
+    public static PaymentNotificationRequest shipment(String id, CustomerOrder order, User user) {
+        PaymentNotificationRequest request = new PaymentNotificationRequest(id, order, user);
+        request.kind = PaymentNotificationKind.SHIPMENT;
+        request.complete(PaymentNotificationStatus.PROCESSING, "출고 및 잔금 안내를 준비하고 있습니다.");
+        return request;
     }
 }

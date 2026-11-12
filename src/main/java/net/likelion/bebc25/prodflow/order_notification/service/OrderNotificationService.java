@@ -8,12 +8,18 @@ import net.likelion.bebc25.prodflow.order_notification.dto.SentOrderNotification
 import net.likelion.bebc25.prodflow.order_notification.entity.OrderNotification;
 import net.likelion.bebc25.prodflow.order_notification.enums.OrderNotificationType;
 import net.likelion.bebc25.prodflow.order_notification.repository.OrderNotificationRepository;
+import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.user.enums.UserRole;
+import net.likelion.bebc25.prodflow.user.enums.UserStatus;
+import net.likelion.bebc25.prodflow.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Transactional(readOnly = true)
@@ -23,6 +29,7 @@ public class OrderNotificationService {
     private static final int IMMINENT_DAYS = 3;
 
     private final OrderNotificationRepository orderNotificationRepository;
+    private final UserRepository userRepository;
 
     public List<OrderNotificationDto> getNotifications(Long userId) {
         return orderNotificationRepository
@@ -46,7 +53,7 @@ public class OrderNotificationService {
         return OrderNotificationDto.from(notification);
     }
 
-    // 납기가 지났거나 3일 이내인 수주를 담당 직원에게 한 번만 알린다.
+    // 납기가 지났거나 3일 이내인 수주를 담당 직원과 활성 최고관리자에게 알린다. 수신자마다 한 번만 만든다.
     @Transactional
     public int createDueNotifications(LocalDate today) {
         LocalDate riskDate = today.plusDays(IMMINENT_DAYS);
@@ -55,27 +62,14 @@ public class OrderNotificationService {
 
         int created = 0;
         for (CustomerOrder order : orders) {
-            OrderNotificationType type = resolveType(order, today);
-            if (orderNotificationRepository.existsByCustomerOrder_IdAndNotificationType(
-                    order.getId(),
-                    type
-            )) {
-                continue;
-            }
-
-            orderNotificationRepository.save(new OrderNotification(
-                    order,
-                    order.getUser(),
-                    type,
-                    message(order, today, type)
-            ));
-            created++;
+            created += saveDueNotifications(order, today);
         }
         return created;
     }
 
-    public List<SentOrderNotificationResponse> listSentDueNotifications() {
-        return orderNotificationRepository.findSentDueNotifications(List.of(
+    // 전송 완료는 로그인한 수신자 기준이다. 담당자에게만 있는 알림 때문에 최고관리자 버튼이 사라지지 않는다.
+    public List<SentOrderNotificationResponse> listSentDueNotifications(Long userId) {
+        return orderNotificationRepository.findSentDueNotifications(userId, List.of(
                 OrderNotificationType.DELIVERY_DELAYED,
                 OrderNotificationType.DELIVERY_IMMINENT
         ));
@@ -96,17 +90,42 @@ public class OrderNotificationService {
                 .orElseThrow(() -> new IllegalArgumentException("납기 위험 수주가 아니어서 알림을 보내지 않습니다."));
 
         OrderNotificationType type = resolveType(order, today);
-        if (orderNotificationRepository.existsByCustomerOrder_IdAndNotificationType(order.getId(), type)) {
-            return new OrderDueNotificationResponse(order.getId(), type, false);
-        }
+        boolean created = saveDueNotifications(order, today) > 0;
+        return new OrderDueNotificationResponse(order.getId(), type, created);
+    }
 
-        orderNotificationRepository.save(new OrderNotification(
-                order,
-                order.getUser(),
-                type,
-                message(order, today, type)
-        ));
-        return new OrderDueNotificationResponse(order.getId(), type, true);
+    // 담당 직원이 최고관리자이면 같은 알림을 두 번 만들지 않는다. 비활성 최고관리자는 추가 수신자에서 뺀다.
+    private List<User> dueNotificationTargets(CustomerOrder order) {
+        Map<Long, User> targets = new LinkedHashMap<>();
+        User assignee = order.getUser();
+        if (assignee != null) {
+            targets.put(assignee.getId(), assignee);
+        }
+        for (User admin : userRepository.findByRole(UserRole.SUPER_ADMIN)) {
+            if (admin.getStatus() != UserStatus.ACTIVE || admin.getId() == null) {
+                continue;
+            }
+            targets.putIfAbsent(admin.getId(), admin);
+        }
+        return List.copyOf(targets.values());
+    }
+
+    private int saveDueNotifications(CustomerOrder order, LocalDate today) {
+        OrderNotificationType type = resolveType(order, today);
+        String text = message(order, today, type);
+        int created = 0;
+        for (User target : dueNotificationTargets(order)) {
+            if (orderNotificationRepository.existsByCustomerOrder_IdAndNotificationTypeAndTarget_Id(
+                    order.getId(),
+                    type,
+                    target.getId()
+            )) {
+                continue;
+            }
+            orderNotificationRepository.save(new OrderNotification(order, target, type, text));
+            created++;
+        }
+        return created;
     }
 
     private OrderNotificationType resolveType(CustomerOrder order, LocalDate today) {

@@ -26,6 +26,10 @@ public class ShipmentTrackingService {
                         "운송장을 찾을 수 없습니다: id=" + shipmentId
                 ));
 
+        if (shipment.getStartedAt() == null) {
+            throw new IllegalArgumentException("계좌 준비와 이메일 전송을 완료한 출고만 배송 조회할 수 있습니다.");
+        }
+
         TrackingApiDto api = shipmentTrackingClient.fetchTrackingInfo(
                 shipment.getCarrier().getCode(),
                 shipment.getTrackingNumber()

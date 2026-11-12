@@ -26,16 +26,24 @@ public interface OrderNotificationRepository extends JpaRepository<OrderNotifica
             OrderNotificationType notificationType
     );
 
+    boolean existsByCustomerOrder_IdAndNotificationTypeAndTarget_Id(
+            Long customerOrderId,
+            OrderNotificationType notificationType,
+            Long targetId
+    );
+
     @Query("""
-            SELECT new net.likelion.bebc25.prodflow.order_notification.dto.SentOrderNotificationResponse(
+            SELECT DISTINCT new net.likelion.bebc25.prodflow.order_notification.dto.SentOrderNotificationResponse(
                 n.customerOrder.id,
                 n.notificationType
             )
             FROM OrderNotification n
             WHERE n.customerOrder IS NOT NULL
+              AND n.target.id = :targetId
               AND n.notificationType IN :types
             """)
     List<SentOrderNotificationResponse> findSentDueNotifications(
+            @Param("targetId") Long targetId,
             @Param("types") Collection<OrderNotificationType> types
     );
 

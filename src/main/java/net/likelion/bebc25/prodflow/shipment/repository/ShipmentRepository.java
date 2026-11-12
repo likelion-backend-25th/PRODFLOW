@@ -29,7 +29,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
     @Query("""
             SELECT s FROM Shipment s
             JOIN FETCH s.carrier
-            WHERE s.complete = false OR s.complete IS NULL
+            WHERE s.startedAt IS NOT NULL AND (s.complete = false OR s.complete IS NULL)
             """)
     List<Shipment> findIncompleteShipments();
 }

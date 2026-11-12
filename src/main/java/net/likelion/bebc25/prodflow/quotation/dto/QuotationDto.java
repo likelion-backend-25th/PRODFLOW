@@ -1,5 +1,6 @@
 package net.likelion.bebc25.prodflow.quotation.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -7,12 +8,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
-import jakarta.validation.Valid;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-
 import net.likelion.bebc25.prodflow.client.entity.Client;
 import net.likelion.bebc25.prodflow.common.domain.Address;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
@@ -20,6 +15,11 @@ import net.likelion.bebc25.prodflow.quotation.entity.Quotation;
 import net.likelion.bebc25.prodflow.quotation.entity.QuotationItem;
 import net.likelion.bebc25.prodflow.quotation.enums.QuotationStatus;
 import net.likelion.bebc25.prodflow.user.entity.User;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 public class QuotationDto {
 
@@ -32,8 +32,20 @@ public class QuotationDto {
             boolean vatIncluded,
             @NotEmpty(message = "견적 품목을 하나 이상 입력해주세요.")
             List<QuotationItemDto.@NotNull(message = "견적 품목은 비어 있을 수 없습니다.") @Valid CreateRequest> items,
-            @Valid ClientRequest newClient
+            @Valid ClientRequest newClient,
+            Boolean sameDayStart
     ) {
+        public CreateRequest(
+                Long clientId,
+                LocalDate requestedDueDate,
+                LocalDate validUntil,
+                boolean vatIncluded,
+                List<QuotationItemDto.CreateRequest> items,
+                ClientRequest newClient
+        ) {
+            this(clientId, requestedDueDate, validUntil, vatIncluded, items, newClient, false);
+        }
+
         // 견적 초안 엔티티 변환
         public Quotation toEntity(
                 String quotationNo,

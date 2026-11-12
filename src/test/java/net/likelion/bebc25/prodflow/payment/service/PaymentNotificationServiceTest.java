@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import net.likelion.bebc25.prodflow.client_notification.entity.PaymentNotificationRequest;
 import net.likelion.bebc25.prodflow.client_notification.enums.PaymentNotificationStatus;
+import net.likelion.bebc25.prodflow.client_notification.enums.PaymentNotificationKind;
 import net.likelion.bebc25.prodflow.client_notification.repository.ClientNotiLogRepository;
 import net.likelion.bebc25.prodflow.client_notification.repository.PaymentNotificationRequestRepository;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
@@ -106,9 +107,10 @@ class PaymentNotificationServiceTest {
         when(payments.findByOrder_IdAndPaymentType(1L, PaymentType.DEPOSIT)).thenReturn(Optional.of(payment));
         when(accounts.findFirstByPayment_IdOrderByIdDesc(5L)).thenReturn(Optional.of(account));
         when(account.isActive()).thenReturn(true);
+        when(account.getExpiresAt()).thenReturn(java.time.OffsetDateTime.parse("2099-01-02T00:00:00Z"));
         when(account.getBank()).thenReturn(Bank.SHINHAN);
         when(account.getAccountNumber()).thenReturn("123456789");
-        when(requests.findFirstByOrder_IdOrderByUpdatedAtDesc(1L)).thenReturn(Optional.empty());
+        when(requests.findFirstByOrder_IdAndKindOrderByUpdatedAtDesc(1L, PaymentNotificationKind.DEPOSIT)).thenReturn(Optional.empty());
         when(order.getId()).thenReturn(1L);
         when(sender.getId()).thenReturn(7L);
         when(requests.findById(anyString())).thenAnswer(call -> Optional.ofNullable(saved.get(call.getArgument(0))));
@@ -157,7 +159,7 @@ class PaymentNotificationServiceTest {
     @Test
     void inProgressOrderBlocksAnotherRequest() {
         User sender = users.getReferenceById(7L);
-        when(requests.findFirstByOrder_IdOrderByUpdatedAtDesc(1L)).thenReturn(Optional.of(
+        when(requests.findFirstByOrder_IdAndKindOrderByUpdatedAtDesc(1L, PaymentNotificationKind.DEPOSIT)).thenReturn(Optional.of(
                 new PaymentNotificationRequest("other-request", order, sender)));
         assertThrows(ResponseStatusException.class, () -> service.send(1L, request, 7L));
         verify(mail, never()).send(anyString(), anyString(), anyString());
