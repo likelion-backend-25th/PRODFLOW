@@ -1,6 +1,7 @@
 package net.likelion.bebc25.prodflow.user;
 
 import net.likelion.bebc25.prodflow.auth.repository.RefreshTokenRepository;
+import net.likelion.bebc25.prodflow.user.dto.UserDto;
 import net.likelion.bebc25.prodflow.user.entity.User;
 import net.likelion.bebc25.prodflow.user.enums.UserRole;
 import net.likelion.bebc25.prodflow.user.repository.UserRepository;
@@ -16,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -34,15 +36,20 @@ class UserServiceTest {
     private UserService userService;
 
     @Test
-    @DisplayName("주문 담당자 역할로 조회하고 조회된 사용자 목록을 반환한다")
+    @DisplayName("주문 담당자 역할로 조회하고 응답 DTO 목록을 반환한다")
     void findByOrderManager() {
         User firstManager = User.builder().name("이서준").role(UserRole.ORDER_MANAGER).build();
         User secondManager = User.builder().name("오지훈").role(UserRole.ORDER_MANAGER).build();
         given(userRepository.findByRole(UserRole.ORDER_MANAGER)).willReturn(List.of(firstManager, secondManager));
 
-        List<User> result = userService.findByOrderManager();
+        List<UserDto.Response> result = userService.findByOrderManager();
 
-        assertThat(result).containsExactly(firstManager, secondManager);
+        assertThat(result)
+                .extracting(UserDto.Response::name, UserDto.Response::role)
+                .containsExactly(
+                        tuple("이서준", UserRole.ORDER_MANAGER),
+                        tuple("오지훈", UserRole.ORDER_MANAGER)
+                );
         verify(userRepository).findByRole(UserRole.ORDER_MANAGER);
     }
 
@@ -51,7 +58,7 @@ class UserServiceTest {
     void findByOrderManagerReturnsEmptyList() {
         given(userRepository.findByRole(UserRole.ORDER_MANAGER)).willReturn(List.of());
 
-        List<User> result = userService.findByOrderManager();
+        List<UserDto.Response> result = userService.findByOrderManager();
 
         assertThat(result).isEmpty();
         verify(userRepository).findByRole(UserRole.ORDER_MANAGER);
