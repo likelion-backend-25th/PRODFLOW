@@ -33,6 +33,7 @@ public class AiModelConfig {
                         .baseUrl("https://api.groq.com/openai/v1")
                         .apiKey(apiKey)
                         .model("openai/gpt-oss-20b")
+                        .maxRetries(0)
                         .replayReasoningContent(false)
                         .build())
                 .build();

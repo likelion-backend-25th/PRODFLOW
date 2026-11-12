@@ -147,12 +147,13 @@ public class ClientService {
         });
     }
 
-    public ClientDto.CountRecentMonthResponse countGreaterThanOneMonth() {
+    public ClientDto.CountResponse countClients() {
         LocalDateTime oneMonthAgo = LocalDateTime.now().minusMonths(1);
+        Long countAll = clientRepository.count();
         Long countByCreatedAt = clientRepository.countByCreatedAtGreaterThan(oneMonthAgo);
         Long countByOrder = customerOrderRepository.countRecentOrderClients(oneMonthAgo);
 
-        return ClientDto.CountRecentMonthResponse.from(countByOrder, countByCreatedAt);
+        return ClientDto.CountResponse.from(countAll, countByOrder, countByCreatedAt);
     }
 
     private boolean isValidExcel(Row headerRow) {
