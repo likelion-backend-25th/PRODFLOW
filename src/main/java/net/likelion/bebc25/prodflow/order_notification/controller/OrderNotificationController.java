@@ -32,8 +32,10 @@ public class OrderNotificationController {
     }
 
     @GetMapping("/sent")
-    public List<SentOrderNotificationResponse> listSentDueNotifications() {
-        return orderNotificationService.listSentDueNotifications();
+    public List<SentOrderNotificationResponse> listSentDueNotifications(
+            @AuthenticationPrincipal(expression = "userId") Long userId
+    ) {
+        return orderNotificationService.listSentDueNotifications(userId);
     }
 
     @PostMapping("/orders/{orderId}")
