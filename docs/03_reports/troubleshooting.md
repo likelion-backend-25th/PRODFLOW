@@ -10,4 +10,6 @@
 
 ### [MCP 호출 시 JWT 인증 오류 및 Spring Security 오류 디스패치 문제](mcp_jwt_authentication.md)
 
-### [MCP 도구의 SQL 실행 예외로 인한 Gemini JSON 파싱 오류](mcp_sql_json_parsing.md) 
+### [MCP 도구의 SQL 실행 예외로 인한 Gemini JSON 파싱 오류](mcp_sql_json_parsing.md)
+
+### [동시 수주 등록 시 생산 물량이 중복 예약된 문제](order_registration_lock.md)
