@@ -36,15 +36,15 @@ class QuotationDocumentIntegrationTest extends QuotationIntegrationTestSupport {
                     .isActualTransactionActive()).isFalse();
             assertThat(invocation.getArgument(0, String.class)).isEqualTo("client@example.com");
             assertThat(invocation.getArgument(1, String.class))
-                    .isEqualTo("[PRODFLOW] 기존 회사 견적서 안내 (" + preview.quotationNo() + ")");
+                    .isEqualTo("[PRODFLOW] 견적서 송부드립니다 — " + preview.quotationNo());
             assertThat(invocation.getArgument(2, String.class)).contains(
                     "안녕하세요, 기존 회사 담당자님.",
                     "견적번호: " + preview.quotationNo(),
                     "견적금액: 110,000원 (VAT 포함)",
                     "예상 납기일: " + confirmed.estimatedDueDate(),
-                    "견적 유효기간: " + confirmed.validUntil() + "까지",
+                    "견적 유효기한: " + confirmed.validUntil() + "까지",
                     "본 메일로 회신 부탁드립니다.",
-                    "실제 수주 등록 시 생산 일정에 따라 조정될 수 있습니다.",
+                    "예상 납기는 수주 등록 시 생산 상황에 따라 조정될 수 있습니다.",
                     "PRODFLOW 드림");
             assertThat(invocation.getArgument(4, byte[].class)).containsExactly(expected);
             return null;

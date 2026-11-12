@@ -28,6 +28,7 @@ import net.likelion.bebc25.prodflow.client_notification.entity.ClientNotiLog;
 import net.likelion.bebc25.prodflow.client_notification.entity.PaymentNotificationRequest;
 import net.likelion.bebc25.prodflow.client_notification.enums.ClientNotiStatus;
 import net.likelion.bebc25.prodflow.client_notification.enums.PaymentNotificationStatus;
+import net.likelion.bebc25.prodflow.client_notification.enums.PaymentNotificationKind;
 import net.likelion.bebc25.prodflow.client_notification.repository.ClientNotiLogRepository;
 import net.likelion.bebc25.prodflow.client_notification.repository.PaymentNotificationRequestRepository;
 import net.likelion.bebc25.prodflow.customer_order.dto.CustomerOrderDetailDto;
@@ -111,13 +112,14 @@ public class PaymentNotificationService {
         Optional<PaymentNotificationRequest> previous = requestRepository.findById(request.requestId());
         if (previous.isPresent()) {
             PaymentNotificationRequest existing = previous.get();
-            if (!existing.getOrder().getId().equals(orderId) || !existing.getUser().getId().equals(userId)) {
+            if (!existing.getOrder().getId().equals(orderId) || !existing.getUser().getId().equals(userId)
+                    || existing.getKind() != PaymentNotificationKind.DEPOSIT) {
                 throw conflict("다른 발송 요청에 사용된 요청 식별자입니다.");
             }
             return PaymentNotificationDto.Response.from(existing);
         }
         Optional<PaymentNotificationRequest> latest =
-                requestRepository.findFirstByOrder_IdOrderByUpdatedAtDesc(orderId);
+                requestRepository.findFirstByOrder_IdAndKindOrderByUpdatedAtDesc(orderId, PaymentNotificationKind.DEPOSIT);
         if (latest.isPresent()) {
             PaymentNotificationStatus state = latest.get().getStatus();
             if (state == PaymentNotificationStatus.PROCESSING || state == PaymentNotificationStatus.SENDING) {
@@ -163,8 +165,8 @@ public class PaymentNotificationService {
             throw conflict("입금 가능한 계좌가 아닙니다. 결제 상태 및 재발급 필요 여부를 확인해주세요.");
         }
         StringBuilder body = new StringBuilder();
-        body.append(detail.client().companyName()).append(" 담당자님, 계약금 결제정보를 안내드립니다.\n\n")
-                .append("수주번호: ").append(detail.orderNo()).append("\n")
+        body.append("안녕하세요, ").append(detail.client().companyName()).append(" 담당자님.\nPRODFLOW입니다.\n\n")
+                .append("주문해 주셔서 감사합니다.\n접수된 수주의 계약금 및 입금 계좌를 안내드립니다.\n\n■ 주문 내역\n")
                 .append("단가 부가세 ").append(detail.vatIncluded() ? "포함" : "별도").append("\n\n");
         for (CustomerOrderDetailDto.ItemResponse item : detail.items()) {
             body.append(item.productName()).append(" | 수량 ").append(item.quantity())
@@ -174,17 +176,21 @@ public class PaymentNotificationService {
         body.append("\n공급가액 합계: ").append(won(detail.supplyAmount()))
                 .append("\n부가세: ").append(won(detail.vatAmount()))
                 .append("\n수주 총액: ").append(won(detail.totalAmount()))
+                .append("\n\n■ 계약금 입금 안내\n수주번호: ").append(detail.orderNo())
                 .append("\n계약금 청구액: ").append(won(payment.getAmount()))
-                .append("\n은행: ").append(account.getBank().getLabel())
+                .append("\n입금은행: ").append(account.getBank().getLabel())
                 .append("\n계좌번호: ").append(account.getAccountNumber())
                 .append("\n예금주: ").append(Objects.toString(account.getAccountName(), "은행 안내 참조"))
-                .append("\n계약금 마감일: ").append(detail.depositDueDate())
-                .append("\n계좌 만료일시: ").append(account.getExpiresAt())
-                .append("\n\n계좌 만료일과 관계없이 계약금 마감일까지 입금해주세요.");
+                .append("\n계약금 납부기한: ").append(detail.depositDueDate())
+                .append("\n가상계좌 만료일시: ").append(account.getExpiresAt().atZoneSameInstant(ZoneId.of("Asia/Seoul"))
+                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))).append(" (한국 시간)")
+                .append("\n\n계좌 만료일시와 계약금 납부기한은 다를 수 있으므로,\n계약금 납부기한 내 입금 부탁드립니다.\n")
+                .append("입금 확인 후 예정된 생산 일정에 따라 작업을 진행합니다.\n\n")
+                .append("문의 사항은 본 메일로 회신 부탁드립니다.\n감사합니다.\n\nPRODFLOW 드림");
         requestRepository.findById(request.requestId()).orElseThrow()
                 .complete(PaymentNotificationStatus.SENDING, "이메일 전송 중입니다. 결과 확인 전 다시 발송하지 마세요.");
         return new MailContext(detail.client().email(),
-                "[PRODFLOW] 계약금 결제 안내 (" + detail.orderNo() + ")", body.toString());
+                "[PRODFLOW] 계약금 입금 안내 — " + detail.orderNo(), body.toString());
     }
 
     private PaymentNotificationDto.Response finish(

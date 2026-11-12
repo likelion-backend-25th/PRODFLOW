@@ -5,5 +5,7 @@ public enum PaymentNotificationStatus {
     SENDING,
     SENT,
     FAILED,
-    ISSUE_UNCERTAIN
+    ISSUE_UNCERTAIN,
+    MAIL_SENT,
+    SEND_UNCERTAIN
 }
