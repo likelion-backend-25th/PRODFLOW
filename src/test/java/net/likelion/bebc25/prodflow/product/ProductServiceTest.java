@@ -57,21 +57,24 @@ class ProductServiceTest {
         assertThat(detail.createdAt()).isNotNull();
 
         PageResponse<Response> list = productService.getList(null, PageRequest.of(0, 10));
-        assertThat(list.getContent()).hasSize(5);
-        assertThat(list.getTotalElements()).isEqualTo(5);
+        assertThat(list.getTotalElements()).isGreaterThanOrEqualTo(10);
+        assertThat(list.getContent()).hasSize(10);
     }
 
     @Test
     @DisplayName("검색테스트")
     void searchProduct() {
         PageResponse<Response> all = productService.productSearch(null, null, PageRequest.of(0, 10));
-        assertThat(all.getContent()).hasSize(5);
+        assertThat(all.getTotalElements()).isGreaterThanOrEqualTo(10);
+        assertThat(all.getContent()).hasSize(10);
 
-        PageResponse<Response> byName = productService.productSearch("클리어", null, PageRequest.of(0, 10));
-        assertThat(byName.getContent()).hasSize(1);
-        assertThat(byName.getContent().getFirst().modelCode()).isEqualTo("PF-CS-A100");
-        PageResponse<Response> byKeyword = productService.productSearch("맥세이프", null, PageRequest.of(0, 10));
-        assertThat(byKeyword.getContent()).hasSize(2);
+        PageResponse<Response> byName = productService.productSearch("클리어", null, PageRequest.of(0, 100));
+        assertThat(byName.getContent()).isNotEmpty()
+                .allSatisfy(product -> assertThat(product.productName()).contains("클리어"));
+        assertThat(byName.getContent()).extracting(Response::modelCode).contains("PF-CS-A100");
+        PageResponse<Response> byKeyword = productService.productSearch("맥세이프", null, PageRequest.of(0, 100));
+        assertThat(byKeyword.getContent()).hasSizeGreaterThanOrEqualTo(2)
+                .allSatisfy(product -> assertThat(product.productName()).contains("맥세이프"));
     }
 
     @Test

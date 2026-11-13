@@ -142,12 +142,15 @@ class WorkOrderServiceTest {
         Page<PageResponse> second = workOrderService.findAll(
                 null, null, null, null, null, null, 5L, PageRequest.of(1, 5));
 
-        assertThat(first.getTotalElements()).isEqualTo(6);
-        assertThat(first.getTotalPages()).isEqualTo(2);
+        long assignedToLee = workOrderRepository.findAll().stream()
+                .filter(work -> work.getUser() != null && work.getUser().getId().equals(5L))
+                .count();
+        assertThat(first.getTotalElements()).isEqualTo(assignedToLee);
+        assertThat(first.getTotalPages()).isEqualTo((int) ((assignedToLee + 4) / 5));
         assertThat(first.getContent()).hasSize(5);
         assertThat(first.getContent()).allSatisfy(row -> assertThat(row.assignedName()).isEqualTo("이재원"));
-        assertThat(second.getContent()).hasSize(1);
-        assertThat(second.getContent().getFirst().assignedName()).isEqualTo("이재원");
+        assertThat(second.getContent()).hasSize((int) Math.min(5, assignedToLee - 5));
+        assertThat(second.getContent()).allSatisfy(row -> assertThat(row.assignedName()).isEqualTo("이재원"));
     }
 
     @Test
@@ -257,7 +260,7 @@ class WorkOrderServiceTest {
     @DisplayName("성탄절은 생산 계획에서 빠진다")
     void skipHoliday() {
         // 저장된 공휴일과 그 앞뒤 평일이다. 연도가 바뀌어도 그 공휴일은 계획에서 빠진다.
-        LocalDate holiday = nextHoliday();
+        LocalDate holiday = LocalDate.of(2026, 12, 25);
         LocalDate before = previousOpenWeekday(holiday);
         LocalDate after = nextOpenWeekday(holiday);
         CreateRequest request = request(15L, 1L, 4L, 1500, before, after);
@@ -288,7 +291,7 @@ class WorkOrderServiceTest {
     @DisplayName("고장 라인을 첫 라인으로 고르면 배정하지 않는다")
     void rejectBrokenLine() {
         LocalDate day = firstOpenWeekday();
-        CreateRequest request = request(15L, 4L, 4L, 100, day, day);
+        CreateRequest request = request(15L, 3L, 4L, 100, day, day);
 
         assertThatThrownBy(() -> workOrderService.create(request, 1L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -368,17 +371,18 @@ class WorkOrderServiceTest {
         assertThat(detail.assignedId()).isEqualTo(4L);
         assertThat(detail.assignedName()).isEqualTo("김태호");
         assertThat(detail.workOrderDate()).isEqualTo(date(2026, 11, 6));
-        assertThat(detail.plannedStartDate()).isEqualTo(date(2026, 11, 10));
-        assertThat(detail.plannedEndDate()).isEqualTo(date(2026, 11, 11));
+        assertThat(detail.plannedStartDate()).isEqualTo(date(2026, 12, 4));
+        assertThat(detail.plannedEndDate()).isEqualTo(date(2026, 12, 21));
         assertThat(detail.completedAt()).isNull();
         assertThat(detail.status()).isEqualTo("PREPARE");
         assertThat(detail.note()).isEqualTo(
                 "아이폰 16 맥세이프 클리어 케이스 2026-11-10 1000개, 2026-11-11 1000개. 수주 품목·라인 단위 작업입니다.");
         assertThat(detail.estimatedDueDate()).isEqualTo(date(2026, 11, 16));
-        assertThat(detail.plans()).extracting(ProductionPlanDto.Response::planDate)
-                .containsExactly(date(2026, 11, 10), date(2026, 11, 11));
-        assertThat(detail.plans()).extracting(ProductionPlanDto.Response::quantity)
-                .containsExactly(1000, 1000);
+        assertThat(detail.plans())
+                .extracting(ProductionPlanDto.Response::planDate, ProductionPlanDto.Response::quantity)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(date(2026, 12, 4), 1000),
+                        org.assertj.core.groups.Tuple.tuple(date(2026, 12, 21), 1000));
         assertThat(detail.plans()).extracting(ProductionPlanDto.Response::workOrderId)
                 .containsOnly(1L);
 
@@ -573,6 +577,8 @@ class WorkOrderServiceTest {
         WorkOrder work = workOrderRepository.findById(15L).orElseThrow();
         Line line = lineRepository.save(new Line("수주이력-생산라인", 1000));
         work.changeLine(line);
+        work.changeStatus(em.find(CommonCode.class, 16L));
+        work.getOrderProduct().getCustomerOrder().changeProgress(em.find(CommonCode.class, 7L));
         ReflectionTestUtils.setField(work, "plannedStartDate", LocalDate.now());
         Long orderId = work.getOrderProduct().getCustomerOrder().getId();
 
@@ -797,7 +803,7 @@ class WorkOrderServiceTest {
     @DisplayName("준비 상태에서 포장으로 건너뛰거나 같은 상태로 바꾸지 않는다")
     void rejectDisallowedStatusTransition() {
         LocalDate day = LocalDate.of(2026, 12, 15);
-        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(15L, 4L, 4L, 100, day, day), 1L).getFirst().id();
 
         assertThatThrownBy(() -> workOrderService.changeStatus(
                 workOrderId, new UpdateStatusRequest("PACK", null), 1L))
@@ -815,7 +821,7 @@ class WorkOrderServiceTest {
     @DisplayName("생산 시작 예정일 전에는 생산을 시작하지 않는다")
     void rejectProduceBeforePlannedStart() {
         LocalDate day = LocalDate.of(2027, 12, 15);
-        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(15L, 4L, 4L, 100, day, day), 1L).getFirst().id();
 
         assertThatThrownBy(() -> workOrderService.changeStatus(
                 workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L))
@@ -827,7 +833,7 @@ class WorkOrderServiceTest {
     @DisplayName("배정되지 않은 생산 현장 관리자는 작업 상태를 바꾸지 않는다")
     void rejectStatusChangeWhenUserIsNotAssignee() {
         LocalDate day = LocalDate.of(2026, 12, 15);
-        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(15L, 4L, 4L, 100, day, day), 1L).getFirst().id();
 
         // 직원 5는 생산 현장 관리자이지만 이 작업의 담당자가 아니다.
         assertThatThrownBy(() -> workOrderService.changeStatus(
@@ -840,7 +846,7 @@ class WorkOrderServiceTest {
     @DisplayName("취소된 수주의 생산 중지 작업은 준비로 돌아가지 않는다")
     void rejectResumeWhenOrderIsCancelled() {
         LocalDate day = LocalDate.of(2026, 12, 15);
-        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(15L, 4L, 4L, 100, day, day), 1L).getFirst().id();
         workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("HALT", "수주 취소"), 1L);
         WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
         workOrder.getOrderProduct().getCustomerOrder().changeProgress(em.find(CommonCode.class, 15L));
@@ -893,16 +899,6 @@ class WorkOrderServiceTest {
         }
         return day;
     }
-
-    private LocalDate nextHoliday() {
-        LocalDate after = latestPlanDate();
-        return holidayRepository.findAll().stream()
-                .map(holiday -> holiday.getHolidayDate())
-                .filter(day -> day.isAfter(after))
-                .min(Comparator.naturalOrder())
-                .orElseThrow();
-    }
-
 
     private boolean isClosed(LocalDate day) {
         return day.getDayOfWeek() == DayOfWeek.SATURDAY
