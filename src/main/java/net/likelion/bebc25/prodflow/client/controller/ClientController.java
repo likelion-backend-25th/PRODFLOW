@@ -126,14 +126,14 @@ public class ClientController {
     }
 
     @Operation(
-            summary = "최근 한달간 등록된 거래처와 거래 요청한 거래처 수 조회",
-            description = "최근 한달간 등록된 거래처와 거래 요청한 거래처 수를 계산하여 조회한다"
+            summary = "거래처 수와 해당 거래처의 거래 요청 수 조회",
+            description = "전체 거래처 수, 최근 한달간 등록된 거래처 수, 최근 한달간 거래 요청한 거래처 수를 계산하여 조회한다"
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping("/counts")
-    public ResponseEntity<ClientDto.CountRecentMonthResponse> countsRecentMonth() {
-        return ResponseEntity.ok(clientService.countGreaterThanOneMonth());
+    public ResponseEntity<ClientDto.CountResponse> countClients() {
+        return ResponseEntity.ok(clientService.countClients());
     }
 }

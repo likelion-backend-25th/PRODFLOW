@@ -211,8 +211,10 @@ public class UserService {
         );
     }
 
-    public List<User> findByOrderManager() {
-        return userRepository.findByRole(UserRole.ORDER_MANAGER);
+    public List<UserDto.Response> findByOrderManager() {
+        return userRepository.findAllByRoleAndStatus(UserRole.ORDER_MANAGER, UserStatus.ACTIVE).stream()
+                .map(UserDto.Response::from)
+                .toList();
     }
 
     // 삭제된 직원 검증

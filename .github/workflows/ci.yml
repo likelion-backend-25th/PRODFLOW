@@ -3,16 +3,39 @@ name: CI Pipeline
 on:
   push:
     branches: [ "main", "dev" ]
-    paths-ignore:
-      - "docs/**"
 
   pull_request:
     branches: [ "main", "dev" ]
-    paths-ignore:
-      - "docs/**"
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+
+    steps:
+      - name: 소스코드 체크아웃
+        uses: actions/checkout@v7
+
+      - name: 변경 파일 확인
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          base: ${{ github.ref }}
+          predicate-quantifier: every
+          filters: |
+            code:
+              - '**'
+              - '!docs/**'
+
   build-and-test:
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
 
     env:
@@ -43,10 +66,11 @@ jobs:
         with:
           java-version: "25"
           distribution: temurin
-          cache: gradle
 
       - name: Gradle 설정
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Gradle 실행 권한 부여
         run: chmod +x gradlew
@@ -64,8 +88,14 @@ jobs:
 
           printf '%s' "$PRODFLOW_SYSTEM_PROMPT" > src/main/resources/prompts/prodflow-system.txt
 
-      - name: Gradle 빌드 및 테스트 수행
-        run: ./gradlew test --no-daemon --info --stacktrace --scan
+      - name: Gradle 테스트 수행
+        timeout-minutes: 20
+        run: |
+          ./gradlew test \
+            --no-daemon \
+            --console=plain \
+            --stacktrace \
+            --max-workers=2
         env:
           # CI에서는 RDS가 아닌 MySQL 서비스 컨테이너 사용
           MYSQL_DB_HOST: "127.0.0.1"

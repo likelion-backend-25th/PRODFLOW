@@ -1,5 +1,17 @@
 package net.likelion.bebc25.prodflow.shipment;
 
+import net.likelion.bebc25.prodflow.payment.client.PortOneClient;
+import net.likelion.bebc25.prodflow.payment.config.PortOneProperties;
+import net.likelion.bebc25.prodflow.payment.dto.PortOneDto;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import jakarta.persistence.EntityManager;
 import net.likelion.bebc25.prodflow.client_notification.entity.PaymentNotificationRequest;
 import net.likelion.bebc25.prodflow.client_notification.enums.PaymentNotificationKind;
@@ -326,5 +338,123 @@ class ShipmentDispatchIntegrationTest {
         String orderStatus = tx.execute(status -> orders.findById(ORDER_ID).orElseThrow().getStatusCode().getCode());
         assertThat(orderStatus).isEqualTo("READY_TO_SHIP");
         assertThat(shipments.findByOrderId(ORDER_ID).orElseThrow().getStartedAt()).isNull();
+    }
+}
+
+// 실제 결제 서비스와 요청 단위 영속성 컨텍스트를 함께 검증한다.
+// PortOne과 SMTP만 대체하여 발급 후 별도 트랜잭션의 상태 반영 경로를 유지한다.
+@SpringBootTest(properties = "spring.jpa.open-in-view=true")
+@AutoConfigureMockMvc
+class ShipmentDispatchRealPaymentIntegrationTest {
+    private static final long ORDER_ID = 4L;
+    private static final ShipmentDto.CreateRequest INPUT =
+            new ShipmentDto.CreateRequest(ORDER_ID, "04", "990000000004");
+
+    @Autowired MockMvc mvc;
+    @Autowired ShipmentDispatchService dispatch;
+    @Autowired EntityManager em;
+    @Autowired PlatformTransactionManager transactionManager;
+    @Autowired CustomerOrderRepository orders;
+    @Autowired PaymentRepository payments;
+    @Autowired VirtualAccountRepository accounts;
+    @Autowired CommonCodeRepository codes;
+    @Autowired UserRepository users;
+    @Autowired PortOneProperties properties;
+    @MockitoBean PortOneClient portOne;
+    @MockitoBean MailService mail;
+
+    private final Map<String, PortOneDto.IssueRequest> issued = new ConcurrentHashMap<>();
+    private TransactionTemplate tx;
+    private CustomUserDetails principal;
+
+    @BeforeEach
+    void setUp() {
+        issued.clear();
+        tx = new TransactionTemplate(transactionManager);
+        tx.executeWithoutResult(status -> {
+            em.createQuery("delete from PaymentNotificationRequest r where r.order.id = :id")
+                    .setParameter("id", ORDER_ID).executeUpdate();
+            em.createQuery("delete from ClientNotiLog l where l.customerOrder.id = :id")
+                    .setParameter("id", ORDER_ID).executeUpdate();
+            em.createQuery("delete from Shipment s where s.orderId = :id")
+                    .setParameter("id", ORDER_ID).executeUpdate();
+            em.createQuery("delete from PaymentHistory h where h.payment.order.id = :id")
+                    .setParameter("id", ORDER_ID).executeUpdate();
+            em.createQuery("delete from VirtualAccount a where a.payment.order.id = :id")
+                    .setParameter("id", ORDER_ID).executeUpdate();
+            em.createQuery("delete from Payment p where p.order.id = :id")
+                    .setParameter("id", ORDER_ID).executeUpdate();
+            CustomerOrder order = orders.findById(ORDER_ID).orElseThrow();
+            order.changeProgress(codes.findByCodeGroup_GroupCodeAndCodeAndStatus(
+                    "ORDER_STATUS", "READY_TO_SHIP", CodeStatus.ACTIVE).orElseThrow());
+            Payment deposit = Payment.builder().order(order).portonePaymentId("repro-deposit")
+                    .paymentType(PaymentType.DEPOSIT)
+                    .amount(PaymentAmountPolicy.calculate(order.getTotalAmount(), PaymentType.DEPOSIT)).build();
+            deposit.paidManually();
+            payments.save(deposit);
+        });
+        principal = new CustomUserDetails(users.findById(1L).orElseThrow());
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
+
+        doAnswer(call -> {
+            PortOneDto.IssueRequest request = call.getArgument(0);
+            issued.put(request.paymentId(), request);
+            return null;
+        }).when(portOne).issueInstantPayment(any());
+        when(portOne.getPayment(anyString())).thenAnswer(call -> {
+            String id = call.getArgument(0);
+            PortOneDto.IssueRequest request = issued.get(id);
+            if (request == null) throw new IllegalStateException("발급 요청 없이 결과 조회됨: " + id);
+
+            // 외부 상태 지연 없이 즉시 정상 발급 결과를 반환한다.
+            return new PortOneDto.PaymentSnapshot(id, "pg-" + id, "VIRTUAL_ACCOUNT_ISSUED",
+                    properties.storeId(), null, null, "KRW",
+                    new PortOneDto.PaymentSnapshot.Amount(request.amount(), null),
+                    new PortOneDto.PaymentSnapshot.Method("PaymentMethodVirtualAccount", request.bank(),
+                            "1234567890", "재현 계좌", request.dueDate()),
+                    new PortOneDto.PaymentSnapshot.Channel(properties.channelKey(), "TOSSPAYMENTS"),
+                    OffsetDateTime.now(), null, null, null);
+        });
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("첫 HTTP 출고부터 발급 결과를 읽어 배송중으로 전환하고 재클릭해도 중복 처리하지 않는다")
+    void firstHttpDispatchUsesIssuedAccountAndDoesNotDuplicateOnRetry() throws Exception {
+        mvc.perform(post("/api/v1/shipments").with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderId\":4,\"carrierCode\":\"04\",\"trackingNumber\":\"990000000004\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.orderStatus").value("SHIPPING"));
+        tx.executeWithoutResult(status -> {
+            Payment balance = payments.findByOrder_IdAndPaymentType(ORDER_ID, PaymentType.BALANCE).orElseThrow();
+            VirtualAccount account = accounts.findFirstByPayment_IdOrderByIdDesc(balance.getId()).orElseThrow();
+            assertThat(balance.getStatus()).isEqualTo(PaymentStatus.WAITING);
+            assertThat(account.isActive()).isTrue();
+            assertThat(account.isExpired()).isFalse();
+            assertThat(account.getPortonePaymentId()).isEqualTo(balance.getPortonePaymentId());
+            assertThat(orders.findById(ORDER_ID).orElseThrow().getStatusCode().getCode()).isEqualTo("SHIPPING");
+        });
+        verify(mail, times(1)).send(anyString(), anyString(), anyString());
+        mvc.perform(post("/api/v1/shipments").with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderId\":4,\"carrierCode\":\"04\",\"trackingNumber\":\"990000000004\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.orderStatus").value("SHIPPING"));
+        verify(portOne, times(1)).issueInstantPayment(any());
+        verify(mail, times(1)).send(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("대조군: HTTP 영속성 컨텍스트 없이 실제 결제 서비스를 호출하면 첫 출고가 성공한다")
+    void firstDispatchWithoutRequestPersistenceContextSucceeds() {
+        assertThat(dispatch.dispatch(INPUT, 1L).orderStatus()).isEqualTo("SHIPPING");
+        verify(portOne, times(1)).issueInstantPayment(any());
+        verify(mail, times(1)).send(anyString(), anyString(), anyString());
     }
 }

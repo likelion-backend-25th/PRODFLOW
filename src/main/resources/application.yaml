@@ -48,6 +48,15 @@ spring:
 
   # AI 재미나이 인증키
   ai:
+    # AI API 오류 발생 시 재시도 정책
+    retry:
+      max-attempts: 1
+      on-http-codes:
+        - 429
+      backoff:
+        initial-interval: 6s
+        multiplier: 2
+        max-interval: 12s
     model:
       chat: google-genai
     google:

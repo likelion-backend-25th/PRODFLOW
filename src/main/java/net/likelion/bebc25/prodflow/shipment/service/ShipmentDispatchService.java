@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.shipment.service;
 import jakarta.mail.SendFailedException;
 import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.likelion.bebc25.prodflow.client_notification.entity.ClientNotiLog;
@@ -81,6 +82,7 @@ public class ShipmentDispatchService {
     private final PaymentService paymentService;
     private final MailService mailService;
     private final PlatformTransactionManager transactionManager;
+    private final EntityManager entityManager;
 
     // 외부 호출은 DB 트랜잭션 밖에서 수행한다. 실패한 단계의 앞선 결과는 커밋해 재사용한다.
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -209,6 +211,8 @@ public class ShipmentDispatchService {
         requireDepositPaid(orderId);
         Payment payment = paymentRepository.findByOrder_IdAndPaymentType(orderId, PaymentType.BALANCE)
                 .orElseThrow(() -> conflict("잔금 결제 정보가 없습니다."));
+        // 별도 발급 트랜잭션이 반영한 상태를 요청의 기존 영속성 컨텍스트에도 갱신한다.
+        entityManager.refresh(payment);
         if (payment.getAmount() != PaymentAmountPolicy.calculate(order.getTotalAmount(), PaymentType.BALANCE)
                 || payment.getPaymentMethod() != PaymentMethod.VA) {
             throw conflict("잔금 청구액과 결제 방식을 확인해주세요.");
@@ -229,6 +233,7 @@ public class ShipmentDispatchService {
         } else {
             VirtualAccount account = accountRepository.findFirstByPayment_IdOrderByIdDesc(payment.getId())
                     .orElseThrow(() -> conflict("잔금 가상계좌가 없습니다."));
+            entityManager.refresh(account);
             if (payment.getStatus() != PaymentStatus.WAITING || !account.isActive() || account.isExpired()
                     || (account.getPortonePaymentId() != null
                     && !Objects.equals(account.getPortonePaymentId(), payment.getPortonePaymentId()))) {

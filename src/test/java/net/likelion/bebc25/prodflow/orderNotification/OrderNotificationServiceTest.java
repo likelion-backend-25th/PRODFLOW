@@ -3,6 +3,8 @@ package net.likelion.bebc25.prodflow.orderNotification;
 import jakarta.persistence.EntityManager;
 import net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder;
 import net.likelion.bebc25.prodflow.user.entity.User;
+import net.likelion.bebc25.prodflow.user.enums.UserRole;
+import net.likelion.bebc25.prodflow.user.enums.UserStatus;
 import net.likelion.bebc25.prodflow.order_notification.entity.OrderNotification;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -69,7 +71,11 @@ class OrderNotificationServiceTest {
         assertThat(created.clientName()).isEqualTo("한빛케이스(주)");
         assertThat(created.isRead()).isFalse();
 
+        // 담당자가 아닌 최고관리자도 같은 알림을 받는다. 다른 수주 관리자에게는 가지 않는다.
         assertThat(orderNotificationService.getNotifications(1L))
+                .extracting(OrderNotificationDto::orderNo)
+                .contains("PF-20261106-9");
+        assertThat(orderNotificationService.getNotifications(2L))
                 .extracting(OrderNotificationDto::orderNo)
                 .doesNotContain("PF-20261106-9");
     }
@@ -179,7 +185,7 @@ class OrderNotificationServiceTest {
     }
 
     @Test
-    @DisplayName("납기 알림은 담당 직원에게만 가고 생산 관리자에게는 가지 않는다")
+    @DisplayName("납기 알림은 생산 현장 관리자에게 가지 않는다")
     void notifiesAssigneeOnly() {
         // given
         LocalDate today = LocalDate.of(2026, 11, 9);
@@ -309,7 +315,7 @@ class OrderNotificationServiceTest {
     void sentListIncludesAutomaticNotification() {
         orderNotificationService.createDueNotifications(TODAY);
 
-        assertThat(orderNotificationService.listSentDueNotifications())
+        assertThat(orderNotificationService.listSentDueNotifications(1L))
                 .anySatisfy(item -> {
                     assertThat(item.orderId()).isEqualTo(3L);
                     assertThat(item.notificationType()).isEqualTo(OrderNotificationType.DELIVERY_DELAYED);
@@ -336,5 +342,110 @@ class OrderNotificationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("납기 위험 수주가 아니어서 알림을 보내지 않습니다.");
         assertThat(orderNotificationRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("납기 임박 알림은 담당 직원과 활성 최고관리자에게 가고 다른 권한에는 가지 않는다")
+    void imminentNoticeReachesAssigneeAndActiveAdmins() {
+        User admin = em.find(User.class, 13L);
+        assertThat(admin.getRole()).isEqualTo(UserRole.SUPER_ADMIN);
+        assertThat(admin.getStatus()).isEqualTo(UserStatus.ACTIVE);
+
+        OrderDueNotificationResponse created =
+                orderNotificationService.createDueNotification(9L, TODAY);
+
+        assertThat(created.created()).isTrue();
+        assertThat(created.notificationType()).isEqualTo(OrderNotificationType.DELIVERY_IMMINENT);
+        assertThat(orderNotificationService.getNotifications(3L))
+                .filteredOn(item -> "PF-20261106-9".equals(item.orderNo()))
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.notificationType()).isEqualTo(OrderNotificationType.DELIVERY_IMMINENT);
+                    assertThat(item.orderId()).isEqualTo(9L);
+                    assertThat(item.message()).contains("PF-20261106-9");
+                    assertThat(item.isRead()).isFalse();
+                    assertThat(item.createdAt()).isNotNull();
+                });
+        assertThat(orderNotificationService.getNotifications(13L))
+                .extracting(OrderNotificationDto::orderNo)
+                .contains("PF-20261106-9");
+        assertThat(orderNotificationService.getUnreadCount(13L)).isPositive();
+        for (Long otherId : List.of(2L, 4L, 7L)) {
+            assertThat(orderNotificationService.getNotifications(otherId))
+                    .extracting(OrderNotificationDto::orderNo)
+                    .doesNotContain("PF-20261106-9");
+        }
+    }
+
+    @Test
+    @DisplayName("납기 지연 알림은 담당 직원과 활성 최고관리자의 목록과 미확인 수에 반영된다")
+    void delayedNoticeReachesAssigneeAndActiveAdmins() {
+        long unreadBefore = orderNotificationService.getUnreadCount(13L);
+
+        OrderDueNotificationResponse created =
+                orderNotificationService.createDueNotification(3L, TODAY);
+
+        assertThat(created.created()).isTrue();
+        assertThat(created.notificationType()).isEqualTo(OrderNotificationType.DELIVERY_DELAYED);
+        assertThat(orderNotificationService.getNotifications(3L))
+                .filteredOn(item -> "PF-20261027-3".equals(item.orderNo()))
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.message()).contains("PF-20261027-3").contains("2026-11-06");
+                    assertThat(item.isRead()).isFalse();
+                });
+        assertThat(orderNotificationService.getNotifications(13L))
+                .extracting(OrderNotificationDto::orderNo)
+                .contains("PF-20261027-3");
+        assertThat(orderNotificationService.getUnreadCount(13L)).isEqualTo(unreadBefore + 1);
+        assertThat(orderNotificationService.listSentDueNotifications(13L))
+                .filteredOn(item -> item.orderId().equals(3L)
+                        && item.notificationType() == OrderNotificationType.DELIVERY_DELAYED)
+                .hasSize(1);
+    }
+
+    @Test
+    @DisplayName("담당 직원이 최고관리자이면 같은 유형의 알림은 한 건만 만든다")
+    void assigneeWhoIsAdminReceivesOneNotification() {
+        orderNotificationService.createDueNotification(6L, TODAY);
+
+        assertThat(orderNotificationService.getNotifications(1L))
+                .filteredOn(item -> "PF-20261030-6".equals(item.orderNo())
+                        && item.notificationType() == OrderNotificationType.DELIVERY_IMMINENT)
+                .hasSize(1);
+
+        long recipients = orderNotificationRepository.findAll().stream()
+                .filter(item -> item.getCustomerOrder() != null
+                        && Long.valueOf(6L).equals(item.getCustomerOrder().getId())
+                        && item.getNotificationType() == OrderNotificationType.DELIVERY_IMMINENT)
+                .map(item -> item.getTarget().getId())
+                .distinct()
+                .count();
+        long activeAdmins = em.createQuery(
+                        "select count(u) from User u where u.role = :role and u.status = :status",
+                        Long.class)
+                .setParameter("role", UserRole.SUPER_ADMIN)
+                .setParameter("status", UserStatus.ACTIVE)
+                .getSingleResult();
+        assertThat(recipients).isEqualTo(activeAdmins);
+    }
+
+    @Test
+    @DisplayName("비활성 최고관리자에게는 납기 알림을 만들지 않는다")
+    void inactiveAdminDoesNotReceiveDueNotification() {
+        em.find(User.class, 15L).deactivate();
+        em.flush();
+
+        orderNotificationService.createDueNotification(3L, TODAY);
+
+        assertThat(orderNotificationService.getNotifications(15L))
+                .extracting(OrderNotificationDto::orderNo)
+                .doesNotContain("PF-20261027-3");
+        assertThat(orderNotificationService.getNotifications(13L))
+                .extracting(OrderNotificationDto::orderNo)
+                .contains("PF-20261027-3");
+        assertThat(orderNotificationService.getNotifications(4L))
+                .extracting(OrderNotificationDto::orderNo)
+                .doesNotContain("PF-20261027-3");
     }
 }
