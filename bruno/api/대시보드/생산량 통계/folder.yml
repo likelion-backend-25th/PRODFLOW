@@ -1,7 +1,0 @@
-info:
-  name: 생산량 통계
-  type: folder
-  seq: 2
-
-request:
-  auth: inherit

@@ -1,0 +1,34 @@
+info:
+  name: 대화 기록 확인
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/ai/conversations/{{conversationId}}"
+  params:
+    - name: ""
+      value: "3"
+      type: query
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwcm9kZmxvdyIsImp0aSI6IjA5OTJiNTA5LWYxM2UtNDliMy04MmQzLTc0NmVkYTI2YmM0ZCIsInN1YiI6IjEiLCJlbWFpbCI6ImFkbWluMUBwcm9kZmxvdy5zaXRlIiwicm9sZSI6IlNVUEVSX0FETUlOIiwidHlwZSI6IkFDQ0VTUyIsImlhdCI6MTc5NDU0NDM0MSwiZXhwIjoxNzk0NTQ2MTQxfQ.bP1sES3hmLebKnPJMEEjdX0JNNZTTvrimKZH2sWmCR4
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.title).to.equal("시연 납기 질문");
+          expect(body.messages.length).to.be.at.least(2);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

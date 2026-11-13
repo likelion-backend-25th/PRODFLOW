@@ -1,0 +1,27 @@
+info:
+  name: 로그아웃
+  type: http
+  seq: 1
+
+docs: |-
+  마지막 로그인의 Refresh Token 쿠키를 폐기한다. 이미 발급된 Access Token은 만료 전까지 유효하다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/logout"
+  auth: inherit
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(204);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

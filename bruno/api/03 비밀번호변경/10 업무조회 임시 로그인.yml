@@ -1,0 +1,34 @@
+info:
+  name: 업무조회 임시 로그인
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{inquiryEmail}}",
+        "password": "{{tempPassword}}"
+      }
+  auth: inherit
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          bru.setVar("inquiryTempToken", body.accessToken);
+          expect(body.mustChangePassword).to.equal(true);
+          expect(body.tokenType).to.equal("Bearer");
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

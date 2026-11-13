@@ -1,0 +1,6 @@
+info:
+  name: 15 대시보드
+  type: folder
+  seq: 15
+request:
+  auth: inherit

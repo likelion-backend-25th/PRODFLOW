@@ -1,0 +1,46 @@
+info:
+  name: 견적 PDF 생성
+  type: http
+  seq: 3
+
+docs: |-
+  S3에 PDF를 저장한다. 실패해도 초안이 남으면 응답의 quotationId로 재생성한다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/quotations/pdf"
+  body:
+    type: json
+    data: |-
+      {
+        "clientId": {{clientId}},
+        "requestedDueDate": "2027-06-30",
+        "validUntil": "2026-12-31",
+        "vatIncluded": false,
+        "sameDayStart": false,
+        "items": [
+          { "productId": {{productId}}, "quantity": 100, "unitPrice": 15000 }
+        ]
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(201);
+          expect(body.quotationId).to.be.a("number");
+          expect(body.confirmationToken).to.match(/^[a-f0-9]{64}\.[a-f0-9]{64}$/);
+          bru.setVar("quotationId", String(body.quotationId));
+          bru.setVar("confirmationToken", body.confirmationToken);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

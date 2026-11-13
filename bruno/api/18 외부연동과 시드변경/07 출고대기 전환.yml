@@ -1,0 +1,29 @@
+info:
+  name: 출고대기 전환
+  type: http
+  seq: 7
+
+docs: |-
+  시드 수주 3이다. 작업이 모두 포장완료가 아니면 400이다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/shipments/orders/3/ready-to-ship"
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect([200, 400]).to.include(status);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

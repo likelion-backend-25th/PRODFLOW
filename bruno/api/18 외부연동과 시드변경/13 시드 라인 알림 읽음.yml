@@ -1,0 +1,30 @@
+info:
+  name: 시드 라인 알림 읽음
+  type: http
+  seq: 13
+
+docs: |-
+  시드 알림 3의 수신자는 prod1이다. 읽음 시각이 기록된다.
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/notifications/3/read"
+  auth:
+    type: bearer
+    token: "{{prod1AccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.isRead).to.equal(true);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

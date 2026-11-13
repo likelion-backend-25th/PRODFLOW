@@ -1,0 +1,40 @@
+info:
+  name: 삭제용 등록
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/users"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{spareEmail}}",
+        "temporaryPassword": "{{tempPassword}}",
+        "name": "브루노삭제",
+        "phone": "010-7100-0004",
+        "role": "INQUIRY_MANAGER"
+      }
+  auth:
+    type: bearer
+    token: "{{adminAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(201);
+          expect(body.role).to.equal("INQUIRY_MANAGER");
+          expect(body.mustChangePassword).to.equal(true);
+          expect(body.status).to.equal("ACTIVE");
+          bru.setVar("spareUserId", String(body.id));
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

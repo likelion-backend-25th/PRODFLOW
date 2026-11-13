@@ -1,0 +1,40 @@
+info:
+  name: 작업 직접 등록
+  type: http
+  seq: 11
+
+docs: |-
+  계약금 처리가 이미 같은 수량을 배정했다. 같은 기간에 다시 넣으면 생산 가능량 초과로 거절된다. 작업지시가 없는 수주 품목으로 이 요청만 따로 실행하면 등록 API를 확인할 수 있다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/work-orders"
+  body:
+    type: json
+    data: |-
+      {
+        "orderProductId": {{orderProductId}},
+        "lineId": 3,
+        "assignedId": {{prodUserId}},
+        "quantity": 100,
+        "plannedStartDate": "{{plannedStartDate}}",
+        "plannedEndDate": "{{plannedEndDate}}"
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(400);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

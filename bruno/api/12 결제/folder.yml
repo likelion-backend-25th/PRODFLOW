@@ -1,0 +1,6 @@
+info:
+  name: 12 결제
+  type: folder
+  seq: 12
+request:
+  auth: inherit

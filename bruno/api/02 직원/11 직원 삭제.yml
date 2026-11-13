@@ -1,0 +1,30 @@
+info:
+  name: 직원 삭제
+  type: http
+  seq: 11
+
+docs: |-
+  삭제용으로 만든 계정만 소프트 삭제한다. 시드 계정은 지우지 않는다.
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/users/{{spareUserId}}"
+  auth:
+    type: bearer
+    token: "{{adminAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.status).to.equal("DELETED");
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,37 @@
+info:
+  name: 거래처 엑셀 등록
+  type: http
+  seq: 6
+
+docs: |-
+  files/clients.xlsx 헤더는 company부터 updated_by까지다. user_id는 시드 수주 관리자 2다. 같은 파일은 이메일이 같아 한 번만 성공한다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/clients/import"
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value: files/clients.xlsx
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(201);
+          expect(body).to.be.an("array");
+          expect(body[0].company).to.equal("브루노임포트");
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

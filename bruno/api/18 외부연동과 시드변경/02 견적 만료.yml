@@ -1,0 +1,30 @@
+info:
+  name: 견적 만료
+  type: http
+  seq: 2
+
+docs: |-
+  유효기간이 지난 시드 SENT 견적을 EXPIRED로 바꿀 수 있다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/quotations/expire"
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.expiredCount).to.be.at.least(0);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

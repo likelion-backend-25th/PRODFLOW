@@ -2,4 +2,11 @@ name: local
 variables:
   - name: baseUrl
     value: http://localhost:8080
-    description: 로컬 80포트
+  - name: adminEmail
+    value: admin1@prodflow.site
+  - name: adminPassword
+    value: Abcd123456!?
+  - name: tempPassword
+    value: TempPass123!
+  - name: newPassword
+    value: Bruno1234!

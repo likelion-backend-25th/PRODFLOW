@@ -1,0 +1,55 @@
+info:
+  name: 계약금 안내
+  type: http
+  seq: 12
+
+docs: |-
+  이 순서는 현금 계약금 이후라 수주가 대기 상태가 아니다. 계약금 안내는 대기 수주와 미입금 가상계좌에서만 성공하므로 409이다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/payments/orders/{{orderId}}/notifications"
+  body:
+    type: json
+    data: |-
+      {
+        "requestId": "{{paymentRequestId}}",
+        "recipient": "{{clientEmail}}",
+        "totalAmount": {{orderTotal}},
+        "supplyAmount": {{supplyAmount}},
+        "vatAmount": {{vatAmount}},
+        "depositAmount": {{depositAmount}},
+        "vatIncluded": {{vatIncluded}},
+        "depositDueDate": "{{depositDueDate}}",
+        "items": [
+          {
+            "id": {{orderProductId}},
+            "productName": "{{orderItemName}}",
+            "quantity": {{orderItemQty}},
+            "unitPrice": {{orderItemPrice}},
+            "supplyAmount": {{orderItemSupply}}
+          }
+        ]
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const hex = Date.now().toString(16).padStart(12, "0").slice(-12);
+        bru.setVar("paymentRequestId", "11111111-2222-4333-8444-" + hex);
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(409);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

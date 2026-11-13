@@ -1,0 +1,29 @@
+info:
+  name: 가상계좌 재발급
+  type: http
+  seq: 4
+
+docs: |-
+  시드 결제 10 재발급이다. 기존 계좌 말소를 확인한 뒤에야 성공한다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/payments/10/reissue"
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect([200, 409, 502, 503]).to.include(status);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

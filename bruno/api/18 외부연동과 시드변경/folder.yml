@@ -1,0 +1,6 @@
+info:
+  name: 18 외부연동과 시드변경
+  type: folder
+  seq: 18
+request:
+  auth: inherit

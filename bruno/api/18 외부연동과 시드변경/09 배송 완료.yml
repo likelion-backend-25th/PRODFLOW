@@ -1,0 +1,29 @@
+info:
+  name: 배송 완료
+  type: http
+  seq: 9
+
+docs: |-
+  시드 운송장 2를 완료하면 수주 6이 완료가 된다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/shipments/2/complete"
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect([200, 400]).to.include(status);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

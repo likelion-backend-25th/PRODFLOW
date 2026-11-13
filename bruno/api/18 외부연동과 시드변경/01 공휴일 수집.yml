@@ -1,0 +1,30 @@
+info:
+  name: 공휴일 수집
+  type: http
+  seq: 1
+
+docs: |-
+  공공데이터포털 호출이다. 최고 관리자만 실행한다. 없는 날짜만 추가한다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/holidays/import?year=2026"
+  auth:
+    type: bearer
+    token: "{{adminAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.year).to.equal(2026);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

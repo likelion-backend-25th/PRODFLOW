@@ -1,0 +1,29 @@
+info:
+  name: 결제 재동기화
+  type: http
+  seq: 5
+
+docs: |-
+  PortOne 단건 조회만 한다. 새 발급 요청은 보내지 않는다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/payments/15/synchronize"
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect([200, 404, 409, 502, 503]).to.include(status);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
