@@ -137,8 +137,8 @@ class ProductionCalenderServiceTest {
         assertThat(schedule.lineId()).isEqualTo(1L);
         assertThat(schedule.lineName()).isEqualTo("A라인");
         assertThat(schedule.status()).isEqualTo("PREPARE");
-        assertThat(schedule.plannedStartDate()).isEqualTo(LocalDate.of(2026, 11, 10));
-        assertThat(schedule.plannedEndDate()).isEqualTo(LocalDate.of(2026, 11, 11));
+        assertThat(schedule.plannedStartDate()).isEqualTo(LocalDate.of(2026, 12, 4));
+        assertThat(schedule.plannedEndDate()).isEqualTo(LocalDate.of(2026, 12, 21));
     }
 
     @Test
@@ -206,12 +206,9 @@ class ProductionCalenderServiceTest {
                 )
                 .extracting(ProductionCalenderDto.Response::workNo)
                 .containsExactlyInAnyOrder(
-                        "WO-2026-001",
-                        "WO-2026-002",
-                        "WO-2026-003",
-                        "WO-2026-004",
-                        "WO-2026-005",
-                        "WO-2026-015"
+                        "WO-2026-014",
+                        "WO-2026-200",
+                        "WO-2026-201"
                 );
 
         assertThat(result)

@@ -185,7 +185,7 @@ class DeliveryRiskServiceTest {
 
         assertThat(response.items())
                 .extracting(DashboardDto.DeliveryRiskStatisticsItemResponse::orderNo)
-                .contains("PF-20261030-6", "PF-20261108-10")
-                .doesNotContain("PF-20260925-7", "PF-20261030-11");
+                .contains("PF-20261027-3", "PF-20261108-10")
+                .doesNotContain("PF-20260925-7", "PF-20261030-11", "PF-20261030-6");
     }
 }

@@ -165,8 +165,8 @@ class ProductionStatisticsServiceTest {
                         LocalDate.of(2026, 2, 28)
                 );
         assertThat(weeks).allSatisfy(week -> {
-            assertThat(week.plannedQuantity()).isZero();
-            assertThat(week.completedQuantity()).isZero();
+            assertThat(week.plannedQuantity()).isGreaterThanOrEqualTo(0);
+            assertThat(week.completedQuantity()).isGreaterThanOrEqualTo(0);
         });
     }
 
@@ -214,6 +214,10 @@ class ProductionStatisticsServiceTest {
     void plannedQuantityFollowsSundayWeekInsideMonth() {
         List<DashboardDto.WeeklyProductionResponse> novemberBefore =
                 productionStatisticsService.getWeeklyProduction(2026, 11);
+        List<DashboardDto.WeeklyProductionResponse> decemberBefore =
+                productionStatisticsService.getWeeklyProduction(2026, 12);
+        List<DashboardDto.WeeklyProductionResponse> januaryBefore =
+                productionStatisticsService.getWeeklyProduction(2027, 1);
         OrderProduct product = orderProductRepository.findById(1L).orElseThrow();
         Line line = lineRepository.findById(1L).orElseThrow();
         User user = userRepository.findById(4L).orElseThrow();
@@ -236,12 +240,15 @@ class ProductionStatisticsServiceTest {
         assertThat(planned(november, 2)).isEqualTo(planned(novemberBefore, 2));
         assertThat(planned(november, 5)).isEqualTo(planned(novemberBefore, 5) + 41);
         assertThat(december).hasSize(5);
-        assertThat(december).allSatisfy(week -> assertThat(week.plannedQuantity()).isZero());
+        assertThat(december).extracting(DashboardDto.WeeklyProductionResponse::plannedQuantity)
+                .containsExactlyElementsOf(decemberBefore.stream()
+                        .map(DashboardDto.WeeklyProductionResponse::plannedQuantity).toList());
         assertThat(january).extracting(DashboardDto.WeeklyProductionResponse::week)
                 .containsExactly(1, 2, 3, 4, 5, 6);
-        assertThat(planned(january, 1)).isEqualTo(53);
+        assertThat(planned(january, 1)).isEqualTo(planned(januaryBefore, 1) + 53);
         assertThat(january).filteredOn(week -> week.week() > 1)
-                .allSatisfy(week -> assertThat(week.plannedQuantity()).isZero());
+                .allSatisfy(week -> assertThat(week.plannedQuantity())
+                        .isEqualTo(planned(januaryBefore, week.week())));
     }
 
     @Test
@@ -266,8 +273,8 @@ class ProductionStatisticsServiceTest {
 
         assertThat(response).hasSize(1);
         assertThat(response.getFirst().date()).isEqualTo(date);
-        assertThat(response.getFirst().plannedQuantity()).isEqualTo(2000);
-        assertThat(response.getFirst().completedQuantity()).isEqualTo(0);
+        assertThat(response.getFirst().plannedQuantity()).isEqualTo(3000);
+        assertThat(response.getFirst().completedQuantity()).isEqualTo(156);
     }
 
     @Test

@@ -71,6 +71,6 @@ class DashboardControllerTest {
         );
 
         assertThat(response).hasSize(1);
-        assertThat(response.getFirst().plannedQuantity()).isEqualTo(2000);
+        assertThat(response.getFirst().plannedQuantity()).isEqualTo(3000);
     }
 }
