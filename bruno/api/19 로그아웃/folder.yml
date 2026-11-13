@@ -1,0 +1,6 @@
+info:
+  name: 19 로그아웃
+  type: folder
+  seq: 19
+request:
+  auth: inherit

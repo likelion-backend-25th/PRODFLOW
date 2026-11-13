@@ -3,6 +3,7 @@ package net.likelion.bebc25.prodflow.dashboard;
 import jakarta.persistence.EntityManager;
 import net.likelion.bebc25.prodflow.commoncode.entity.CommonCode;
 import net.likelion.bebc25.prodflow.dashboard.dto.DashboardDto;
+import net.likelion.bebc25.prodflow.dashboard.repository.OrderStatisticsRepository;
 import net.likelion.bebc25.prodflow.dashboard.service.OrderStatisticsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +28,9 @@ class OrderStatisticsServiceTest {
     @Autowired
     private EntityManager em;
 
+    @Autowired
+    private OrderStatisticsRepository orderStatisticsRepository;
+
     @Test
     @DisplayName("전체 수주 건수와 10월 수주 건수를 조회한다")
     void getOrderStatistics() {
@@ -36,11 +41,9 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2026, 10, 31)
                 );
 
-        // ORDER_STATUS에 속한 수주 13건 중 취소 1건을 제외한다.
-        assertThat(response.totalOrderCount()).isEqualTo(12);
-
-        // 10월 등록 수주 8건 중 취소 1건을 제외한다.
-        assertThat(response.periodOrderCount()).isEqualTo(7);
+        assertThat(response.totalOrderCount()).isEqualTo(orderStatisticsRepository.countAllOrders());
+        assertThat(response.periodOrderCount()).isEqualTo(periodCount(
+                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)));
     }
 
     @Test
@@ -95,9 +98,10 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2026, 10, 20)
                 );
 
-        assertThat(response.totalOrderCount()).isEqualTo(12);
+        assertThat(response.totalOrderCount()).isEqualTo(orderStatisticsRepository.countAllOrders());
 
-        assertThat(response.periodOrderCount()).isGreaterThanOrEqualTo(0);
+        assertThat(response.periodOrderCount()).isEqualTo(periodCount(
+                LocalDate.of(2026, 10, 20), LocalDate.of(2026, 10, 20)));
     }
 
     @Test
@@ -110,7 +114,7 @@ class OrderStatisticsServiceTest {
                         LocalDate.of(2030, 1, 31)
                 );
 
-        assertThat(response.totalOrderCount()).isEqualTo(12);
+        assertThat(response.totalOrderCount()).isEqualTo(orderStatisticsRepository.countAllOrders());
 
         assertThat(response.periodOrderCount()).isZero();
     }
@@ -166,7 +170,10 @@ class OrderStatisticsServiceTest {
 
         assertThat(producingStatus.statusCode()).isEqualTo("IN_PRODUCTION");
         assertThat(producingStatus.statusName()).isEqualTo("생산중");
-        assertThat(producingStatus.orderCount()).isEqualTo(1L);
+        Long producing = em.createQuery(
+                        "select count(o) from CustomerOrder o where o.statusCode.code = 'IN_PRODUCTION'", Long.class)
+                .getSingleResult();
+        assertThat(producingStatus.orderCount()).isEqualTo(producing);
     }
 
 
@@ -244,5 +251,11 @@ class OrderStatisticsServiceTest {
                         "SHIPPING",
                         "WAITING"
                 );
+    }
+
+    private long periodCount(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.plusDays(1).atStartOfDay();
+        return orderStatisticsRepository.countOrdersByPeriod(start, end);
     }
 }

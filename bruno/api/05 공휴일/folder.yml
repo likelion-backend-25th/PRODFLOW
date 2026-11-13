@@ -1,0 +1,6 @@
+info:
+  name: 05 공휴일
+  type: folder
+  seq: 5
+request:
+  auth: inherit

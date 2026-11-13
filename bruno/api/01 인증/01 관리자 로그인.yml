@@ -1,0 +1,53 @@
+info:
+  name: 관리자 로그인
+  type: http
+  seq: 1
+
+docs: |-
+  시드 최고 관리자는 비밀번호 변경이 끝난 계정이다. 여기서 받은 토큰으로 임시 비밀번호 계정을 만든다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{adminEmail}}",
+        "password": "{{adminPassword}}"
+      }
+  auth: inherit
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const stamp = Date.now().toString();
+        bru.setVar("runStamp", stamp);
+        bru.setVar("orderEmail", "bruno.order." + stamp + "@prodflow.site");
+        bru.setVar("prodEmail", "bruno.prod." + stamp + "@prodflow.site");
+        bru.setVar("inquiryEmail", "bruno.inquiry." + stamp + "@prodflow.site");
+        bru.setVar("spareEmail", "bruno.spare." + stamp + "@prodflow.site");
+        bru.setVar("clientEmail", "bruno.client." + stamp + "@example.com");
+        bru.setVar("modelCode", "BRU" + stamp.slice(-8));
+        bru.setVar("lineName", "브루노" + stamp.slice(-6));
+        bru.setVar("trackingNumber", "53" + stamp.slice(-10));
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.tokenType).to.equal("Bearer");
+          expect(body.role).to.equal("SUPER_ADMIN");
+          expect(body.mustChangePassword).to.equal(false);
+          expect(body.accessToken).to.be.a("string");
+          bru.setVar("adminAccessToken", body.accessToken);
+          bru.setVar("accessToken", body.accessToken);
+          bru.setVar("adminUserId", String(body.userId));
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

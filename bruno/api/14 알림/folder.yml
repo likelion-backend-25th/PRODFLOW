@@ -1,0 +1,6 @@
+info:
+  name: 14 알림
+  type: folder
+  seq: 14
+request:
+  auth: inherit

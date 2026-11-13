@@ -1,7 +1,0 @@
-info:
-  name: 생산/수주 관리자 로그인
-  type: folder
-  seq: 1
-
-request:
-  auth: inherit

@@ -1,0 +1,41 @@
+info:
+  name: 현금 계약금
+  type: http
+  seq: 6
+
+docs: |-
+  금액은 수주 총액의 50%에서 원 미만을 버린 값이다. 입금 시각을 생략하면 한국 현재 시각을 쓴다. 활성 가상계좌가 없는 새 수주만 성공한다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/payments/deposit/manual"
+  body:
+    type: json
+    data: |-
+      {
+        "orderId": {{orderId}},
+        "amount": {{depositAmount}}
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(String(body.orderId)).to.equal(bru.getVar("orderId"));
+          expect(body.workOrderIds).to.be.an("array");
+          expect(body.workOrderIds.length).to.be.at.least(1);
+          bru.setVar("paymentId", String(body.paymentId));
+          bru.setVar("workOrderId", String(body.workOrderIds[0]));
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

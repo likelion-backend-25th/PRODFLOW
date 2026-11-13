@@ -34,7 +34,7 @@ class LineBreakRescheduleTest {
     private static final LocalDate PRODUCE_DAY = LocalDate.of(2026, 11, 6);
     private static final LocalDate FULL = LocalDate.of(2026, 12, 15);
     private static final LocalDate NEXT = LocalDate.of(2026, 12, 16);
-    private static final Long ORDER_PRODUCT_ID = 15L;
+    private static final Long ORDER_PRODUCT_ID = 13L;
     private static final Long ASSIGNEE_ID = 4L;
     private static final Long ACTOR_ID = 1L;
 

@@ -1,0 +1,29 @@
+info:
+  name: 배송조회 갱신
+  type: http
+  seq: 11
+
+docs: |-
+  시드 운송장 2의 외부 조회 결과를 저장할 수 있다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/shipments/2/tracking/refresh"
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect([200, 400, 502, 503]).to.include(status);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

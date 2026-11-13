@@ -40,7 +40,7 @@ class PaymentRepositoryTest {
     void findPaymentsByOrderId() {
         List<Payment> payments = paymentRepository.findByOrder_IdOrderByIdAsc(7L);
 
-        assertThat(payments).extracting(Payment::getId).containsExactly(7L, 16L);
+        assertThat(payments).extracting(Payment::getId).containsExactly(9L, 10L);
         assertThat(payments).allSatisfy(payment -> assertThat(payment.getOrder().getId()).isEqualTo(7L));
         assertThat(paymentRepository.findByOrder_IdOrderByIdAsc(Long.MAX_VALUE)).isEmpty();
     }
@@ -58,7 +58,7 @@ class PaymentRepositoryTest {
     @Test
     @DisplayName("각 결제의 최신 계좌만 일괄 조회하고 다른 수주는 제외한다")
     void findLatestAccountsByOrderId() {
-        Payment deposit = paymentRepository.findById(7L).orElseThrow();
+        Payment deposit = paymentRepository.findById(9L).orElseThrow();
         VirtualAccount latest = virtualAccountRepository.save(VirtualAccount.builder().payment(deposit)
                 .bank(Bank.SHINHAN).accountNumber("NEWEST-ACCOUNT").accountName("재발급 계좌")
                 .expiresAt(OffsetDateTime.of(
@@ -73,7 +73,7 @@ class PaymentRepositoryTest {
 
         assertThat(accounts).hasSize(2).allSatisfy(account ->
                 assertThat(account.getPayment().getOrder().getId()).isEqualTo(7L));
-        assertThat(accounts).filteredOn(account -> account.getPayment().getId().equals(7L))
+        assertThat(accounts).filteredOn(account -> account.getPayment().getId().equals(9L))
                 .singleElement().satisfies(account -> {
                     assertThat(account.getId()).isEqualTo(latest.getId());
                     assertThat(account.getStatus()).isEqualTo(VirtualAccountStatus.CANCELLED);

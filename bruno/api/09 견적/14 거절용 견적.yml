@@ -1,0 +1,41 @@
+info:
+  name: 거절용 견적
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/quotations/pdf"
+  body:
+    type: json
+    data: |-
+      {
+        "clientId": {{clientId}},
+        "requestedDueDate": "2027-06-30",
+        "validUntil": "2026-12-31",
+        "vatIncluded": false,
+        "sameDayStart": false,
+        "items": [
+          { "productId": {{productId}}, "quantity": 100, "unitPrice": 15000 }
+        ]
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(201);
+          bru.setVar("rejectQuotationId", String(body.quotationId));
+          bru.setVar("rejectQuotationIdToken", body.confirmationToken);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

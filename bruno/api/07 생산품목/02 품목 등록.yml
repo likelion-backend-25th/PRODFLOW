@@ -1,0 +1,42 @@
+info:
+  name: 품목 등록
+  type: http
+  seq: 2
+
+docs: |-
+  deviceCode는 DEVICE 공통코드다. 1은 iPhone 16이다. deviceName은 기존 기종을 쓸 때 보내지 않는다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/products"
+  body:
+    type: json
+    data: |-
+      {
+        "modelCode": "{{modelCode}}",
+        "productName": "브루노 클리어 케이스",
+        "deviceCode": 1,
+        "productDescription": "Bruno 시연 품목",
+        "currentPrice": 15000
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(201);
+          expect(body.modelCode).to.equal(bru.getVar("modelCode"));
+          expect(body.status).to.equal("AVAILABLE");
+          bru.setVar("productId", String(body.id));
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

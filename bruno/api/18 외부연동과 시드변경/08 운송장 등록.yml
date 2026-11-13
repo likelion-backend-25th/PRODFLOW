@@ -1,0 +1,37 @@
+info:
+  name: 운송장 등록
+  type: http
+  seq: 8
+
+docs: |-
+  시드 수주 4가 출고대기일 때 운송장을 등록하면 배송중이 된다. 메일을 보낸다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/shipments"
+  body:
+    type: json
+    data: |-
+      {
+        "orderId": 4,
+        "carrierCode": "04",
+        "trackingNumber": "{{trackingNumber}}"
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect([201, 400]).to.include(status);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

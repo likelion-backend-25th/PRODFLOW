@@ -32,6 +32,24 @@ class LineNotificationServiceTest {
     @Autowired
     private LineRepository lineRepository;
 
+    @Autowired
+    private jakarta.persistence.EntityManager em;
+
+    private Long seedNotificationId;
+
+    @org.junit.jupiter.api.BeforeEach
+    void prepareNotifications() {
+        lineNotificationRepository.deleteAllInBatch();
+        Line line = lineRepository.findById(3L).orElseThrow();
+        var first = new LineNotification(line,
+                em.find(net.likelion.bebc25.prodflow.user.entity.User.class, 6L),
+                LineNotificationType.BROKEN, "고장 알림");
+        seedNotificationId = lineNotificationRepository.save(first).getId();
+        lineNotificationRepository.save(new LineNotification(line,
+                em.find(net.likelion.bebc25.prodflow.user.entity.User.class, 4L),
+                LineNotificationType.BROKEN, "담당 라인 고장"));
+    }
+
     @Test
     @DisplayName("사용자의 알림 목록을 조회한다")
     void getNotification() {
@@ -74,7 +92,7 @@ class LineNotificationServiceTest {
     @DisplayName("알림을 읽음 처리한다")
     void markAsRead() {
         // given
-        Long notificationId = 1L;
+        Long notificationId = seedNotificationId;
         Long userId = 6L;
 
         // when
@@ -97,7 +115,7 @@ class LineNotificationServiceTest {
     @DisplayName("다른 사용자의 알림은 읽음 처리할 수 없다")
     void markAsReadByOtherUser() {
         // given
-        Long notificationId = 1L;
+        Long notificationId = seedNotificationId;
         Long otherUserId = 5L;
 
         // when & then

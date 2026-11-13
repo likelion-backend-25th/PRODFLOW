@@ -1,0 +1,29 @@
+info:
+  name: 대시보드
+  type: http
+  seq: 1
+
+docs: |-
+  업무 조회 담당자 토큰으로 조회한다. 네 역할 모두 인증 후 조회할 수 있다.
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/statistics/dashboard?startDate=2026-11-01&endDate=2026-11-30"
+  auth:
+    type: bearer
+    token: "{{inquiryAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

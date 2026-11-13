@@ -131,6 +131,8 @@ class DeliveryPerformanceServiceTest {
         // 운송장 자체가 없는 생산중 수주와, 운송장은 있지만 배송중인 수주를 함께 검증한다.
         em.createQuery("update CustomerOrder o set o.requestedDueDate = :date where o.id in (2, 6)")
                 .setParameter("date", dueDate).executeUpdate();
+        em.createQuery("update Shipment s set s.deliveredAt = null where s.orderId in (2, 6)")
+                .executeUpdate();
 
         DashboardDto.DeliveryPerformanceResponse response =
                 deliveryPerformanceService.getDeliveryPerformance(dueDate, dueDate);

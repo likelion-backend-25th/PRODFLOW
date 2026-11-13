@@ -82,17 +82,17 @@ class WorkOrderServiceTest {
     void listByOrderId() {
         Page<PageResponse> result = workOrderService.findAll(1L, null, null, null, null, null, PageRequest.of(0, 10));
 
-        assertThat(result.getTotalElements()).isEqualTo(5);
+        assertThat(result.getTotalElements()).isEqualTo(2);
         assertThat(result.getContent()).allSatisfy(row -> {
-            assertThat(row.orderNo()).isEqualTo("PF-20261106-1");
-            assertThat(row.orderProductId()).isIn(1L, 2L, 3L);
+            assertThat(row.orderNo()).isEqualTo("PF-20261110-1");
+            assertThat(row.orderProductId()).isEqualTo(1L);
             assertThat(row.plannedStartDate()).isNotNull();
             assertThat(row.plannedEndDate()).isNotNull();
             assertThat(row.completedAt()).isNull();
         });
         Page<PageResponse> completed = workOrderService.findAll(7L, null, null, null, null, null, PageRequest.of(0, 10));
         assertThat(completed.getContent()).hasSize(1);
-        assertThat(completed.getContent().getFirst().completedAt()).isEqualTo(LocalDate.of(2026, 10, 19));
+        assertThat(completed.getContent().getFirst().completedAt()).isEqualTo(LocalDate.of(2026, 10, 27));
     }
 
     @Test
@@ -100,12 +100,12 @@ class WorkOrderServiceTest {
     void listByOrderIdWithOtherConditions() {
         WorkOrder target = workOrderRepository.findById(1L).orElseThrow();
         Page<PageResponse> result = workOrderService.findAll(1L, target.getLine().getId(), " PREPARE ",
-                target.getWorkOrderDate(), target.getWorkOrderDate(), " PF-20261106-1 ", PageRequest.of(0, 5));
+                target.getWorkOrderDate(), target.getWorkOrderDate(), " PF-20261110-1 ", PageRequest.of(0, 5));
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().getFirst().id()).isEqualTo(target.getId());
         Page<PageResponse> noMatch = workOrderService.findAll(2L, target.getLine().getId(), "PREPARE",
-                target.getWorkOrderDate(), target.getWorkOrderDate(), "PF-20261106-1", PageRequest.of(0, 5));
+                target.getWorkOrderDate(), target.getWorkOrderDate(), "PF-20261110-1", PageRequest.of(0, 5));
         assertThat(noMatch.getContent()).isEmpty();
     }
 
@@ -113,14 +113,14 @@ class WorkOrderServiceTest {
     @DisplayName("수주별 조회에서도 완료 예정일·최근 등록 순서와 페이징을 유지한다")
     void listByOrderIdWithPagination() {
         List<PageResponse> rows = new ArrayList<>();
-        for (int page = 0; page < 3; page++) {
-            Page<PageResponse> result = workOrderService.findAll(1L, null, null, null, null, null, PageRequest.of(page, 2));
-            assertThat(result.getTotalElements()).isEqualTo(5);
-            assertThat(result.getTotalPages()).isEqualTo(3);
+        for (int page = 0; page < 2; page++) {
+            Page<PageResponse> result = workOrderService.findAll(1L, null, null, null, null, null, PageRequest.of(page, 1));
+            assertThat(result.getTotalElements()).isEqualTo(2);
+            assertThat(result.getTotalPages()).isEqualTo(2);
             rows.addAll(result.getContent());
         }
 
-        assertThat(rows).hasSize(5).isSortedAccordingTo(Comparator.comparing(PageResponse::plannedEndDate)
+        assertThat(rows).hasSize(2).isSortedAccordingTo(Comparator.comparing(PageResponse::plannedEndDate)
                 .thenComparing(Comparator.comparing(PageResponse::id).reversed()));
         assertThat(rows).extracting(PageResponse::id).doesNotHaveDuplicates();
     }
@@ -142,12 +142,15 @@ class WorkOrderServiceTest {
         Page<PageResponse> second = workOrderService.findAll(
                 null, null, null, null, null, null, 5L, PageRequest.of(1, 5));
 
-        assertThat(first.getTotalElements()).isEqualTo(6);
-        assertThat(first.getTotalPages()).isEqualTo(2);
+        long assignedToLee = workOrderRepository.findAll().stream()
+                .filter(work -> work.getUser() != null && work.getUser().getId().equals(5L))
+                .count();
+        assertThat(first.getTotalElements()).isEqualTo(assignedToLee);
+        assertThat(first.getTotalPages()).isEqualTo((int) ((assignedToLee + 4) / 5));
         assertThat(first.getContent()).hasSize(5);
         assertThat(first.getContent()).allSatisfy(row -> assertThat(row.assignedName()).isEqualTo("이재원"));
-        assertThat(second.getContent()).hasSize(1);
-        assertThat(second.getContent().getFirst().assignedName()).isEqualTo("이재원");
+        assertThat(second.getContent()).hasSize((int) Math.min(5, assignedToLee - 5));
+        assertThat(second.getContent()).allSatisfy(row -> assertThat(row.assignedName()).isEqualTo("이재원"));
     }
 
     @Test
@@ -163,8 +166,8 @@ class WorkOrderServiceTest {
         // 이미 계획이 있는 날 다음의 평일 이틀이다. 시드가 늘어도 같은 검증을 한다.
         LocalDate start = firstOpenWeekday();
         LocalDate end = nextOpenWeekday(start);
-        CreateRequest request = request(15L, 1L, 4L, 1500, start, end);
-        String orderManagerName = em.find(OrderProduct.class, 15L)
+        CreateRequest request = request(13L, 1L, 4L, 1500, start, end);
+        String orderManagerName = em.find(OrderProduct.class, 13L)
                 .getCustomerOrder().getUser().getName();
         long historyCount = statusHistoryRepository.count();
         String workNo = workNo(workOrderRepository.count() + 1);
@@ -178,7 +181,7 @@ class WorkOrderServiceTest {
         assertResponsePlans(created.getFirst(), List.of(start, end), List.of(1000, 500));
 
         WorkOrder saved = workOrderRepository.findById(created.getFirst().id()).orElseThrow();
-        assertThat(saved.getOrderProduct().getId()).isEqualTo(15L);
+        assertThat(saved.getOrderProduct().getId()).isEqualTo(13L);
         assertThat(saved.getLine().getId()).isEqualTo(1L);
         assertThat(saved.getUser().getId()).isEqualTo(4L);
         assertThat(saved.getUser().getName()).isEqualTo("김태호");
@@ -194,7 +197,7 @@ class WorkOrderServiceTest {
         List<ProductionPlan> plans = plansOf(saved.getId());
         assertThat(plans).extracting(ProductionPlan::getPlanDate).containsExactly(start, end);
         assertThat(plans).extracting(ProductionPlan::getQuantity).containsExactly(1000, 500);
-        assertThat(plans).allMatch(plan -> plan.getOrderProduct().getId().equals(15L));
+        assertThat(plans).allMatch(plan -> plan.getOrderProduct().getId().equals(13L));
         assertThat(plans).allMatch(plan -> orderManagerName.equals(plan.getCreatedBy())
                 && orderManagerName.equals(plan.getUpdatedBy()));
         // 등록은 준비 상태만 채우고 상태 변경 이력은 남기지 않는다.
@@ -210,7 +213,7 @@ class WorkOrderServiceTest {
         // 평일 이틀은 한 라인에 2,000개다. 2,500개면 다음 가동 라인에 500개가 넘어간다.
         LocalDate start = firstOpenWeekday();
         LocalDate end = nextOpenWeekday(start);
-        CreateRequest request = request(15L, 1L, 4L, 2500, start, end);
+        CreateRequest request = request(13L, 1L, 4L, 2500, start, end);
         long firstNo = workOrderRepository.count() + 1;
 
         List<Response> created = workOrderService.create(request, 1L);
@@ -240,7 +243,7 @@ class WorkOrderServiceTest {
         // 계획이 없는 금요일부터 다음 월요일까지다. 그 사이 토, 일은 빠진다.
         LocalDate friday = nextWeekday(DayOfWeek.FRIDAY);
         LocalDate monday = friday.plusDays(3);
-        CreateRequest request = request(15L, 1L, 4L, 1500, friday, monday);
+        CreateRequest request = request(13L, 1L, 4L, 1500, friday, monday);
 
         List<Response> created = workOrderService.create(request, 1L);
 
@@ -257,10 +260,10 @@ class WorkOrderServiceTest {
     @DisplayName("성탄절은 생산 계획에서 빠진다")
     void skipHoliday() {
         // 저장된 공휴일과 그 앞뒤 평일이다. 연도가 바뀌어도 그 공휴일은 계획에서 빠진다.
-        LocalDate holiday = nextHoliday();
+        LocalDate holiday = LocalDate.of(2026, 12, 25);
         LocalDate before = previousOpenWeekday(holiday);
         LocalDate after = nextOpenWeekday(holiday);
-        CreateRequest request = request(15L, 1L, 4L, 1500, before, after);
+        CreateRequest request = request(13L, 1L, 4L, 1500, before, after);
 
         List<Response> created = workOrderService.create(request, 1L);
 
@@ -277,7 +280,7 @@ class WorkOrderServiceTest {
         // 가동 중인 라인의 이틀 생산량보다 1개 많다. 라인이 늘어도 같은 방식으로 거절된다.
         LocalDate start = firstOpenWeekday();
         LocalDate end = nextOpenWeekday(start);
-        CreateRequest request = request(15L, 1L, 4L, usableCapacity(2) + 1, start, end);
+        CreateRequest request = request(13L, 1L, 4L, usableCapacity(2) + 1, start, end);
 
         assertThatThrownBy(() -> workOrderService.create(request, 1L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -288,7 +291,7 @@ class WorkOrderServiceTest {
     @DisplayName("고장 라인을 첫 라인으로 고르면 배정하지 않는다")
     void rejectBrokenLine() {
         LocalDate day = firstOpenWeekday();
-        CreateRequest request = request(15L, 4L, 4L, 100, day, day);
+        CreateRequest request = request(13L, 3L, 4L, 100, day, day);
 
         assertThatThrownBy(() -> workOrderService.create(request, 1L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -302,11 +305,11 @@ class WorkOrderServiceTest {
         LocalDate sameDay = firstOpenWeekday();
         LocalDate later = nextOpenWeekday(sameDay);
         Response firstOnSameDay = workOrderService.create(
-                request(15L, 1L, 4L, 100, sameDay, sameDay), 1L).getFirst();
+                request(13L, 1L, 4L, 100, sameDay, sameDay), 1L).getFirst();
         Response secondOnSameDay = workOrderService.create(
-                request(15L, 1L, 4L, 100, sameDay, sameDay), 1L).getFirst();
+                request(13L, 1L, 4L, 100, sameDay, sameDay), 1L).getFirst();
         Response laterDay = workOrderService.create(
-                request(15L, 1L, 4L, 100, later, later), 1L).getFirst();
+                request(13L, 1L, 4L, 100, later, later), 1L).getFirst();
 
         // 화면과 같이 5건씩이다. 정렬은 비워 레포지토리 순서를 쓴다.
         Page<PageResponse> firstPage = workOrderService.findAll(null, null, null, null, null, PageRequest.of(0, 5));
@@ -327,10 +330,10 @@ class WorkOrderServiceTest {
 
         List<String> workNos = list.stream().map(PageResponse::workNo).toList();
         // 포장 완료 작업도 포함하며 완료 예정일 10월 19일이 11월 11일보다 앞이다.
-        assertThat(workNos).contains("WO-2026-012", "WO-2026-001");
-        assertThat(workNos.indexOf("WO-2026-012")).isLessThan(workNos.indexOf("WO-2026-001"));
+        assertThat(workNos).contains("WO-2026-008", "WO-2026-001");
+        assertThat(workNos.indexOf("WO-2026-008")).isLessThan(workNos.indexOf("WO-2026-001"));
         // 시드의 완료 예정일 11월 6일이 같으면 ID가 큰 007이 006보다 앞이다.
-        assertThat(workNos.indexOf("WO-2026-007")).isLessThan(workNos.indexOf("WO-2026-006"));
+        assertThat(workNos.indexOf("WO-2026-005")).isLessThan(workNos.indexOf("WO-2026-004"));
 
         int laterRegistration = workNos.indexOf(secondOnSameDay.workNo());
         int earlierRegistration = workNos.indexOf(firstOnSameDay.workNo());
@@ -340,8 +343,8 @@ class WorkOrderServiceTest {
 
         PageResponse row = list.get(laterRegistration);
         assertThat(row.id()).isEqualTo(secondOnSameDay.id());
-        assertThat(row.orderNo()).isEqualTo("PF-20261103-13");
-        assertThat(row.clientName()).isEqualTo("세원모바일(주)");
+        assertThat(row.orderNo()).isEqualTo("PF-20261113-13");
+        assertThat(row.clientName()).isEqualTo("한빛케이스(주)");
         assertThat(row.productName()).isEqualTo("아이폰 16 맥세이프 클리어 케이스");
         assertThat(row.quantity()).isEqualTo(100);
         assertThat(row.lineName()).isEqualTo("A라인");
@@ -354,39 +357,31 @@ class WorkOrderServiceTest {
     @Test
     @DisplayName("작업지시 한 장의 수주, 라인, 담당자, 기간, 납기를 조회한다")
     void getDetailOfSeedWorkOrder() {
-        // 시드 1번은 준비 상태다. 완료일은 없다.
         DetailResponse detail = workOrderService.getDetail(1L);
-
         assertThat(detail.id()).isEqualTo(1L);
         assertThat(detail.workNo()).isEqualTo("WO-2026-001");
-        assertThat(detail.orderNo()).isEqualTo("PF-20261106-1");
+        assertThat(detail.orderNo()).isEqualTo("PF-20261110-1");
         assertThat(detail.clientName()).isEqualTo("한빛케이스(주)");
         assertThat(detail.productName()).isEqualTo("아이폰 16 맥세이프 클리어 케이스");
-        assertThat(detail.quantity()).isEqualTo(2000);
-        assertThat(detail.lineId()).isEqualTo(1L);
-        assertThat(detail.lineName()).isEqualTo("A라인");
-        assertThat(detail.assignedId()).isEqualTo(4L);
-        assertThat(detail.assignedName()).isEqualTo("김태호");
-        assertThat(detail.workOrderDate()).isEqualTo(date(2026, 11, 6));
-        assertThat(detail.plannedStartDate()).isEqualTo(date(2026, 11, 10));
-        assertThat(detail.plannedEndDate()).isEqualTo(date(2026, 11, 11));
+        assertThat(detail.quantity()).isEqualTo(1000);
+        assertThat(detail.lineId()).isEqualTo(2L);
+        assertThat(detail.lineName()).isEqualTo("B라인");
+        assertThat(detail.assignedId()).isEqualTo(5L);
+        assertThat(detail.assignedName()).isEqualTo("이재원");
+        assertThat(detail.workOrderDate()).isEqualTo(date(2026, 11, 10));
+        assertThat(detail.plannedStartDate()).isEqualTo(date(2026, 11, 16));
+        assertThat(detail.plannedEndDate()).isEqualTo(date(2026, 11, 16));
         assertThat(detail.completedAt()).isNull();
         assertThat(detail.status()).isEqualTo("PREPARE");
-        assertThat(detail.note()).isEqualTo(
-                "아이폰 16 맥세이프 클리어 케이스 2026-11-10 1000개, 2026-11-11 1000개. 수주 품목·라인 단위 작업입니다.");
-        assertThat(detail.estimatedDueDate()).isEqualTo(date(2026, 11, 16));
-        assertThat(detail.plans()).extracting(ProductionPlanDto.Response::planDate)
-                .containsExactly(date(2026, 11, 10), date(2026, 11, 11));
-        assertThat(detail.plans()).extracting(ProductionPlanDto.Response::quantity)
-                .containsExactly(1000, 1000);
-        assertThat(detail.plans()).extracting(ProductionPlanDto.Response::workOrderId)
-                .containsOnly(1L);
-
-        // 시드 12번은 포장 완료라 완료일이 있다.
-        DetailResponse packed = workOrderService.getDetail(12L);
-        assertThat(packed.workNo()).isEqualTo("WO-2026-012");
+        assertThat(detail.note()).contains("시나리오 01");
+        assertThat(detail.estimatedDueDate()).isEqualTo(date(2026, 11, 19));
+        assertThat(detail.plans()).extracting(ProductionPlanDto.Response::planDate, ProductionPlanDto.Response::quantity)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(date(2026, 11, 16), 1000));
+        assertThat(detail.plans()).extracting(ProductionPlanDto.Response::workOrderId).containsOnly(1L);
+        DetailResponse packed = workOrderService.getDetail(8L);
+        assertThat(packed.workNo()).isEqualTo("WO-2026-008");
         assertThat(packed.status()).isEqualTo("PACK_DONE");
-        assertThat(packed.completedAt()).isEqualTo(date(2026, 10, 19));
+        assertThat(packed.completedAt()).isEqualTo(date(2026, 10, 27));
     }
 
     @Test
@@ -402,7 +397,7 @@ class WorkOrderServiceTest {
     void rejectCreateWhenAssigneeIsNotProductionManager() {
         // 이서준은 사용 중인 수주 관리자다.
         LocalDate day = firstOpenWeekday();
-        CreateRequest request = request(15L, 1L, 2L, 100, day, day);
+        CreateRequest request = request(13L, 1L, 2L, 100, day, day);
 
         assertThatThrownBy(() -> workOrderService.create(request, 1L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -414,7 +409,7 @@ class WorkOrderServiceTest {
     void rejectCreateWhenProductionManagerIsInactive() {
         // 정민석은 생산 현장 관리자이지만 비활성이다.
         LocalDate day = firstOpenWeekday();
-        CreateRequest request = request(15L, 1L, 8L, 100, day, day);
+        CreateRequest request = request(13L, 1L, 8L, 100, day, day);
 
         assertThatThrownBy(() -> workOrderService.create(request, 1L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -425,7 +420,7 @@ class WorkOrderServiceTest {
     @DisplayName("수정은 사용 중인 생산 현장 관리자로 담당자를 바꾼다")
     void updateAssigneeToActiveProductionManager() {
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 1L, 4L, 100, day, day), 1L).getFirst().id();
 
         // 박시우는 사용 중인 생산 현장 관리자다. 수정한 직원은 서도윤이다.
         DetailResponse updated = workOrderService.update(workOrderId, updateRequest(null, 6L), 1L);
@@ -442,7 +437,7 @@ class WorkOrderServiceTest {
     @DisplayName("생산 현장 관리자가 아닌 직원으로는 담당자를 바꾸지 않는다")
     void rejectUpdateWhenAssigneeIsNotProductionManager() {
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 1L, 4L, 100, day, day), 1L).getFirst().id();
 
         assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(null, 2L), 1L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -454,7 +449,7 @@ class WorkOrderServiceTest {
     @DisplayName("비활성 생산 현장 관리자로는 담당자를 바꾸지 않는다")
     void rejectUpdateWhenProductionManagerIsInactive() {
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 1L, 4L, 100, day, day), 1L).getFirst().id();
 
         assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(null, 8L), 1L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -466,7 +461,7 @@ class WorkOrderServiceTest {
     @DisplayName("가동 중인 라인으로는 작업지시 라인을 바꾸지 않는다")
     void rejectUpdateWhenLineIsOperating() {
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 1L, 4L, 100, day, day), 1L).getFirst().id();
         Line operatingLine = lineRepository.save(new Line("이동-가동", 1000));
         operatingLine.changeStatus(LineStatus.OPERATING);
 
@@ -483,7 +478,7 @@ class WorkOrderServiceTest {
         Line target = lineRepository.save(new Line("시작-다른라인", 1000));
         LocalDate day = firstOpenWeekday();
         Long workOrderId = workOrderService.create(
-                request(15L, source.getId(), 4L, 100, day, day), 1L).getFirst().id();
+                request(13L, source.getId(), 4L, 100, day, day), 1L).getFirst().id();
         WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
         // 시작 예정일이 오늘보다 뒤면 생산 중 검증보다 날짜 검증이 먼저 난다.
         ReflectionTestUtils.setField(workOrder, "plannedStartDate", LocalDate.now());
@@ -512,7 +507,7 @@ class WorkOrderServiceTest {
     @DisplayName("가동 가능 라인으로 작업지시 라인을 바꾼다")
     void updateLineToAvailableLine() {
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 1L, 4L, 100, day, day), 1L).getFirst().id();
         // 시드 라인은 점검·고장으로 바뀌어 있을 수 있다. 이 테스트 안에서 가동 가능 라인을 만든다.
         Line availableLine = lineRepository.save(new Line("이동-가능", 1000));
 
@@ -534,7 +529,7 @@ class WorkOrderServiceTest {
     @DisplayName("바꿀 라인과 담당자가 없으면 수정하지 않는다")
     void rejectUpdateWhenNothingChanges() {
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 1L, 4L, 100, day, day), 1L).getFirst().id();
 
         assertThatThrownBy(() -> workOrderService.update(workOrderId, updateRequest(null, null), 1L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -545,7 +540,7 @@ class WorkOrderServiceTest {
     @DisplayName("작업 상태를 바꾸면 상태 변경 이력을 남긴다")
     void recordStatusHistoryWhenStatusChanges() {
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 1L, 4L, 100, day, day), 1L).getFirst().id();
         long assignmentHistoryCount = workOrderHistoryRepository.count();
 
         // 준비에서 생산 중지로 바꾼다. 시작 예정일과 상관없이 허용되는 전이다.
@@ -570,9 +565,11 @@ class WorkOrderServiceTest {
     @Test
     @DisplayName("작업지시의 생산·보류·재개·중지·포장 처리로 바뀐 수주 상태를 이력으로 남긴다")
     void recordOrderHistoryThroughoutWorkProgress() {
-        WorkOrder work = workOrderRepository.findById(15L).orElseThrow();
+        WorkOrder work = workOrderRepository.findById(11L).orElseThrow();
         Line line = lineRepository.save(new Line("수주이력-생산라인", 1000));
         work.changeLine(line);
+        work.changeStatus(em.find(CommonCode.class, 16L));
+        work.getOrderProduct().getCustomerOrder().changeProgress(em.find(CommonCode.class, 7L));
         ReflectionTestUtils.setField(work, "plannedStartDate", LocalDate.now());
         Long orderId = work.getOrderProduct().getCustomerOrder().getId();
 
@@ -604,7 +601,7 @@ class WorkOrderServiceTest {
     void skipOrderHistoryWhenAnotherWorkStarts() {
         Line line = lineRepository.save(new Line("수주이력-추가라인", 1000));
         LocalDate day = firstOpenWeekday();
-        Long workId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        Long workId = workOrderService.create(request(13L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
         WorkOrder work = workOrderRepository.findById(workId).orElseThrow();
         ReflectionTestUtils.setField(work, "plannedStartDate", LocalDate.now());
         work.getOrderProduct().getCustomerOrder().changeProgress(em.find(CommonCode.class, 8L));
@@ -625,7 +622,7 @@ class WorkOrderServiceTest {
     void rejectProduceWhenPlanExceedsReducedCapacity() {
         Line line = lineRepository.save(new Line("생산시작-용량", 1000));
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
         WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
         // 시작 예정일이 오늘보다 뒤면 생산능력 검증보다 날짜 검증이 먼저 난다.
         ReflectionTestUtils.setField(workOrder, "plannedStartDate", LocalDate.now());
@@ -655,7 +652,7 @@ class WorkOrderServiceTest {
     void rejectProduceOnUnavailableLine(String workStatus, LineStatus lineStatus, String message) {
         Line line = lineRepository.save(new Line("생산시작-상태검증", 1000));
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
         WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
         ReflectionTestUtils.setField(workOrder, "plannedStartDate", LocalDate.now());
         if ("SUSPEND".equals(workStatus)) {
@@ -682,7 +679,7 @@ class WorkOrderServiceTest {
     void produceOnUsableLine(String workStatus, LineStatus lineStatus) {
         Line line = lineRepository.save(new Line("생산시작-정상라인", 1000));
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
         WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
         ReflectionTestUtils.setField(workOrder, "plannedStartDate", LocalDate.now());
         if ("SUSPEND".equals(workStatus)) {
@@ -702,9 +699,10 @@ class WorkOrderServiceTest {
     @DisplayName("같은 라인에 생산 중인 작업이 있으면 생산을 시작하지 않는다")
     void rejectProduceWhenAnotherWorkIsProducing() {
         // 시드 A라인. 6번은 생산 중이고 1번은 준비다.
-        WorkOrder producing = workOrderRepository.findById(6L).orElseThrow();
+        WorkOrder producing = workOrderRepository.findById(3L).orElseThrow();
         WorkOrder waiting = workOrderRepository.findById(1L).orElseThrow();
         assertThat(producing.getCommonCode().getCode()).isEqualTo("PRODUCE");
+        waiting.changeLine(producing.getLine());
         assertThat(producing.getLine().getId()).isEqualTo(waiting.getLine().getId());
         assertThat(waiting.getCommonCode().getCode()).isEqualTo("PREPARE");
         // 시작 예정일이 오늘보다 뒤면 생산 중 검증보다 날짜 검증이 먼저 난다.
@@ -723,7 +721,7 @@ class WorkOrderServiceTest {
     @DisplayName("라인과 담당자를 바꾸면 작업지시 변경 이력을 남긴다")
     void recordWorkOrderHistoryWhenLineAndAssigneeChange() {
         LocalDate day = firstOpenWeekday();
-        Long workOrderId = workOrderService.create(request(15L, 1L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 1L, 4L, 100, day, day), 1L).getFirst().id();
         long statusHistoryCount = statusHistoryRepository.count();
         // 다른 라인을 이 테스트 안에서만 가동 가능으로 둔다.
         Line targetLine = lineRepository.findAll().stream()
@@ -767,7 +765,7 @@ class WorkOrderServiceTest {
     void rejectInspectionLine() {
         LocalDate day = LocalDate.of(2026, 12, 15);
 
-        assertThatThrownBy(() -> workOrderService.create(request(15L, 5L, 4L, 100, day, day), 1L))
+        assertThatThrownBy(() -> workOrderService.create(request(13L, 5L, 4L, 100, day, day), 1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("점검·고장 라인에는 배정할 수 없습니다.");
     }
@@ -781,13 +779,13 @@ class WorkOrderServiceTest {
         lineRepository.save(line);
         LocalDate day = LocalDate.of(2026, 12, 15);
         Long workOrderId = workOrderService.create(
-                request(15L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
+                request(13L, line.getId(), 4L, 100, day, day), 1L).getFirst().id();
         String workNo = workOrderRepository.findById(workOrderId).orElseThrow().getWorkNo();
 
         Page<PageResponse> matched = workOrderService.findAll(
-                line.getId(), "PREPARE", null, null, "PF-20261103-13", PageRequest.of(0, 5));
+                line.getId(), "PREPARE", null, null, "PF-20261113-13", PageRequest.of(0, 5));
         Page<PageResponse> otherStatus = workOrderService.findAll(
-                line.getId(), "PRODUCE", null, null, "PF-20261103-13", PageRequest.of(0, 5));
+                line.getId(), "PRODUCE", null, null, "PF-20261113-13", PageRequest.of(0, 5));
 
         assertThat(matched.getContent()).extracting(PageResponse::workNo).containsExactly(workNo);
         assertThat(otherStatus.getContent()).isEmpty();
@@ -797,7 +795,7 @@ class WorkOrderServiceTest {
     @DisplayName("준비 상태에서 포장으로 건너뛰거나 같은 상태로 바꾸지 않는다")
     void rejectDisallowedStatusTransition() {
         LocalDate day = LocalDate.of(2026, 12, 15);
-        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 4L, 4L, 100, day, day), 1L).getFirst().id();
 
         assertThatThrownBy(() -> workOrderService.changeStatus(
                 workOrderId, new UpdateStatusRequest("PACK", null), 1L))
@@ -815,7 +813,7 @@ class WorkOrderServiceTest {
     @DisplayName("생산 시작 예정일 전에는 생산을 시작하지 않는다")
     void rejectProduceBeforePlannedStart() {
         LocalDate day = LocalDate.of(2027, 12, 15);
-        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 4L, 4L, 100, day, day), 1L).getFirst().id();
 
         assertThatThrownBy(() -> workOrderService.changeStatus(
                 workOrderId, new UpdateStatusRequest("PRODUCE", null), 1L))
@@ -827,7 +825,7 @@ class WorkOrderServiceTest {
     @DisplayName("배정되지 않은 생산 현장 관리자는 작업 상태를 바꾸지 않는다")
     void rejectStatusChangeWhenUserIsNotAssignee() {
         LocalDate day = LocalDate.of(2026, 12, 15);
-        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 4L, 4L, 100, day, day), 1L).getFirst().id();
 
         // 직원 5는 생산 현장 관리자이지만 이 작업의 담당자가 아니다.
         assertThatThrownBy(() -> workOrderService.changeStatus(
@@ -840,7 +838,7 @@ class WorkOrderServiceTest {
     @DisplayName("취소된 수주의 생산 중지 작업은 준비로 돌아가지 않는다")
     void rejectResumeWhenOrderIsCancelled() {
         LocalDate day = LocalDate.of(2026, 12, 15);
-        Long workOrderId = workOrderService.create(request(15L, 3L, 4L, 100, day, day), 1L).getFirst().id();
+        Long workOrderId = workOrderService.create(request(13L, 4L, 4L, 100, day, day), 1L).getFirst().id();
         workOrderService.changeStatus(workOrderId, new UpdateStatusRequest("HALT", "수주 취소"), 1L);
         WorkOrder workOrder = workOrderRepository.findById(workOrderId).orElseThrow();
         workOrder.getOrderProduct().getCustomerOrder().changeProgress(em.find(CommonCode.class, 15L));
@@ -893,16 +891,6 @@ class WorkOrderServiceTest {
         }
         return day;
     }
-
-    private LocalDate nextHoliday() {
-        LocalDate after = latestPlanDate();
-        return holidayRepository.findAll().stream()
-                .map(holiday -> holiday.getHolidayDate())
-                .filter(day -> day.isAfter(after))
-                .min(Comparator.naturalOrder())
-                .orElseThrow();
-    }
-
 
     private boolean isClosed(LocalDate day) {
         return day.getDayOfWeek() == DayOfWeek.SATURDAY

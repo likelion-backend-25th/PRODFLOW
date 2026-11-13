@@ -1,0 +1,31 @@
+info:
+  name: 토큰 재발급
+  type: http
+  seq: 6
+
+docs: |-
+  직전 로그인 응답의 refreshToken 쿠키를 사용한다. 다른 계정으로 로그인하기 전에 실행한다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/refresh"
+  auth: inherit
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.tokenType).to.equal("Bearer");
+          expect(body.mustChangePassword).to.equal(false);
+          bru.setVar("orderAccessToken", body.accessToken);
+          bru.setVar("accessToken", body.accessToken);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

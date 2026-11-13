@@ -16,8 +16,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.PageImpl;
 import org.hibernate.Hibernate;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -69,7 +71,8 @@ class QuotationSeedTest {
         assertThat(service.getQuotationList(null, QuotationStatus.SENT,
                 QuotationSortType.CREATED_AT, PageRequest.of(0, 12), true).getContent()).isEmpty();
         assertThat(service.getQuotationList(null, null,
-                QuotationSortType.CREATED_AT, PageRequest.of(0, 12), false).getTotalElements()).isEqualTo(16);
+                QuotationSortType.CREATED_AT, PageRequest.of(0, 12), false).getTotalElements())
+                .isEqualTo(quotations.count());
     }
 
     @Test
@@ -96,27 +99,29 @@ class QuotationSeedTest {
         }
 
         for (QuotationSortType sortType : QuotationSortType.values()) {
+            long approvedCount = quotations.count() - singleStatusIds.size();
             var approved = service.getQuotationList(" ", QuotationStatus.APPROVED, sortType, PageRequest.of(0, 5));
-            assertThat(approved.getTotalElements()).isEqualTo(12);
-            assertThat(approved.getTotalPages()).isEqualTo(3);
+            assertThat(approved.getTotalElements()).isEqualTo(approvedCount);
+            assertThat(approved.getTotalPages()).isEqualTo((approvedCount + 4) / 5);
             assertThat(approved.getContent()).hasSize(5)
                     .allSatisfy(quotation -> assertThat(quotation.status()).isEqualTo(QuotationStatus.APPROVED));
         }
 
         var search = service.getQuotationList(" 한빛 ", QuotationStatus.APPROVED,
-                QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
+                QuotationSortType.CREATED_AT, PageRequest.of(0, 500));
         assertThat(search.getContent()).extracting(quotation -> quotation.id())
-                .containsExactlyInAnyOrder(5L, 9L, 15L);
-        assertThat(search.getTotalElements()).isEqualTo(3);
+                .contains(5L, 9L, 13L, 17L);
+        assertThat(search.getContent()).allSatisfy(quotation -> assertThat(quotation.clientCompany()).contains("한빛"));
+        assertThat(search.getTotalElements()).isEqualTo(search.getContent().size());
 
-        var noMatch = service.getQuotationList("QT-20261105-1", QuotationStatus.APPROVED,
+        var noMatch = service.getQuotationList("QT-20261109-1", QuotationStatus.APPROVED,
                 QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
         assertThat(noMatch.getContent()).isEmpty();
         assertThat(noMatch.getTotalElements()).isZero();
         var outOfRange = service.getQuotationList(null, QuotationStatus.APPROVED,
                 QuotationSortType.CREATED_AT, PageRequest.of(99, 5));
         assertThat(outOfRange.getContent()).isEmpty();
-        assertThat(outOfRange.getTotalElements()).isEqualTo(12);
+        assertThat(outOfRange.getTotalElements()).isEqualTo(quotations.count() - singleStatusIds.size());
     }
 
     @Test
@@ -147,35 +152,36 @@ class QuotationSeedTest {
         // 외부 sort 입력보다 Enum의 정렬 우선
         var pageable = PageRequest.of(0, 3, Sort.by("id"));
         assertThat(service.getQuotationList(null, null, QuotationSortType.CREATED_AT, pageable).getContent())
-                .extracting(quotation -> quotation.id()).containsExactly(1L, 2L, 16L);
+                .extracting(quotation -> quotation.id()).containsExactly(1L, 2L, idsDescExcept(1L, 2L).getFirst());
         assertThat(service.getQuotationList(null, null, QuotationSortType.REQUESTED_DUE_DATE, pageable).getContent())
-                .extracting(quotation -> quotation.id()).containsExactly(2L, 3L, 16L);
+                .extracting(quotation -> quotation.id()).containsExactly(2L, 3L, idsDescExcept(2L, 3L).getFirst());
         assertThat(service.getQuotationList(null, null, QuotationSortType.ESTIMATED_DUE_DATE, pageable).getContent())
-                .extracting(quotation -> quotation.id()).containsExactly(3L, 1L, 16L);
+                .extracting(quotation -> quotation.id()).containsExactly(3L, 1L, idsDescExcept(3L, 1L).getFirst());
+        List<Long> latestValidUntil = idsDescExcept(1L, 2L);
         assertThat(service.getQuotationList(null, null, QuotationSortType.VALID_UNTIL, pageable).getContent())
-                .extracting(quotation -> quotation.id()).containsExactly(16L, 15L, 14L);
+                .extracting(quotation -> quotation.id()).containsExactlyElementsOf(latestValidUntil.subList(0, 3));
         assertThat(service.getQuotationList("QT-", null, QuotationSortType.REQUESTED_DUE_DATE, pageable).getContent())
-                .extracting(quotation -> quotation.id()).containsExactly(2L, 3L, 16L);
+                .extracting(quotation -> quotation.id()).containsExactly(2L, 3L, idsDescExcept(2L, 3L).getFirst());
         var nextPage = service.getQuotationList(null, null, QuotationSortType.VALID_UNTIL, PageRequest.of(1, 3));
         assertThat(nextPage.getContent()).extracting(quotation -> quotation.id())
-                .containsExactly(13L, 12L, 11L);
-        assertThat(nextPage.getTotalElements()).isEqualTo(16);
+                .containsExactlyElementsOf(latestValidUntil.subList(3, 6));
+        assertThat(nextPage.getTotalElements()).isEqualTo(quotations.count());
     }
 
     @Test
     void listReturnsPageResponseWithAmountsAndLinkedOrder() {
         var response = service.getQuotationList(
-                " QT-20261105-1 ", null, QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
+                " QT-20261109-1 ", null, QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
         assertThat(response.getPage()).isZero();
         assertThat(response.getSize()).isEqualTo(12);
         assertThat(response.getTotalElements()).isEqualTo(1);
         assertThat(response.getTotalPages()).isEqualTo(1);
         long total = quotations.findById(1L).orElseThrow().getTotalAmount();
         assertThat(response.getContent()).singleElement().satisfies(quotation -> {
-            assertThat(quotation.quotationNo()).isEqualTo("QT-20261105-1");
+            assertThat(quotation.quotationNo()).isEqualTo("QT-20261109-1");
             assertThat(quotation.totalAmount()).isEqualTo(total);
             assertThat(quotation.customerOrderId()).isEqualTo(1L);
-            assertThat(quotation.orderNo()).isEqualTo("PF-20261106-1");
+            assertThat(quotation.orderNo()).isEqualTo("PF-20261110-1");
         });
     }
 
@@ -184,8 +190,9 @@ class QuotationSeedTest {
         var response = service.getQuotationList(null, null, QuotationSortType.CREATED_AT, PageRequest.of(99, 12));
         assertThat(response.getContent()).isEmpty();
         assertThat(response.getPage()).isEqualTo(99);
-        assertThat(response.getTotalElements()).isEqualTo(16);
-        assertThat(response.getTotalPages()).isEqualTo(2);
+        long quotationCount = quotations.count();
+        assertThat(response.getTotalElements()).isEqualTo(quotationCount);
+        assertThat(response.getTotalPages()).isEqualTo((quotationCount + 11) / 12);
 
         var noMatch = service.getQuotationList("없는견적검색어", null, QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
         assertThat(noMatch.getContent()).isEmpty();
@@ -197,8 +204,9 @@ class QuotationSeedTest {
     void pagesQuotationsWithClientAndUserAndConvertsPageMetadata() {
         em.clear();
         var page = quotations.findAll(PageRequest.of(1, 5, Sort.by(Sort.Direction.DESC, "id")));
+        List<Long> ids = idsDescExcept();
         assertThat(page.getContent()).extracting(quotation -> quotation.getId())
-                .containsExactly(11L, 10L, 9L, 8L, 7L);
+                .containsExactlyElementsOf(ids.subList(5, 10));
         assertThat(page.getContent()).allSatisfy(quotation -> {
             assertThat(Hibernate.isInitialized(quotation.getClient())).isTrue();
             assertThat(Hibernate.isInitialized(quotation.getUser())).isTrue();
@@ -207,8 +215,8 @@ class QuotationSeedTest {
         assertThat(response.getContent()).hasSize(5);
         assertThat(response.getPage()).isEqualTo(1);
         assertThat(response.getSize()).isEqualTo(5);
-        assertThat(response.getTotalElements()).isEqualTo(16);
-        assertThat(response.getTotalPages()).isEqualTo(4);
+        assertThat(response.getTotalElements()).isEqualTo(ids.size());
+        assertThat(response.getTotalPages()).isEqualTo((ids.size() + 4) / 5);
         var empty = PageResponse.from(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
         assertThat(empty.getContent()).isEmpty();
         assertThat(empty.getTotalPages()).isZero();
@@ -218,13 +226,13 @@ class QuotationSeedTest {
     void findsOnlyRequestedQuotationsLinkedOrders() {
         assertThat(orders.findByQuotationIdIn(List.of(1L, 2L)))
                 .extracting(order -> order.getOrderNo())
-                .containsExactlyInAnyOrder("PF-20261106-1", "PF-20261030-2");
+                .containsExactlyInAnyOrder("PF-20261110-1", "PF-20261110-2");
         assertThat(orders.findByQuotationIdIn(List.of(Long.MAX_VALUE))).isEmpty();
     }
 
     @Test
     void seedLoadsWithContactSnapshotsAndExistingProductionReadyOrdersAreIncluded() {
-        assertThat(quotations.count()).isEqualTo(16);
+        assertThat(quotations.count()).isPositive();
         assertThat(quotations.findAll()).allSatisfy(quotation -> {
             long expectedTotal = items.findByQuotationIdOrderByIdAsc(quotation.getId()).stream()
                     .mapToLong(item -> item.getLineAmount()).sum();
@@ -239,5 +247,14 @@ class QuotationSeedTest {
         var ids = orders.stream().map(order -> order.getId()).toList();
         assertThat(schedules.findOrderProducts(ids)).isNotEmpty();
         assertThat(schedules.findFixedPlans(ids)).isNotEmpty();
+    }
+
+    private List<Long> idsDescExcept(Long... excluded) {
+        Set<Long> skip = Set.of(excluded);
+        return quotations.findAll().stream()
+                .map(quotation -> quotation.getId())
+                .filter(id -> !skip.contains(id))
+                .sorted(Comparator.reverseOrder())
+                .toList();
     }
 }

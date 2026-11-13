@@ -1,7 +1,0 @@
-info:
-  name: 납기 이행률 통계
-  type: folder
-  seq: 3
-
-request:
-  auth: inherit

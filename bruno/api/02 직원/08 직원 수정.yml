@@ -1,0 +1,38 @@
+info:
+  name: 직원 수정
+  type: http
+  seq: 8
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/v1/users/{{spareUserId}}"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "브루노수정",
+        "email": "{{spareEmail}}",
+        "phone": "010-7100-0009",
+        "role": "INQUIRY_MANAGER",
+        "status": "ACTIVE"
+      }
+  auth:
+    type: bearer
+    token: "{{adminAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.name).to.equal("브루노수정");
+          expect(body.phone).to.equal("010-7100-0009");
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

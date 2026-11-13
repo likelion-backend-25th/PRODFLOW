@@ -1,0 +1,6 @@
+info:
+  name: 02 직원
+  type: folder
+  seq: 2
+request:
+  auth: inherit

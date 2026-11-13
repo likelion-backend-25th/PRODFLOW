@@ -1,7 +1,0 @@
-info:
-  name: 납기 위험 현황 조회
-  type: folder
-  seq: 4
-
-request:
-  auth: inherit

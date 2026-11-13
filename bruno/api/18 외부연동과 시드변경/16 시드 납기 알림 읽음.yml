@@ -1,0 +1,30 @@
+info:
+  name: 시드 납기 알림 읽음
+  type: http
+  seq: 16
+
+docs: |-
+  시드 납기 알림 3의 수신자는 order2다.
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/order-notifications/3/read"
+  auth:
+    type: bearer
+    token: "{{order2AccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.isRead).to.equal(true);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,38 @@
+info:
+  name: 납기 미리보기 불가능
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/quotations/schedule"
+  body:
+    type: json
+    data: |-
+      {
+        "items": [
+          { "productId": 1, "quantity": 100 }
+        ],
+        "requestedDueDate": "2026-11-01",
+        "sameDayStart": false
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.feasible).to.equal(false);
+          expect(body.plannedStartDate).to.equal(null);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

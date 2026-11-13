@@ -1,0 +1,33 @@
+info:
+  name: 대화방 생성
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/ai/conversations"
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwcm9kZmxvdyIsImp0aSI6IjA5OTJiNTA5LWYxM2UtNDliMy04MmQzLTc0NmVkYTI2YmM0ZCIsInN1YiI6IjEiLCJlbWFpbCI6ImFkbWluMUBwcm9kZmxvdy5zaXRlIiwicm9sZSI6IlNVUEVSX0FETUlOIiwidHlwZSI6IkFDQ0VTUyIsImlhdCI6MTc5NDU0NDM0MSwiZXhwIjoxNzk0NTQ2MTQxfQ.bP1sES3hmLebKnPJMEEjdX0JNNZTTvrimKZH2sWmCR4
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(201);
+          const conversationId = (body && typeof body === "object") ? (body.conversationId || body.id) : body;
+          expect(conversationId).to.be.ok;
+          bru.setVar("conversationId", String(conversationId));
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: 응답 본문은 대화방 ID 숫자다.
