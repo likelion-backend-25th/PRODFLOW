@@ -39,7 +39,7 @@ class WorkOrderHistoryTest {
         changedBy = em.find(User.class, 1L);
         workOrder = new WorkOrder(
                 "WO-HISTORY-001",
-                em.find(OrderProduct.class, 15L),
+                em.find(OrderProduct.class, 13L),
                 previousLine,
                 previousUser,
                 100,

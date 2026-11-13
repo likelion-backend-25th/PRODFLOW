@@ -37,7 +37,7 @@ class ProductionPlanTest {
         em.persist(line);
         workOrder = new WorkOrder(
                 "WO-PLAN-001",
-                em.find(OrderProduct.class, 15L),
+                em.find(OrderProduct.class, 13L),
                 line,
                 em.find(User.class, 4L),
                 100,
@@ -61,7 +61,7 @@ class ProductionPlanTest {
 
         ProductionPlan saved = em.find(ProductionPlan.class, plan.getId());
         assertThat(saved.getWorkOrder().getId()).isEqualTo(workOrder.getId());
-        assertThat(saved.getOrderProduct().getId()).isEqualTo(15L);
+        assertThat(saved.getOrderProduct().getId()).isEqualTo(13L);
         assertThat(saved.getPlanDate()).isEqualTo(DAY);
         assertThat(saved.getQuantity()).isEqualTo(100);
     }

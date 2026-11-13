@@ -21,6 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProductionCalenderServiceTest {
 
     @Autowired
+    private jakarta.persistence.EntityManager em;
+
+    @Autowired
     private ProductionCalenderService productionCalenderService;
 
     @Autowired
@@ -131,46 +134,37 @@ class ProductionCalenderServiceTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertThat(schedule.orderNo()).isEqualTo("PF-20261106-1");
+        assertThat(schedule.orderNo()).isEqualTo("PF-20261110-1");
         assertThat(schedule.productName()).isEqualTo("아이폰 16 맥세이프 클리어 케이스");
-        assertThat(schedule.quantity()).isEqualTo(2000);
-        assertThat(schedule.lineId()).isEqualTo(1L);
-        assertThat(schedule.lineName()).isEqualTo("A라인");
+        assertThat(schedule.quantity()).isEqualTo(1000);
+        assertThat(schedule.lineId()).isEqualTo(2L);
+        assertThat(schedule.lineName()).isEqualTo("B라인");
         assertThat(schedule.status()).isEqualTo("PREPARE");
-        assertThat(schedule.plannedStartDate()).isEqualTo(LocalDate.of(2026, 11, 10));
-        assertThat(schedule.plannedEndDate()).isEqualTo(LocalDate.of(2026, 11, 11));
+        assertThat(schedule.plannedStartDate()).isEqualTo(LocalDate.of(2026, 11, 16));
+        assertThat(schedule.plannedEndDate()).isEqualTo(LocalDate.of(2026, 11, 16));
     }
 
     @Test
     @DisplayName("한 수주의 여러 품목은 작업지시마다 제품명과 수량이 다르다")
     void getCalenderSchedulesForMultipleProducts() {
-        // when
-        List<ProductionCalenderDto.Response> result =
-                productionCalenderService.getCalenderSchedules();
-
-        // then
-
-        assertThat(result)
-                .filteredOn(schedule -> "PF-20261106-1".equals(schedule.orderNo()))
-                .extracting(
-                        ProductionCalenderDto.Response::workNo,
-                        ProductionCalenderDto.Response::productName,
-                        ProductionCalenderDto.Response::quantity
-                )
-                .contains(
-                        org.assertj.core.groups.Tuple.tuple(
-                                "WO-2026-001", "아이폰 16 맥세이프 클리어 케이스", 2000
-                        ),
-                        org.assertj.core.groups.Tuple.tuple(
-                                "WO-2026-002", "아이폰 16 맥세이프 클리어 케이스", 1000
-                        ),
-                        org.assertj.core.groups.Tuple.tuple(
-                                "WO-2026-003", "아이폰 16 프로 맥세이프 범퍼 케이스", 1000
-                        ),
-                        org.assertj.core.groups.Tuple.tuple(
-                                "WO-2026-005", "갤럭시 S25 카드수납 슬라이드 케이스", 1000
-                        )
-                );
+        var order = customerOrderRepository.findById(1L).orElseThrow();
+        var product = em.find(net.likelion.bebc25.prodflow.product.entity.Product.class, 2L);
+        var item = new net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct(order, product, product.getProductName(), 100, product.getCurrentPrice());
+        em.persist(item);
+        var work = new net.likelion.bebc25.prodflow.work_order.entity.WorkOrder("WO-CALENDAR-MULTI", item,
+                em.find(net.likelion.bebc25.prodflow.line.entity.Line.class, 4L),
+                em.find(net.likelion.bebc25.prodflow.user.entity.User.class, 5L), 100,
+                order.getPlannedStartDate(), order.getPlannedEndDate(), "다품목 조회");
+        work.changeStatus(commonCodeRepository.findById(16L).orElseThrow());
+        em.persist(work);
+        em.flush();
+        assertThat(productionCalenderService.getCalenderSchedules())
+                .filteredOn(row -> row.orderNo().equals(order.getOrderNo()))
+                .extracting(ProductionCalenderDto.Response::workNo, ProductionCalenderDto.Response::productName, ProductionCalenderDto.Response::quantity)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("WO-2026-001", "아이폰 16 맥세이프 클리어 케이스", 1000),
+                        org.assertj.core.groups.Tuple.tuple("WO-2026-002", "아이폰 16 맥세이프 클리어 케이스", 300),
+                        org.assertj.core.groups.Tuple.tuple("WO-CALENDAR-MULTI", product.getProductName(), 100));
     }
 
     @Test
@@ -185,39 +179,22 @@ class ProductionCalenderServiceTest {
         assertThat(result)
                 .filteredOn(schedule -> "아이폰 16 맥세이프 클리어 케이스".equals(schedule.productName()))
                 .extracting(ProductionCalenderDto.Response::workNo)
-                .containsExactlyInAnyOrder("WO-2026-001", "WO-2026-002", "WO-2026-015");
+                .containsExactlyInAnyOrder("WO-2026-001", "WO-2026-002", "WO-2026-011");
     }
 
     @Test
     @DisplayName("예정 기간이 요청 범위와 겹치는 작업지시만 그 범위에 해당한다")
     void getCalenderSchedulesWithinRequestedDates() {
-        LocalDate from = LocalDate.of(2026, 11, 10);
-        LocalDate to = LocalDate.of(2026, 11, 11);
-
-        // when
-        List<ProductionCalenderDto.Response> result =
-                productionCalenderService.getCalenderSchedules();
-
-        // then
-        assertThat(result)
-                .filteredOn(schedule ->
-                        !schedule.plannedEndDate().isBefore(from)
-                                && !schedule.plannedStartDate().isAfter(to)
-                )
+        LocalDate from = LocalDate.of(2026, 11, 12);
+        LocalDate to = LocalDate.of(2026, 11, 13);
+        var result = productionCalenderService.getCalenderSchedules();
+        assertThat(result).filteredOn(schedule -> !schedule.plannedEndDate().isBefore(from)
+                        && !schedule.plannedStartDate().isAfter(to))
                 .extracting(ProductionCalenderDto.Response::workNo)
-                .containsExactlyInAnyOrder(
-                        "WO-2026-001",
-                        "WO-2026-002",
-                        "WO-2026-003",
-                        "WO-2026-004",
-                        "WO-2026-005",
-                        "WO-2026-015"
-                );
-
-        assertThat(result)
-                .extracting(ProductionCalenderDto.Response::workNo)
-                .contains("WO-2026-006", "WO-2026-014")
-                .doesNotContain("WO-2026-009");
+                .containsExactlyInAnyOrder("WO-2026-003", "WO-2026-004", "WO-2026-011");
+        assertThat(result).extracting(ProductionCalenderDto.Response::workNo)
+                .contains("WO-2026-003", "WO-2026-010")
+                .doesNotContain("WO-2026-006");
     }
 
     @Test

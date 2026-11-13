@@ -54,7 +54,7 @@ class WorkOrderRepositoryTest {
         LocalDate today = LocalDate.now();
 
         assertThat(workOrderRepository.search(
-                        line.getId(), "PREPARE", today, today, "PF-20261103-13", PageRequest.of(0, 5))
+                        line.getId(), "PREPARE", today, today, "PF-20261113-13", PageRequest.of(0, 5))
                 .getContent())
                 .extracting(WorkOrder::getWorkNo)
                 .containsExactly("WO-REPO-PREPARE");
@@ -64,12 +64,12 @@ class WorkOrderRepositoryTest {
                 .isEmpty();
 
         assertThat(workOrderRepository.searchPage(
-                        line.getId(), "PREPARE", today, today, "PF-20261103-13", PageRequest.of(0, 5))
+                        line.getId(), "PREPARE", today, today, "PF-20261113-13", PageRequest.of(0, 5))
                 .getContent())
                 .singleElement()
                 .satisfies(row -> {
                     assertThat(row.workNo()).isEqualTo("WO-REPO-PREPARE");
-                    assertThat(row.orderNo()).isEqualTo("PF-20261103-13");
+                    assertThat(row.orderNo()).isEqualTo("PF-20261113-13");
                     assertThat(row.lineName()).isEqualTo("저장소-라인");
                     assertThat(row.assignedName()).isEqualTo("김태호");
                     assertThat(row.status()).isEqualTo("PREPARE");
@@ -104,7 +104,7 @@ class WorkOrderRepositoryTest {
     @Test
     @DisplayName("같은 수주의 다른 작업 상태를 자기 자신을 빼고 확인한다")
     void existsByCustomerOrderStatus() {
-        Long customerOrderId = em.find(OrderProduct.class, 15L).getCustomerOrder().getId();
+        Long customerOrderId = em.find(OrderProduct.class, 13L).getCustomerOrder().getId();
 
         assertThat(workOrderRepository.existsByOrderProduct_CustomerOrder_IdAndCommonCode_CodeAndIdNot(
                 customerOrderId, "PRODUCE", prepareId)).isTrue();
@@ -126,7 +126,7 @@ class WorkOrderRepositoryTest {
     private WorkOrder saveWork(String workNo, long statusId, int quantity, LocalDate start, LocalDate end) {
         WorkOrder workOrder = new WorkOrder(
                 workNo,
-                em.find(OrderProduct.class, 15L),
+                em.find(OrderProduct.class, 13L),
                 line,
                 em.find(User.class, 4L),
                 quantity,
