@@ -266,15 +266,15 @@ class ProductionStatisticsServiceTest {
     @Test
     @DisplayName("시작일과 종료일이 같으면 해당 날짜만 조회한다")
     void dailyProductionOnBoundaryDate() {
-        LocalDate date = LocalDate.of(2026, 11, 6);
+        LocalDate date = LocalDate.of(2026, 11, 13);
 
         List<DashboardDto.ProductionResponse> response =
                 productionStatisticsService.getDailyProduction(date, date);
 
         assertThat(response).hasSize(1);
         assertThat(response.getFirst().date()).isEqualTo(date);
-        assertThat(response.getFirst().plannedQuantity()).isEqualTo(3000);
-        assertThat(response.getFirst().completedQuantity()).isEqualTo(156);
+        assertThat(response.getFirst().plannedQuantity()).isEqualTo(300);
+        assertThat(response.getFirst().completedQuantity()).isZero();
     }
 
     @Test
@@ -292,7 +292,7 @@ class ProductionStatisticsServiceTest {
     void cancelledOrderPlanIsExcluded() {
         DashboardDto.MonthlyProductionResponse before =
                 productionStatisticsService.getMonthlyProduction(2026, 10);
-        OrderProduct cancelledProduct = orderProductRepository.findById(13L).orElseThrow();
+        OrderProduct cancelledProduct = orderProductRepository.findById(11L).orElseThrow();
         Line line = lineRepository.findById(1L).orElseThrow();
         User user = userRepository.findById(4L).orElseThrow();
         CommonCode prepare = commonCodeRepository.findById(16L).orElseThrow();

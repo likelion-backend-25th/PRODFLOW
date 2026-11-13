@@ -33,7 +33,7 @@ class DeliveryRiskServiceTest {
     @BeforeEach
     void setUpRiskDates() {
         // 임박·지연·미입금·다품목 조건을 시드의 절대 날짜와 독립적으로 구성한다.
-        Map<Long, Integer> offsets = Map.of(1L, 1, 9L, 2, 10L, 3, 12L, -1);
+        Map<Long, Integer> offsets = Map.of(1L, 1, 3L, -2, 9L, 2, 10L, 3, 12L, -1);
         offsets.forEach((id, offset) -> em.createQuery(
                         "update CustomerOrder o set o.requestedDueDate = :date where o.id = :id")
                 .setParameter("date", FixedDashboardClock.TODAY.plusDays(offset))
@@ -58,7 +58,7 @@ class DeliveryRiskServiceTest {
     @DisplayName("납기 임박 수주가 조회된다")
     void getUrgentDeliveryRisk() {
         // given
-        String orderNo = "PF-20261106-9";
+        String orderNo = "PF-20261113-9";
 
         // when
         DashboardDto.DeliveryRiskStatisticsResponse response =
@@ -77,7 +77,7 @@ class DeliveryRiskServiceTest {
     @DisplayName("납기일이 지난 수주는 지연 상태로 조회된다")
     void getDelayedDeliveryRisk() {
         // given
-        String orderNo = "PF-20261027-12";
+        String orderNo = "PF-20261105-12";
 
         // when
         DashboardDto.DeliveryRiskStatisticsResponse response =
@@ -165,6 +165,12 @@ class DeliveryRiskServiceTest {
     @Test
     @DisplayName("여러 품목의 이름과 수량을 한 수주로 합친다")
     void joinsProductsOnOneOrder() {
+        var order = em.find(net.likelion.bebc25.prodflow.customer_order.entity.CustomerOrder.class, 1L);
+        for (long id : List.of(2L, 3L)) {
+            var product = em.find(net.likelion.bebc25.prodflow.product.entity.Product.class, id);
+            em.persist(new net.likelion.bebc25.prodflow.customer_order.entity.OrderProduct(order, product, product.getProductName(), 1000, product.getCurrentPrice()));
+        }
+        em.flush();
         DashboardDto.DeliveryRiskStatisticsResponse response =
                 deliveryRiskService.getDeliveryRisks();
 
@@ -173,7 +179,7 @@ class DeliveryRiskServiceTest {
                 .singleElement().satisfies(item -> {
                     assertThat(item.productName()).isEqualTo(
                             "아이폰 16 맥세이프 클리어 케이스, 아이폰 16 프로 맥세이프 범퍼 케이스, 갤럭시 S25 카드수납 슬라이드 케이스");
-                    assertThat(item.quantity()).isEqualTo(6000);
+                    assertThat(item.quantity()).isEqualTo(3300);
                 });
     }
 
@@ -185,7 +191,7 @@ class DeliveryRiskServiceTest {
 
         assertThat(response.items())
                 .extracting(DashboardDto.DeliveryRiskStatisticsItemResponse::orderNo)
-                .contains("PF-20261027-3", "PF-20261108-10")
-                .doesNotContain("PF-20260925-7", "PF-20261030-11", "PF-20261030-6");
+                .contains("PF-20261108-3", "PF-20261113-10")
+                .doesNotContain("PF-20261023-7", "PF-20261105-11", "PF-20261107-6");
     }
 }

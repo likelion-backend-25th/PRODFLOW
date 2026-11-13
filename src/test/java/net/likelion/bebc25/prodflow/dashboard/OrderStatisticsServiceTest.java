@@ -138,6 +138,7 @@ class OrderStatisticsServiceTest {
                         "IN_PRODUCTION",
                         "PACKING",
                         "READY_TO_SHIP",
+                        "SHIPPING",
                         "COMPLETED",
                         "ON_HOLD",
                         "CANCELLED"
@@ -247,6 +248,7 @@ class OrderStatisticsServiceTest {
                         "ON_HOLD",
                         "PACKING",
                         "READY_TO_SHIP",
+                        "SHIPPING",
                         "WAITING"
                 );
     }

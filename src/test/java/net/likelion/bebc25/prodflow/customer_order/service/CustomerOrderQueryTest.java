@@ -62,8 +62,8 @@ class CustomerOrderQueryTest {
         assertThat(statuses).extracting(CustomerOrderListDto.StatusResponse::id)
                 .containsExactly(6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L);
         var confirmed = service.getOrders(condition(OrderListTab.OPEN, null, 7L), PageRequest.of(0, 8));
-        assertThat(confirmed.getTotalElements()).isGreaterThan(8);
-        assertThat(confirmed.getContent()).hasSize(8).allSatisfy(row -> {
+        assertThat(confirmed.getTotalElements()).isEqualTo(3);
+        assertThat(confirmed.getContent()).hasSize(3).allSatisfy(row -> {
                     assertThat(row.statusCodeId()).isEqualTo(7L);
                     assertThat(row.status()).isEqualTo("CONFIRMED");
                     assertThat(row.statusName()).isEqualTo("생산대기");
@@ -104,11 +104,11 @@ class CustomerOrderQueryTest {
         assertThat(service.getOrders(condition(OrderListTab.OPEN, " 케이스 ", null), PageRequest.of(0, 20))
                 .getTotalElements()).isPositive();
         var byOrderNo = service.getOrders(
-                condition(OrderListTab.OPEN, "PF-20261106-1", null), PageRequest.of(0, 8)).getContent();
+                condition(OrderListTab.OPEN, "PF-20261110-1", null), PageRequest.of(0, 8)).getContent();
         assertThat(byOrderNo).extracting(CustomerOrderListDto.Response::id).doesNotHaveDuplicates().contains(1L);
         assertThat(byOrderNo).filteredOn(row -> row.id().equals(1L)).singleElement().satisfies(row -> {
-            assertThat(row.itemCount()).isEqualTo(3);
-            assertThat(row.totalQuantity()).isEqualTo(6000);
+            assertThat(row.itemCount()).isEqualTo(1);
+            assertThat(row.totalQuantity()).isEqualTo(1300);
             assertThat(row.totalAmount()).isEqualTo(em.find(CustomerOrder.class, 1L).getTotalAmount());
         });
         CustomerOrderListDto.SearchCondition filtered = new CustomerOrderListDto.SearchCondition(OrderListTab.OPEN,
@@ -172,7 +172,7 @@ class CustomerOrderQueryTest {
                 .isNotEmpty().allSatisfy(row -> assertThat(row.status()).isEqualTo("COMPLETED"));
         String csv = new String(service.export(condition(OrderListTab.DONE, null, 15L)), StandardCharsets.UTF_8);
         assertThat(csv.lines().count()).isEqualTo(cancelled.getTotalElements() + 1);
-        assertThat(csv).contains("PF-20261030-11");
+        assertThat(csv).contains("PF-20261105-11");
     }
 
     @Test

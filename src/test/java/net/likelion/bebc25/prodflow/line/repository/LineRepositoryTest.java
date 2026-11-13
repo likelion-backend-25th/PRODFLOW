@@ -53,7 +53,7 @@ class LineRepositoryTest {
         Line producing = saveLine("조회-생산");
         WorkOrder workOrder = new WorkOrder(
                 "WO-LINE-LIST",
-                em.find(OrderProduct.class, 15L),
+                em.find(OrderProduct.class, 13L),
                 producing,
                 em.find(User.class, 4L),
                 100,
@@ -79,7 +79,7 @@ class LineRepositoryTest {
         LineList producingRow = row(rows, "조회-생산");
         assertThat(producingRow.lineId()).isEqualTo(producing.getId());
         assertThat(producingRow.workNo()).isEqualTo("WO-LINE-LIST");
-        assertThat(producingRow.orderNo()).isEqualTo("PF-20261103-13");
+        assertThat(producingRow.orderNo()).isEqualTo("PF-20261113-13");
         assertThat(producingRow.managerName()).isEqualTo("김태호");
         assertThat(idle.getId()).isNotNull();
     }

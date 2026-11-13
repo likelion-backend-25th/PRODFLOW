@@ -66,11 +66,11 @@ class DashboardControllerTest {
     @DisplayName("일간 생산 조회는 기간의 날짜 수를 반환한다")
     void dailyProductionReturnsRequestedDays() {
         var response = productionStatisticsController.getDailyProduction(
-                LocalDate.of(2026, 11, 6),
-                LocalDate.of(2026, 11, 6)
+                LocalDate.of(2026, 11, 13),
+                LocalDate.of(2026, 11, 13)
         );
 
         assertThat(response).hasSize(1);
-        assertThat(response.getFirst().plannedQuantity()).isEqualTo(3000);
+        assertThat(response.getFirst().plannedQuantity()).isEqualTo(300);
     }
 }
