@@ -105,7 +105,7 @@ class LineServiceTest {
     @Test
     @DisplayName("기존 계획이 새 생산능력보다 크면 생산량을 줄이지 않는다")
     void rejectCapacityDecreaseWhenPlansExceed() {
-        UpdateRequest request = new UpdateRequest("A라인", 800, "설비 점검으로 감축");
+        UpdateRequest request = new UpdateRequest("A라인", 100, "설비 점검으로 감축");
         long logCount = lineCapacityLogRepository.count();
 
         assertThatThrownBy(() -> lineService.update(1L, request, 1L))
@@ -206,7 +206,7 @@ class LineServiceTest {
         long logCount = lineCapacityLogRepository.count();
         Long workOrderId = workOrderService.create(
                 new net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.CreateRequest(
-                        15L, createdLine.id(), 4L, 100, day, day), 1L).getFirst().id();
+                        13L, createdLine.id(), 4L, 100, day, day), 1L).getFirst().id();
 
         // 하루짜리 100은 생산능력 40에 들어가지 않는다. 라인 변경은 하지 않는다.
         assertThatThrownBy(() -> lineService.update(
@@ -230,7 +230,7 @@ class LineServiceTest {
         long workOrderCount = workOrderRepository.count();
         Long workOrderId = workOrderService.create(
                 new net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.CreateRequest(
-                        15L, createdLine.id(), 4L, 80, start, end), 1L).getFirst().id();
+                        13L, createdLine.id(), 4L, 80, start, end), 1L).getFirst().id();
 
         // 80은 하루 40으로는 부족하고 이틀이면 된다. 15일에 새 장을 겹치지 않는다.
         lineService.update(createdLine.id(), new UpdateRequest("재배치-기간", 40, "설비 감축"), 1L);
@@ -258,7 +258,7 @@ class LineServiceTest {
         long workOrderCount = workOrderRepository.count();
         Long workOrderId = workOrderService.create(
                 new net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.CreateRequest(
-                        15L, createdLine.id(), 4L, 100, day, day), 1L).getFirst().id();
+                        13L, createdLine.id(), 4L, 100, day, day), 1L).getFirst().id();
 
         lineService.changeStatus(createdLine.id(), new UpdateStatusRequest(LineStatus.BROKEN), 1L);
 
@@ -329,7 +329,7 @@ class LineServiceTest {
         LocalDate day = LocalDate.of(2026, 12, 15);
         Long workOrderId = workOrderService.create(
                 new net.likelion.bebc25.prodflow.work_order.dto.WorkOrderDto.CreateRequest(
-                        15L, createdLine.id(), 4L, 100, day, day), 1L).getFirst().id();
+                        13L, createdLine.id(), 4L, 100, day, day), 1L).getFirst().id();
 
         lineService.update(createdLine.id(), new UpdateRequest("증설-유지", 1200, "설비 증설"), 1L);
 
@@ -348,7 +348,7 @@ class LineServiceTest {
     void rejectInspectionWhenProducing() {
         // 등록은 주말을 건너뛰므로 생산 계획을 오늘로 직접 넣는다. 점검은 오늘 이후 생산만 막는다.
         Response createdLine = lineService.create(new CreateRequest("점검-생산", 1000), 1L);
-        WorkOrder sample = workOrderRepository.findById(6L).orElseThrow();
+        WorkOrder sample = workOrderRepository.findById(3L).orElseThrow();
         LocalDate today = LocalDate.now();
         WorkOrder producing = new WorkOrder(
                 "WO-TEST-PRODUCE",

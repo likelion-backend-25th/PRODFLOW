@@ -110,11 +110,11 @@ class QuotationSeedTest {
         var search = service.getQuotationList(" 한빛 ", QuotationStatus.APPROVED,
                 QuotationSortType.CREATED_AT, PageRequest.of(0, 500));
         assertThat(search.getContent()).extracting(quotation -> quotation.id())
-                .contains(5L, 9L, 15L);
+                .contains(5L, 9L, 13L, 17L);
         assertThat(search.getContent()).allSatisfy(quotation -> assertThat(quotation.clientCompany()).contains("한빛"));
         assertThat(search.getTotalElements()).isEqualTo(search.getContent().size());
 
-        var noMatch = service.getQuotationList("QT-20261105-1", QuotationStatus.APPROVED,
+        var noMatch = service.getQuotationList("QT-20261109-1", QuotationStatus.APPROVED,
                 QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
         assertThat(noMatch.getContent()).isEmpty();
         assertThat(noMatch.getTotalElements()).isZero();
@@ -171,17 +171,17 @@ class QuotationSeedTest {
     @Test
     void listReturnsPageResponseWithAmountsAndLinkedOrder() {
         var response = service.getQuotationList(
-                " QT-20261105-1 ", null, QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
+                " QT-20261109-1 ", null, QuotationSortType.CREATED_AT, PageRequest.of(0, 12));
         assertThat(response.getPage()).isZero();
         assertThat(response.getSize()).isEqualTo(12);
         assertThat(response.getTotalElements()).isEqualTo(1);
         assertThat(response.getTotalPages()).isEqualTo(1);
         long total = quotations.findById(1L).orElseThrow().getTotalAmount();
         assertThat(response.getContent()).singleElement().satisfies(quotation -> {
-            assertThat(quotation.quotationNo()).isEqualTo("QT-20261105-1");
+            assertThat(quotation.quotationNo()).isEqualTo("QT-20261109-1");
             assertThat(quotation.totalAmount()).isEqualTo(total);
             assertThat(quotation.customerOrderId()).isEqualTo(1L);
-            assertThat(quotation.orderNo()).isEqualTo("PF-20261106-1");
+            assertThat(quotation.orderNo()).isEqualTo("PF-20261110-1");
         });
     }
 
@@ -226,7 +226,7 @@ class QuotationSeedTest {
     void findsOnlyRequestedQuotationsLinkedOrders() {
         assertThat(orders.findByQuotationIdIn(List.of(1L, 2L)))
                 .extracting(order -> order.getOrderNo())
-                .containsExactlyInAnyOrder("PF-20261106-1", "PF-20261030-2");
+                .containsExactlyInAnyOrder("PF-20261110-1", "PF-20261110-2");
         assertThat(orders.findByQuotationIdIn(List.of(Long.MAX_VALUE))).isEmpty();
     }
 

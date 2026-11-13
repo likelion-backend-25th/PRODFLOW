@@ -45,13 +45,13 @@ class AiQueryServiceTest {
                        c.code
                 FROM work_order w
                 JOIN common_code c ON c.id = w.common_code_id
-                WHERE w.work_no = 'WO-2026-006'
+                WHERE w.work_no = 'WO-2026-003'
                 """);
 
         assertThat(result.rowCount()).isEqualTo(1);
         Map<String, Object> row = result.rows().getFirst();
-        assertThat(value(row, "work_no")).isEqualTo("WO-2026-006");
-        assertThat(value(row, "planned_start_date")).hasToString("2026-11-06");
+        assertThat(value(row, "work_no")).isEqualTo("WO-2026-003");
+        assertThat(value(row, "planned_start_date")).hasToString("2026-11-13");
         assertThat(value(row, "code")).isEqualTo("PRODUCE");
     }
 

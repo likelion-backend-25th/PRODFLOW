@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 class LineReadServiceTest {
 
-    private static final Long ORDER_PRODUCT_ID = 15L;
+    private static final Long ORDER_PRODUCT_ID = 13L;
     private static final Long ASSIGNEE_ID = 4L;
     private static final Long ACTOR_ID = 1L;
     // 2026-11-06은 금요일이다. 생산 시작은 예정일이 오늘보다 뒤면 거절되고, 토·일은 등록되지 않는다.

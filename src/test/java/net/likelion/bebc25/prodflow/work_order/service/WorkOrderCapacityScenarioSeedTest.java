@@ -32,72 +32,53 @@ class WorkOrderCapacityScenarioSeedTest {
     EntityManager em;
 
     @Test
-    @DisplayName("1,300개 수주는 작업지시 두 장으로 나뉘고 이어진 200개 수주가 남은 라인에 배정된다")
+    @DisplayName("1,300개 생산대기 수주는 B·D라인 작업지시 두 장으로 나뉜다")
     void seedSplitsThirteenHundredAndKeepsFourPrepareWorks() {
-        CustomerOrder first = order("PF-20261113-217");
-        CustomerOrder second = order("PF-20261113-218");
-        CustomerOrder third = order("PF-20261113-219");
-
+        CustomerOrder first = order("PF-20261110-1");
         assertThat(quantityOf(first)).isEqualTo(1300);
-        assertThat(quantityOf(second)).isEqualTo(200);
-        assertThat(quantityOf(third)).isEqualTo(200);
-
-        Map<String, WorkOrder> works = works(
-                "WO-2026-203", "WO-2026-204", "WO-2026-205", "WO-2026-206");
-
-        assertThat(works.get("WO-2026-203").getQuantity()).isEqualTo(1000);
-        assertThat(works.get("WO-2026-203").getLine().getLineName()).isEqualTo("A라인");
-        assertThat(works.get("WO-2026-204").getQuantity()).isEqualTo(300);
-        assertThat(works.get("WO-2026-204").getLine().getLineName()).isEqualTo("B라인");
-        assertThat(works.get("WO-2026-203").getOrderProduct().getId())
-                .isEqualTo(works.get("WO-2026-204").getOrderProduct().getId());
-        assertThat(works.get("WO-2026-205").getQuantity()).isEqualTo(200);
-        assertThat(works.get("WO-2026-205").getLine().getLineName()).isEqualTo("B라인");
-        assertThat(works.get("WO-2026-206").getQuantity()).isEqualTo(200);
-        assertThat(works.get("WO-2026-206").getLine().getLineName()).isEqualTo("D라인");
+        Map<String, WorkOrder> works = works("WO-2026-001", "WO-2026-002");
+        assertThat(works).hasSize(2);
+        assertThat(works.get("WO-2026-001").getQuantity()).isEqualTo(1000);
+        assertThat(works.get("WO-2026-002").getQuantity()).isEqualTo(300);
+        assertThat(works.get("WO-2026-001").getLine().getLineName()).isEqualTo("B라인");
+        assertThat(works.get("WO-2026-002").getLine().getLineName()).isEqualTo("D라인");
+        assertThat(works.get("WO-2026-002").getUser()).isNull();
         assertThat(works.values()).allSatisfy(work -> {
+            assertThat(work.getOrderProduct().getCustomerOrder().getId()).isEqualTo(first.getId());
             assertThat(work.getCommonCode().getCode()).isEqualTo("PREPARE");
-            assertThat(work.getPlannedStartDate()).isEqualTo(TODAY);
-            assertThat(work.getPlannedEndDate()).isEqualTo(TODAY);
+            assertThat(work.getPlannedStartDate()).isEqualTo(TODAY.plusDays(3));
         });
     }
 
     @Test
-    @DisplayName("당일 계획은 A 1,000, B 500, D 200이고 C는 고장, E는 점검이다")
+    @DisplayName("당일 계획은 A 200개·B 100개이고 당일착수 여유를 남긴다")
     void seedKeepsSameDayPlanAfterInspectionBreakdownAndDirectReturn() {
         List<ProductionPlan> plans = em.createQuery(
-                        "select plan from ProductionPlan plan join fetch plan.workOrder workOrder join fetch workOrder.line "
-                                + "where plan.planDate = :planDate",
-                        ProductionPlan.class)
-                .setParameter("planDate", TODAY)
-                .getResultList();
-
-        assertThat(plans).hasSize(4);
-        assertThat(sum(plans, "A라인")).isEqualTo(1000);
-        assertThat(sum(plans, "B라인")).isEqualTo(500);
+                "select p from ProductionPlan p join fetch p.workOrder w join fetch w.line where p.planDate=:date", ProductionPlan.class)
+                .setParameter("date", TODAY).getResultList();
+        assertThat(plans).hasSize(2);
+        assertThat(sum(plans, "A라인")).isEqualTo(200);
+        assertThat(sum(plans, "B라인")).isEqualTo(100);
         assertThat(sum(plans, "C라인")).isZero();
-        assertThat(sum(plans, "D라인")).isEqualTo(200);
-        assertThat(plans).extracting(plan -> plan.getQuantity()).containsExactlyInAnyOrder(1000, 300, 200, 200);
-
+        assertThat(sum(plans, "D라인")).isZero();
+        assertThat(line("A라인").getStatus()).isEqualTo(LineStatus.OPERATING);
+        assertThat(line("B라인").getStatus()).isEqualTo(LineStatus.AVAILABLE);
         assertThat(line("C라인").getStatus()).isEqualTo(LineStatus.BROKEN);
         assertThat(line("D라인").getStatus()).isEqualTo(LineStatus.AVAILABLE);
         assertThat(line("E라인").getStatus()).isEqualTo(LineStatus.INSPECTION);
     }
 
     @Test
-    @DisplayName("D라인 작업만 점검과 고장을 거쳐 복구된 D라인으로 직접 돌아온다")
+    @DisplayName("다음 달 작업은 준비 상태이며 생산·완료 이력이 없다")
     void seedRecordsMoveHistoryForTheReturnedWork() {
-        List<String> returned = reasons("WO-2026-206");
-        List<String> movedFromBrokenLine = reasons("WO-2026-205");
-
-        assertThat(returned).containsExactly(
-                "라인 점검으로 재배치|2026-11-13|2026-11-13",
-                "라인 고장으로 재배치|2026-11-13|2026-11-13",
-                "복구된 라인으로 직접 배치");
-        assertThat(movedFromBrokenLine).containsExactly(
-                "라인 고장으로 재배치|2026-11-13|2026-11-13");
-        assertThat(reasons("WO-2026-203")).isEmpty();
-        assertThat(reasons("WO-2026-204")).isEmpty();
+        WorkOrder future = works("WO-2026-012").get("WO-2026-012");
+        assertThat(future.getOrderProduct().getCustomerOrder().getId()).isEqualTo(20L);
+        assertThat(future.getPlannedStartDate()).isEqualTo(LocalDate.of(2026, 12, 1));
+        assertThat(future.getCommonCode().getCode()).isEqualTo("PREPARE");
+        assertThat(future.getCompletedAt()).isNull();
+        Long completedEvents = em.createQuery("select count(h) from StatusHistory h where h.entityId=:id and h.entity=net.likelion.bebc25.prodflow.common.enums.HistoryEntityType.WORK_ORDER and h.toStatus in ('PRODUCE','PACK','PACK_DONE')", Long.class)
+                .setParameter("id", future.getId()).getSingleResult();
+        assertThat(completedEvents).isZero();
     }
 
     private CustomerOrder order(String orderNo) {

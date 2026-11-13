@@ -38,11 +38,11 @@ class ProductionPlanRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        existingProductPlanQuantity = productionPlanRepository.sumQuantityByOrderProductId(15L);
+        existingProductPlanQuantity = productionPlanRepository.sumQuantityByOrderProductId(13L);
         line = saveLine("계획-조회");
         User user = em.find(User.class, 4L);
-        OrderProduct activeProduct = em.find(OrderProduct.class, 15L);
-        OrderProduct cancelledProduct = em.find(OrderProduct.class, 13L);
+        OrderProduct activeProduct = em.find(OrderProduct.class, 13L);
+        OrderProduct cancelledProduct = em.find(OrderProduct.class, 11L);
         prepareWorkOrderId = savePlan(activeProduct, user, "WO-PLAN-PREPARE", 16L, DAY, 100);
         savePlan(activeProduct, user, "WO-PLAN-HALT", 21L, DAY, 30);
         savePlan(activeProduct, user, "WO-PLAN-PACK", 18L, DAY, 40);
@@ -78,9 +78,9 @@ class ProductionPlanRepositoryTest {
         assertThat(productionPlanRepository.findByWorkOrder_Id(prepareWorkOrderId))
                 .extracting(ProductionPlan::getPlanDate, ProductionPlan::getQuantity)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple(DAY, 100));
-        assertThat(productionPlanRepository.sumQuantityByOrderProductId(15L))
+        assertThat(productionPlanRepository.sumQuantityByOrderProductId(13L))
                 .isEqualTo(existingProductPlanQuantity + 190);
-        assertThat(productionPlanRepository.sumQuantityByOrderProductId(13L)).isEqualTo(50);
+        assertThat(productionPlanRepository.sumQuantityByOrderProductId(11L)).isEqualTo(50);
     }
 
     private Line saveLine(String name) {

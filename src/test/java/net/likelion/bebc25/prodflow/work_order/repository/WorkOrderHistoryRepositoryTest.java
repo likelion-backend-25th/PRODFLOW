@@ -43,7 +43,7 @@ class WorkOrderHistoryRepositoryTest {
         User actor = em.find(User.class, 1L);
         WorkOrder workOrder = new WorkOrder(
                 "WO-HISTORY-REPO",
-                em.find(OrderProduct.class, 15L),
+                em.find(OrderProduct.class, 13L),
                 latest,
                 assignee,
                 100,

@@ -42,7 +42,7 @@ class WorkOrderTest {
         otherLine = saveLine("작업-이동");
         assignee = em.find(User.class, 4L);
         otherUser = em.find(User.class, 5L);
-        orderProduct = em.find(OrderProduct.class, 15L);
+        orderProduct = em.find(OrderProduct.class, 13L);
         prepare = em.find(CommonCode.class, 16L);
         pack = em.find(CommonCode.class, 18L);
     }
@@ -62,7 +62,7 @@ class WorkOrderTest {
         assertThat(saved.getPlannedStartDate()).isEqualTo(START);
         assertThat(saved.getPlannedEndDate()).isEqualTo(END);
         assertThat(saved.getCompletedAt()).isNull();
-        assertThat(saved.getOrderProduct().getId()).isEqualTo(15L);
+        assertThat(saved.getOrderProduct().getId()).isEqualTo(13L);
         assertThat(saved.getLine().getId()).isEqualTo(line.getId());
         assertThat(saved.getUser().getId()).isEqualTo(4L);
         assertThat(saved.getCommonCode().getCode()).isEqualTo("PREPARE");
