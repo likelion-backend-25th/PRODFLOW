@@ -1,0 +1,33 @@
+info:
+  name: 대기 수주 취소
+  type: http
+  seq: 17
+
+docs: |-
+  시드 수주 9는 입금 전 취소 후보였으나 가상계좌가 있으면 409이다. 작업지시가 생긴 수주는 취소되지 않는다.
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/orders/9/cancel"
+  body:
+    type: json
+    data: |-
+      { "reason": "Bruno 시연 취소" }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect([200, 409]).to.include(status);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

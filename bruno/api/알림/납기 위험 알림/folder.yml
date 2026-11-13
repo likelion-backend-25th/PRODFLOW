@@ -1,9 +1,0 @@
-info:
-  name: 납기 위험 알림
-  type: folder
-  seq: 2
-
-request:
-  auth:
-    type: bearer
-    token: "{{accessToken}}"

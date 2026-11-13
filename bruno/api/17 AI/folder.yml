@@ -1,0 +1,6 @@
+info:
+  name: 17 AI
+  type: folder
+  seq: 17
+request:
+  auth: inherit

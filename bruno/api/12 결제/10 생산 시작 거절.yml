@@ -1,0 +1,33 @@
+info:
+  name: 생산 시작 거절
+  type: http
+  seq: 10
+
+docs: |-
+  새 수주의 시작 예정일은 오늘보다 뒤다. 시작 예정일 전 생산 시작은 거절된다.
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/work-orders/{{workOrderId}}/status"
+  body:
+    type: json
+    data: |-
+      { "status": "PRODUCE", "note": null }
+  auth:
+    type: bearer
+    token: "{{adminAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(400);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

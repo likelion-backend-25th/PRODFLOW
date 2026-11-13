@@ -1,0 +1,43 @@
+info:
+  name: 납기 미리보기 가능
+  type: http
+  seq: 1
+
+docs: |-
+  시드 품목 1, 수량 100, 희망 납기 2027-06-30. 미리보기는 견적을 저장하지 않는다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/quotations/schedule"
+  body:
+    type: json
+    data: |-
+      {
+        "items": [
+          { "productId": 1, "quantity": 100 }
+        ],
+        "requestedDueDate": "2027-06-30",
+        "sameDayStart": false
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.feasible).to.equal(true);
+          expect(body.earliestDueDate).to.be.a("string");
+          expect(body.plannedStartDate).to.be.a("string");
+          expect(body.plannedEndDate).to.be.a("string");
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

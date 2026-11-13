@@ -1,9 +1,0 @@
-info:
-  name: 알림
-  type: folder
-  seq: 7
-
-request:
-  auth:
-    type: bearer
-    token: ""

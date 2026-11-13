@@ -1,0 +1,50 @@
+info:
+  name: 수주 등록
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/orders"
+  body:
+    type: json
+    data: |-
+      {
+        "quotationId": {{quotationId}},
+        "items": [
+          { "quotationItemId": {{quotationItemId}}, "quantity": 100 }
+        ],
+        "dueDate": "{{dueDate}}",
+        "useCompanyAddress": true,
+        "receiverName": "김브루노",
+        "receiverPhone": "010-7000-0001",
+        "notifyChannel": "EMAIL",
+        "memo": "Bruno 시연 수주",
+        "sameDayStart": false
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(201);
+          expect(body.quotationId).to.be.a("number");
+          expect(body.orderNo).to.be.a("string");
+          bru.setVar("orderId", String(body.id));
+          bru.setVar("dueDate", body.dueDate);
+          bru.setVar("depositDueDate", body.depositDueDate);
+          bru.setVar("plannedStartDate", body.plannedStartDate);
+          bru.setVar("plannedEndDate", body.plannedEndDate);
+          bru.setVar("depositAmount", String(Math.floor(Number(body.totalAmount) / 2)));
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

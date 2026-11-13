@@ -1,0 +1,6 @@
+info:
+  name: 07 생산품목
+  type: folder
+  seq: 7
+request:
+  auth: inherit

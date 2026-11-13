@@ -1,0 +1,6 @@
+info:
+  name: 03 비밀번호변경
+  type: folder
+  seq: 3
+request:
+  auth: inherit

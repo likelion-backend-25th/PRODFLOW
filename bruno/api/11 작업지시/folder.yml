@@ -1,0 +1,6 @@
+info:
+  name: 11 작업지시
+  type: folder
+  seq: 11
+request:
+  auth: inherit

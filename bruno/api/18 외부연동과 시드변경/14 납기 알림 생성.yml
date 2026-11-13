@@ -1,0 +1,29 @@
+info:
+  name: 납기 알림 생성
+  type: http
+  seq: 14
+
+docs: |-
+  시드 수주 3의 납기 알림을 만들 수 있다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/order-notifications/orders/3"
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect([200, 400, 409]).to.include(status);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

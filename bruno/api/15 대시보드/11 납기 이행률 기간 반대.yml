@@ -1,0 +1,28 @@
+info:
+  name: 납기 이행률 기간 반대
+  type: http
+  seq: 11
+
+docs: |-
+  기존 컬렉션의 실패 케이스다. 시작일이 종료일보다 늦으면 조회하지 않는다.
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/statistics/delivery-performance?from=2026-10-31&to=2026-10-01"
+  auth:
+    type: bearer
+    token: "{{inquiryAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        test("응답", function () {
+          expect(status).to.equal(400);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,43 @@
+info:
+  name: 거래처 등록
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/clients"
+  body:
+    type: json
+    data: |-
+      {
+        "company": "브루노거래처{{runStamp}}",
+        "employee": "김브루노",
+        "email": "{{clientEmail}}",
+        "phone": "010-7000-0001",
+        "userId": {{orderUserId}},
+        "address": {
+          "zipcode": "06236",
+          "roadAddress": "서울특별시 강남구 테헤란로 152",
+          "detailAddress": "브루노 3층"
+        }
+      }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(201);
+          expect(body.company).to.include("브루노거래처");
+          bru.setVar("clientId", String(body.id));
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

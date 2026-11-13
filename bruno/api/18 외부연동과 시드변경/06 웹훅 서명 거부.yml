@@ -1,0 +1,43 @@
+info:
+  name: 웹훅 서명 거부
+  type: http
+  seq: 6
+
+docs: |-
+  서명이 없거나 키가 없으면 401 또는 503이다. 결제 상태는 바꾸지 않는다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/payments/webhook"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: webhook-id
+      value: msg_bruno
+    - name: webhook-timestamp
+      value: 1700000000
+    - name: webhook-signature
+      value: v1,aaaa
+  body:
+    type: json
+    data: |-
+      {
+        "type": "Transaction.Paid",
+        "data": { "storeId": "store", "paymentId": "PF-2026-015-BALANCE" }
+      }
+  auth: inherit
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect([401, 503]).to.include(status);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

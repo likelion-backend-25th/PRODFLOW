@@ -1,0 +1,35 @@
+info:
+  name: 수주관리자 재로그인
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{orderEmail}}",
+        "password": "{{newPassword}}"
+      }
+  auth: inherit
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          bru.setVar("orderAccessToken", body.accessToken);
+          expect(body.mustChangePassword).to.equal(false);
+          bru.setVar("accessToken", body.accessToken);
+          expect(body.tokenType).to.equal("Bearer");
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

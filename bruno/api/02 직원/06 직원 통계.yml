@@ -1,0 +1,28 @@
+info:
+  name: 직원 통계
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/users/stats"
+  auth:
+    type: bearer
+    token: "{{adminAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.totalAccounts).to.be.at.least(body.activeAccounts);
+          expect(body.inactiveAccounts).to.be.at.least(0);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

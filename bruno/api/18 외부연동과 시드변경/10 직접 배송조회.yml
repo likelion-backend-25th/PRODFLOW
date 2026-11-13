@@ -1,0 +1,29 @@
+info:
+  name: 직접 배송조회
+  type: http
+  seq: 10
+
+docs: |-
+  스마트택배 조회다. 시드 운송장 530012345671이다.
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/shipments/tracking?carrierCode=04&trackingNumber=530012345671"
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect([200, 502, 503]).to.include(status);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,38 @@
+info:
+  name: 라인 생산량 수정
+  type: http
+  seq: 4
+
+docs: |-
+  이름은 바꾸지 않는다. 이름 변경은 최고 관리자만 가능해서 이 요청은 관리자 토큰을 쓴다.
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/lines/{{lineId}}"
+  body:
+    type: json
+    data: |-
+      {
+        "lineName": "{{lineName}}",
+        "productionCapacity": 80,
+        "reason": "Bruno 시연 생산량 조정"
+      }
+  auth:
+    type: bearer
+    token: "{{adminAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.productionCapacity).to.equal(80);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

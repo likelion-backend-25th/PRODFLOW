@@ -1,0 +1,33 @@
+info:
+  name: 대화방 제목
+  type: http
+  seq: 4
+
+docs: |-
+  제목은 20자 이하다.
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/ai/conversations/{{conversationId}}/title"
+  body:
+    type: json
+    data: |-
+      { "title": "시연 납기 질문" }
+  auth:
+    type: bearer
+    token: "{{orderAccessToken}}"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(204);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,36 @@
+info:
+  name: 시드 생산관리자 로그인
+  type: http
+  seq: 12
+
+docs: |-
+  시드 prod1은 비밀번호 변경이 끝난 계정이다. 본인 라인 알림을 읽는 데만 쓴다.
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "prod1@prodflow.site",
+        "password": "{{adminPassword}}"
+      }
+  auth: inherit
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const status = (typeof res.getStatus === "function") ? res.getStatus() : res.status;
+        const body = (typeof res.getBody === "function") ? res.getBody() : res.body;
+        test("응답", function () {
+          expect(status).to.equal(200);
+          expect(body.mustChangePassword).to.equal(false);
+          bru.setVar("prod1AccessToken", body.accessToken);
+        });
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
