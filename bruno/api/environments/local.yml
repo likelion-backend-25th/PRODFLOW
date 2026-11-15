@@ -7,6 +7,6 @@ variables:
   - name: adminPassword
     value: Abcd123456!?
   - name: tempPassword
-    value: TempPass123!
+    value: Abcd123456!?
   - name: newPassword
     value: Bruno1234!

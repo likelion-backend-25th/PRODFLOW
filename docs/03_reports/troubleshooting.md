@@ -15,3 +15,7 @@
 ### [PortOne API 응답 유실로 인한 가상계좌 중복 발급 문제](portone_virtual_account_duplicate_issuance.md)
 
 ### [생산품목 도면 S3 미리보기 URL 노출 설계](product_drawing_presigned_url.md)
+
+### [동시 수주 등록 시 생산 물량이 중복 예약된 문제](order_registration_lock.md)
+
+### [대시보드 통계 조회 시 일부 데이터 누락 및 월간 집계 오류](dashboard_statistics_aggregations_miss.md)

@@ -16,7 +16,8 @@ http:
       }
   auth:
     type: bearer
-    token: "{{prodTempToken}}"
+    token: eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwcm9kZmxvdyIsImp0aSI6IjQ4MTViZThiLTA3MmEtNDZjMy1hMzBlLTM5MzY4Mjc0YjI2NyIsInN1YiI6IjE2IiwiZW1haWwiOiJicnVuby5wcm9kLjE3OTQ1NTIwNDIyNjFAcHJvZGZsb3cuc2l0ZSIsInJvbGUiOiJQUk9EVUNUSU9OX01BTkFHRVIiLCJ0eXBlIjoiQUNDRVNTIiwiaWF0IjoxNzk0NTUyMDYxLCJleHAiOjE3OTQ1NTM4NjF9.1voffm9Xo2-Rt3YSnfCsCOLORjpCFTd7VJsS9KyUsJ0
+
 runtime:
   scripts:
     - type: tests
@@ -26,6 +27,7 @@ runtime:
         test("응답", function () {
           expect(status).to.equal(204);
         });
+
 settings:
   encodeUrl: true
   timeout: 0

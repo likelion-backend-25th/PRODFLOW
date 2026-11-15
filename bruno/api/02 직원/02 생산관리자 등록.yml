@@ -18,7 +18,8 @@ http:
       }
   auth:
     type: bearer
-    token: "{{adminAccessToken}}"
+    token: eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwcm9kZmxvdyIsImp0aSI6ImJjN2FjNGU4LTY2YjctNDA2Ni04NjQ1LTY2NWNmYzVlY2YxZiIsInN1YiI6IjEiLCJlbWFpbCI6ImFkbWluMUBwcm9kZmxvdy5zaXRlIiwicm9sZSI6IlNVUEVSX0FETUlOIiwidHlwZSI6IkFDQ0VTUyIsImlhdCI6MTc5NDU1MjA0MiwiZXhwIjoxNzk0NTUzODQyfQ.ZLLza8YT0m27ecS3Xg04AnSHty5uEPiG-nJ7l2XCD30
+
 runtime:
   scripts:
     - type: tests
@@ -32,6 +33,7 @@ runtime:
           expect(body.status).to.equal("ACTIVE");
           bru.setVar("prodUserId", String(body.id));
         });
+
 settings:
   encodeUrl: true
   timeout: 0
