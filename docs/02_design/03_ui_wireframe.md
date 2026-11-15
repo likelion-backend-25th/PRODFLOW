@@ -322,7 +322,7 @@ PRODFLOW는 수주·생산·입금·포장·출고·배송 조회를 통합한 �
 
 ### 5.1 직원 계정 등록 모달
 
-<img src="../images/account_manage.png" width="500" alt="직원 계정 등록 모달">
+<img src="../images/account_in.png" width="500" alt="직원 계정 등록 모달">
 
 - **출력 데이터 항목 (Output Data):**
     - 직원 계정 등록 모달
