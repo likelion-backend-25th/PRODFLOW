@@ -84,9 +84,9 @@ PRODFLOW는 휴대폰 케이스 생산시설의 임직원을 위한 내부 생�
 
 ### 3.4 견적
 
-- `DRAFT` → PDF(S3) → `SENT` → 승인 / 거절 / 취소 / 만료
-- 납기 재산정은 `SENT` 상태에서만 수행한다.
-- 수주 등록 이후에는 원본 견적의 납기를 재산정하지 않는다.
+- 거래처와 품목별 수량·단가를 입력하여 견적서를 작성한다. 
+- 생산능력을 기준으로 예상 납기를 산정하고, 견적서를 PDF로 확인·발송한다. 
+- 거래처의 승인·거절 결과를 기록하고, 승인된 견적을 수주로 연결한다.
 
 ### 3.5 수주
 
@@ -143,15 +143,15 @@ PRODFLOW는 휴대폰 케이스 생산시설의 임직원을 위한 내부 생�
 
 ---
 
-## 4. 비기능·기술 스택
+## 4. 기술 스택
 
 | 분야      | 구성                                              |
 |---------|-------------------------------------------------|
 | Backend | Java 25, Spring Boot 4.1.x, JPA, Security, Mail |
 | AI      | Spring AI (Gemini, Groq), MCP                   |
-| DB      | MySQL 9.7, 테스트 H2                               |
-| 파일      | S3 + Presigned GET                              |
-| 배포      | Docker, GitHub Actions (CI / main → EC2 CD)     |
+| DB      | MySQL 9.7, AWS RDS, 테스트 H2                               |
+| 파일      | AWS S3 + Presigned GET                              |
+| 배포      | Docker, AWS EC2, GitHub Actions CI/CD, AWS Amplify     |
 | 주기 작업   | `@Scheduled` (Batch·QueryDSL 미사용)               |
 
 ---
