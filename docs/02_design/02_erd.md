@@ -508,7 +508,7 @@ erDiagram
 | zipcode        | VARCHAR(10)  | NOT NULL                     | 우편번호              |
 | road_address   | VARCHAR(100) | NOT NULL                     | 도로명 주소            |
 | detail_address | VARCHAR(100) | NOT NULL                     | 상세 주소             |
-| user_id        | BIGINT       | NOT NULL, FK → user.id, NULL | 수주 관리자 ID         |
+| user_id        | BIGINT       | NOT NULL, FK → user.id | 수주 관리자 ID         |
 | created_at     | DATETIME     | NOT NULL                     | 거래처 생성 일시         |
 | updated_at     | DATETIME     | NOT NULL                     | 거래처 수정 일시         |
 | created_by     | VARCHAR(255) | NULL                         | 생성한 사용자           |
@@ -863,7 +863,7 @@ erDiagram
 | id                  | BIGINT       | PK, AUTO_INCREMENT | 생산라인 식별자                                                       |
 | line_name           | VARCHAR(255) | NOT NULL, UNIQUE   | 생산라인명                                                          |
 | production_capacity | INT          | NOT NULL           | 라인의 일일 생산 가능 수량                                                |
-| status              | VARCHAR(255) | NOT NULL           | AVAILABLE(가동 가능), RUNNING(가동 중), MAINTENANCE(점검 중), BROKEN(고장) |
+| status              | VARCHAR(255) | NOT NULL           | AVAILABLE(가동 가능), OPERATING(가동 중), INSPECTION(점검 중), BROKEN(고장) |
 | created_at          | DATETIME     | NOT NULL           | 생산라인 도입 일시                                                     |
 | updated_at          | DATETIME     | NOT NULL           | 수정 일시                                                          |
 | created_by          | VARCHAR(255) | NULL               | 등록한 직원                                                         |

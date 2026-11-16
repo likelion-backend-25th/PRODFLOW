@@ -117,6 +117,7 @@ graph TD
 - `./gradlew test --no-daemon --info --stacktrace --scan`
 - Secrets로 DB/JWT/AWS/Mail/Holiday/Shipment/AI 키를 주입
 - 테스트 시 `SHIPMENT_TRACKING_REFRESH_ENABLED=false`로 배송 주기 조회 스케줄러를 끈다
+- `docs/`만 변경된 경우 테스트 작업을 생략한다.
 
 ### 1.3.2 CD (`deploy.yml`)
 
