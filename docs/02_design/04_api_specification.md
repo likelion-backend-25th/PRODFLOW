@@ -1320,7 +1320,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 ## **5. 수주 및 견적**
 
 날짜는`yyyy-MM-dd`, 일시는 ISO 8601 문자열을 사용한다. 이 장의 페이징 응답은`content`,`page`,`size`,`totalElements`,`totalPages`이며,`page`는 0부터
-시작한다.
+시작한다. 5.8은 Spring Data `Page` 응답을 사용한다.
 
 견적 승인과 수주 확정은 별도이다. 견적을 승인해도 수주가 자동 생성되지 않으며, 수주 등록 이후 계약금 확인 시 확정 및 작업지시 생성이 진행된다.
 
@@ -1335,7 +1335,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
   - `APPROVED`견적만 등록할 수 있다. 이미 연결된 수주가 있으면`409`로 거절한다.
   - `items`에는 승인 견적의 모든 품목을 중복 없이 전달한다.`quotationItemId`는 견적 품목 ID이며`productId`가 아니다.
   - 품목별 수량은 100개 이상, 승인 견적 수량 이하여야 한다. 단가·VAT·거래처 정보는 견적에서 가져온다.
-  - 최종`dueDate`는 저장 직전 최신 생산 상황으로 재검증한다. 계약금 마감일은 한국 날짜 기준 등록일+3일이다.
+  - 최종`dueDate`는 저장 직전 최신 생산 상황으로 재검증한다. `sameDayStart`는 선택 입력이며 생략·false이면 일반 일정, true이면 당일 착수 일정으로 계산한다. 계약금 마감일은 일반 요청은 등록일+3일, 당일 착수 요청은 등록 당일이다.
   - `useCompanyAddress=true`이면 거래처 주소를 사용한다.`false`이면`shippingAddress`의 우편번호·도로명·상세 주소가 모두 필요하다.
   - 초기 진행 상태는`WAITING`이다. 등록 시 결제 건·가상계좌·작업지시는 생성하지 않는다.
 - Request Body
@@ -1359,7 +1359,8 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
   "receiverName": "김담당",
   "receiverPhone": "010-2222-3333",
   "notifyChannel": "EMAIL",
-  "memo": "로고 위치 확인"
+  "memo": "로고 위치 확인",
+  "sameDayStart": false
 }
 ```
 
@@ -1397,7 +1398,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 
 | **파라미터**             | **타입**  | **필수** | **기본값**      | **설명**                              |
 |----------------------|---------|--------|--------------|-------------------------------------|
-| `tab`                | String  | X      | `OPEN`       | `OPEN`: 완료·취소 제외, `DONE`: 완료 수주     |
+| `tab`                | String  | X      | `OPEN`       | `OPEN`: 완료·취소 제외, `DONE`: 완료·취소 수주     |
 | `keyword`            | String  | X      | 없음           | 수주번호·거래처명·저장된 품목명 검색                |
 | `confirmationStatus` | String  | X      | 전체           | `PENDING`, `CONFIRMED`, `CANCELLED` |
 | `statusCodeId`       | Long    | X      | 전체           | 수주 진행 상태 공통코드 ID                    |
@@ -1534,7 +1535,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
   - 권한: 로그인 사용자
 - 처리 규칙
   - 해당 수주의 상태 이력을 반환한다. 변경 전·후 상태, 처리자, 사유, 처리 시각을 확인할 수 있다.
-  - 최신 처리 시각·ID 순서로 반환한다.`userName`은 이력에 저장된 처리자명이다. 시스템 처리 시`userId`,`userName`은 null일 수 있다.
+  - 최신 처리 시각·ID 순서로 반환한다.`userName`은 이력에 저장된 처리자명이다. 시스템 처리 시`userId`는 null일 수 있다.
 - Response:`200 OK`
 
 ```json
@@ -1620,33 +1621,35 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 - URI: `/api/v1/orders/clients/{id}`
 - Path Parameters
   - id: 거래처 ID, 필수, Long
-- 인증 필요 여부: 불필요
+- 인증 필요 여부: 필요
+  - 권한: 로그인 사용자
+- Query Parameters: `page`(기본 0), `size`(기본 4), `sort`(기본 `createdAt,desc`)
 - 처리 규칙
   - 특정 거래처가 수주 주문한 이력들을 조회한다
 - Response: `200 OK`, `Page<CustomerOrderDto.ClientDetailResponse>`
 
     ```json
     {
-    	"content": [
-    		{
-    			"customer_order": {
-    				...
-    			},
-    			"product_name": "갤럭시 케이스"
-    		},
-    		{
-    			...
-    		}
-    	],
-    	"empty": false,
-    	...
+      "content": [
+        {
+          "customerOrder": {
+            ...
+          },
+          "productName": "갤럭시 케이스"
+        },
+        {
+          ...
+        }
+      ],
+      "empty": false,
+      ...
     }
     ```
 
   - content: Page 클래스에서 구조체 리스트가 들어가는 부분
     - 여기서는 CustomerOrderDto.ClientDetailResponse 리스트가 들어감
-  - customer_order: 거래처의 개별 수주 내역, customer_order 테이블 레코드
-  - product_name: 해당 수주의 주문 제품명, String
+  - customerOrder: 거래처의 개별 수주 내역, customer_order 테이블 레코드
+  - productName: 해당 수주의 주문 제품명, String
   - 그 뒤로는 Page 클래스 속성들이 나열
 
 ### 5.9 거래처의 가장 최근 수주 내역 조회
@@ -1655,71 +1658,25 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 - URI: `/api/v1/orders/clients/{id}/recent`
 - Path Parameters
   - id: 거래처 ID, 필수, Long
-- 인증 필요 여부: 불필요
+- 인증 필요 여부: 필요
+  - 권한: 로그인 사용자
 - 처리 규칙
   - 특정 거래처의 가장 최근에 수주한 내역을 조회한다
 - Response: `200 OK`, `CustomerOrderDto.ClientDetailResponse`
 
     ```json
     {
-    	"customer_order": {
-    		...
-    	},
-    	"product_name": "갤럭시 케이스"
+      "customerOrder": {
+        ...
+      },
+      "productName": "갤럭시 케이스"
     }
     ```
 
-  - customer_order: 거래처의 개별 수주 내역, customer_order 테이블 레코드
-  - product_name: 해당 수주의 주문 제품명, String
+  - customerOrder: 거래처의 개별 수주 내역, customer_order 테이블 레코드
+  - productName: 해당 수주의 주문 제품명, String
 
-### **5.10 견적 초안 저장**
-
-- Method:`POST`
-- URI:`/api/v1/quotations`
-- Path Parameters: 없음
-- 인증 필요 여부: 필요
-  - 권한:`SUPER_ADMIN`,`ORDER_MANAGER`
-- 처리 규칙
-  - `clientId`와`newClient`중 하나만 전달한다. 신규 거래처 정보가 있으면 거래처를 함께 등록한다.
-  - 희망 납기는 오늘 이후여야 한다.`validUntil`은 발행일+7일 또는 +14일이며 생략 시 +14일이다.
-  - 품목별 수량은 최소 100개, 단가는 0원 이상이다. 견적 단가는 요청으로 전달한다.
-  - 금액과 생산 일정을 계산하여`DRAFT`로 저장한다. PDF 생성·이메일 발송·생산 자리 예약은 하지 않는다.
-- Request Body — 기존 거래처
-
-```json
-{
-  "clientId": 1,
-  "requestedDueDate": "2026-11-30",
-  "validUntil": "2026-11-23",
-  "vatIncluded": true,
-  "items": [
-    {
-      "productId": 1,
-      "quantity": 1000,
-      "unitPrice": 12000
-    }
-  ]
-}
-```
-
-- 신규 거래처는`clientId`를 생략하고 다음`newClient`를 전달한다.
-
-```json
-{
-  "company": "샘플상사",
-  "employee": "김담당",
-  "email": "client@example.com",
-  "phone": "010-2222-3333",
-  "zipcode": "08501",
-  "roadAddress": "서울특별시 금천구 가산디지털1로 1",
-  "detailAddress": "101호"
-}
-```
-
-- Response:`201 Created`— 5.10의 견적 상세 응답,`Location: /api/v1/quotations/{id}`,`Cache-Control: no-store`
-- 주요 오류:`400`거래처 선택·품목·수량·유효기간·납기 오류,`403`권한·계정 조건 미충족,`404`거래처·품목 없음
-
-### **5.11 견적 목록**
+### **5.10 견적 목록**
 
 - Method:`GET`
 - URI:`/api/v1/quotations`
@@ -1769,7 +1726,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 }
 ```
 
-### **5.12 견적 상세**
+### **5.11 견적 상세**
 
 - Method:`GET`
 - URI:`/api/v1/quotations/{quotationId}`
@@ -1826,22 +1783,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 
 - 주요 오류:`404`견적 없음
 
-### **5.13 견적 초안 수정**
-
-- Method:`PUT`
-- URI:`/api/v1/quotations/{quotationId}`
-- Path Parameters:`quotationId`— 견적 ID, Long
-- 인증 필요 여부: 필요
-  - 권한:`SUPER_ADMIN`,`ORDER_MANAGER`
-- Request Body: 5.8과 동일한 전체 입력
-- 처리 규칙
-  - `DRAFT`만 수정한다. 견적 ID·번호·최초 작성자를 유지하고 품목·금액·납기를 갱신한다.
-  - 기존 PDF를 무효화하며 PDF 생성·메일 발송은 하지 않는다.
-  - 유효기간 생략 시 기존 값을 유지한다. 지정 시 최초 발행일+7일 또는 +14일이어야 한다.
-- Response:`200 OK`— 5.10의 견적 상세 응답,`Cache-Control: no-store`
-- 주요 오류:`400`초안이 아닌 상태·입력 오류,`404`견적·거래처·품목 없음
-
-### **5.14 견적 초안 삭제**
+### **5.12 견적 초안 삭제**
 
 - Method:`DELETE`
 - URI:`/api/v1/quotations/{quotationId}`
@@ -1852,7 +1794,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 - Response:`204 No Content`— 응답 본문 없음
 - 주요 오류:`404`견적 없음,`409`초안이 아닌 상태
 
-### **5.15 신규 견적 납기 미리보기**
+### **5.13 신규 견적 납기 미리보기**
 
 - Method:`POST`
 - URI:`/api/v1/quotations/schedule`
@@ -1864,6 +1806,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
   - 불가능한 희망 납기에는`200`과`feasible=false`를 반환하며 생산 시작·완료 예정일은 null이다.
   - 한국 날짜 기준 다음 해 12월 31일까지 계산한다. 견적 저장·생산 자리 예약은 하지 않는다.
   - 수주 등록 전에도 선택한 품목·수량·납기의 확인에 사용할 수 있으며, 실제 저장 시 재검증한다.
+  - `sameDayStart`는 선택 입력이다. 생략·false이면 오늘+3일, true이면 오늘부터 생산 가능 일정을 계산한다.
 - Request Body
 
 ```json
@@ -1874,7 +1817,8 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
       "quantity": 1000
     }
   ],
-  "requestedDueDate": "2026-11-30"
+  "requestedDueDate": "2026-11-30",
+  "sameDayStart": false
 }
 ```
 
@@ -1892,7 +1836,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 
 - 주요 오류:`400`입력·품목·계산 범위 오류
 
-### **5.16 기존 견적 납기 재산정 미리보기**
+### **5.14 기존 견적 납기 재산정 미리보기**
 
 - Method:`POST`
 - URI:`/api/v1/quotations/{quotationId}/schedule`
@@ -1904,7 +1848,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 - Response:`200 OK`— 5.13의 납기 미리보기 응답
 - 주요 오류:`400`상태·유효기간·입력·계산 범위 오류,`404`견적 없음
 
-### **5.17 기존 견적 납기 변경**
+### **5.15 기존 견적 납기 변경**
 
 - Method:`PATCH`
 - URI:`/api/v1/quotations/{quotationId}/schedule`
@@ -1915,18 +1859,55 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 - 처리 규칙
   - 유효기간 내`SENT`견적만 변경한다. 저장 직전 재계산하며 불가능하면 기존 일정을 유지한다.
   - 희망·예상 납기, 생산 시작·완료 예정일만 변경한다. 품목·금액·유효기간·상태는 유지하고 메일은 보내지 않는다.
-- Response:`200 OK`— 5.10의 견적 상세 응답
+- Response:`200 OK`— 5.11의 견적 상세 응답
 - 주요 오류:`400`상태·유효기간·불가능한 납기,`404`견적 없음
 
-### **5.18 견적 초안 저장 및 PDF 생성**
+### **5.16 견적 초안 저장 및 PDF 생성**
 
 - Method:`POST`
 - URI:`/api/v1/quotations/pdf`
 - Path Parameters: 없음
 - 인증 필요 여부: 필요
   - 권한:`SUPER_ADMIN`,`ORDER_MANAGER`
-- Request Body: 5.8의 견적 초안 입력과 동일
-- 처리 규칙: 초안 저장·커밋 후 PDF를 생성하여 S3에 저장한다. 메일은 보내지 않는다. PDF 준비 실패 시에도 저장된 초안은 유지한다.
+- 처리 규칙
+  - `clientId`와`newClient`중 하나만 전달한다. 같은 회사명이 있으면 기존 거래처를 사용하고, 없으면 함께 등록한다.
+  - 희망 납기는 오늘 또는 이후 날짜이다.`validUntil`은 작성일+7일 또는 +14일이며 생략 시 +14일이다.
+  - 생산 가능 품목만 중복 없이 전달한다. 품목별 수량은 최소 100개, 단가는 0원 이상이다.
+  - `sameDayStart`는 선택 입력이다. 생략·false이면 오늘+3일, true이면 오늘부터 생산 가능 일정을 계산한다.
+  - 초안 저장·커밋 후 PDF를 S3에 저장한다. 메일 발송·생산 용량 예약은 하지 않으며, PDF 준비 실패 시에도 초안은 유지한다.
+- Request Body — 기존 거래처
+
+```json
+{
+  "clientId": 1,
+  "requestedDueDate": "2026-11-30",
+  "validUntil": "2026-11-23",
+  "vatIncluded": true,
+  "sameDayStart": false,
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 1000,
+      "unitPrice": 12000
+    }
+  ]
+}
+```
+
+- 신규 거래처는`clientId`를 생략하고 다음`newClient`를 전달한다.
+
+```json
+{
+  "company": "샘플상사",
+  "employee": "김담당",
+  "email": "client@example.com",
+  "phone": "010-2222-3333",
+  "zipcode": "08501",
+  "roadAddress": "서울특별시 금천구 가산디지털1로 1",
+  "detailAddress": "101호"
+}
+```
+
 - Response:`201 Created`
   - `Location: /api/v1/quotations/{quotationId}`
   - `X-Quotation-Id: {quotationId}`,`Cache-Control: no-store`
@@ -1956,19 +1937,19 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 }
 ```
 
-### **5.19 견적 초안 수정 및 PDF 재생성**
+### **5.17 견적 초안 수정 및 PDF 재생성**
 
 - Method:`PUT`
 - URI:`/api/v1/quotations/{quotationId}/pdf`
 - Path Parameters:`quotationId`— 견적 ID, Long
 - 인증 필요 여부: 필요
   - 권한:`SUPER_ADMIN`,`ORDER_MANAGER`
-- Request Body: 5.8의 견적 초안 입력과 동일
-- 처리 규칙:`DRAFT`를 수정·커밋한 뒤 PDF를 준비한다. ID·번호·최초 작성자를 유지하며 PDF 실패 시에도 수정 내용은 유지한다.
+- Request Body: 5.16의 견적 초안 입력과 동일
+- 처리 규칙:`DRAFT`를 수정·커밋한 뒤 PDF를 준비한다. ID·번호·최초 작성자를 유지하며 PDF 실패 시에도 수정 내용은 유지한다. 유효기간 생략 시 기존 값을 유지하며, 지정 시 최초 작성일+7일 또는 +14일이어야 한다.
 - Response:`200 OK`— 5.16의 PDF 미리보기 응답,`Cache-Control: no-store`
 - 주요 오류:`400`초안 상태·입력·PDF 생성 오류,`404`견적 없음,`502`PDF 준비 실패
 
-### **5.20 기존 초안 PDF 재생성**
+### **5.18 기존 초안 PDF 재생성**
 
 - Method:`POST`
 - URI:`/api/v1/quotations/{quotationId}/pdf/regenerate`
@@ -1980,7 +1961,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 - Response:`200 OK`— 5.16의 PDF 미리보기 응답,`Cache-Control: no-store`
 - 주요 오류:`400`초안이 아닌 상태·PDF 생성 오류,`404`견적 없음,`502`PDF 준비 실패
 
-### **5.21 견적 PDF 미리보기 조회**
+### **5.19 견적 PDF 미리보기 조회**
 
 - Method:`GET`
 - URI:`/api/v1/quotations/{quotationId}/pdf`
@@ -1991,7 +1972,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 - Response:`200 OK`— 5.16의 PDF 미리보기 응답,`Cache-Control: no-store`
 - 주요 오류:`404`견적 없음,`409 PDF_NOT_READY`PDF 미준비,`409 PDF_CHANGED`현재 견적과 PDF 불일치,`502`PDF 조회 실패
 
-### **5.22 견적 발송 확정 및 이메일 전송**
+### **5.20 견적 발송 확정 및 이메일 전송**
 
 - Method:`POST`
 - URI:`/api/v1/quotations/{quotationId}/send`
@@ -2032,7 +2013,7 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
 
 - 주요 오류:`400`토큰 형식 오류,`404`견적 없음,`409`상태·PDF·납기·유효기간 재확인 필요,`502`발송 확정 전 PDF 읽기 실패
 
-### **5.23 견적 승인**
+### **5.21 견적 승인**
 
 - Method:`PATCH`
 - URI:`/api/v1/quotations/{quotationId}/approve`
@@ -2041,10 +2022,10 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
   - 권한:`SUPER_ADMIN`,`ORDER_MANAGER`
 - Request Body: 없음
 - 처리 규칙: 거래처 승인 결과를 직원이 반영한다. 유효기간 내`SENT`를`APPROVED`로 변경하며, 이미 승인된 견적은 현재 상세를 반환한다. 수주는 자동 생성하지 않는다.
-- Response:`200 OK`— 5.10의 견적 상세 응답
+- Response:`200 OK`— 5.11의 견적 상세 응답
 - 주요 오류:`404`견적 없음,`409`처리 불가 상태·유효기간 경과
 
-### **5.24 견적 거절**
+### **5.22 견적 거절**
 
 - Method:`PATCH`
 - URI:`/api/v1/quotations/{quotationId}/reject`
@@ -2053,10 +2034,10 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
   - 권한:`SUPER_ADMIN`,`ORDER_MANAGER`
 - Request Body: 없음
 - 처리 규칙: 유효기간 내`SENT`를`REJECTED`로 변경한다. 같은 거절 요청은 현재 상세를 반환한다.
-- Response:`200 OK`— 5.10의 견적 상세 응답
+- Response:`200 OK`— 5.11의 견적 상세 응답
 - 주요 오류:`404`견적 없음,`409`처리 불가 상태·유효기간 경과
 
-### **5.25 견적 취소**
+### **5.23 견적 취소**
 
 - Method:`PATCH`
 - URI:`/api/v1/quotations/{quotationId}/cancel`
@@ -2065,10 +2046,10 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
   - 권한:`SUPER_ADMIN`,`ORDER_MANAGER`
 - Request Body: 없음
 - 처리 규칙: 유효기간 내`SENT`를`CANCELLED`로 변경한다. 연결 수주를 취소하는 API가 아니다.
-- Response:`200 OK`— 5.10의 견적 상세 응답
+- Response:`200 OK`— 5.11의 견적 상세 응답
 - 주요 오류:`404`견적 없음,`409`처리 불가 상태·유효기간 경과
 
-### **5.26 견적 수동 만료 처리**
+### **5.24 견적 수동 만료 처리**
 
 - Method:`POST`
 - URI:`/api/v1/quotations/expire`
@@ -2084,6 +2065,29 @@ Spring Security와 JWT를 사용하여 API 접근 권한을 관리한다.
   "expiredCount": 3
 }
 ```
+
+### **5.25 수주 취소**
+
+- Method:`PATCH`
+- URI:`/api/v1/orders/{orderId}/cancel`
+- Path Parameters:`orderId`— 수주 ID, Long
+- 인증 필요 여부: 필요
+  - 권한:`SUPER_ADMIN`,`ORDER_MANAGER`
+- Request Body
+
+```json
+{
+  "reason": "거래처 요청으로 취소"
+}
+```
+
+- 처리 규칙
+  - 취소 사유는 공백이 아닌 값이 필요하며 최대 255자이다.
+  - 미입금(`UNPAID`)·대기(`WAITING`) 수주만 취소한다. 입금 이력·작업지시가 있거나 결제정보 발송 처리 중이면 거절한다.
+  - 결제·가상계좌 말소를 확인한 뒤 수주와 원본 견적을 `CANCELLED`로 변경하고 상태 이력을 기록한다. 말소 결과가 불확실하면 취소를 확정하지 않는다.
+  - 이미 취소된 수주는 상태 이력을 추가하지 않고 현재 상세를 반환한다.
+- Response:`200 OK`— 5.3의 수주 상세 응답
+- 주요 오류:`400`취소 사유 오류,`403`권한·계정 조건 미충족,`404`수주·원본 견적 없음,`409`취소 조건 미충족·결제 말소 미확인
 
 ## 6. 생산관리
 

@@ -2,82 +2,82 @@
 
 ## 목차
 
-- [1.1 시스템 아키텍처 개요](#11-시스템-아키텍처-개요)
-- [1.2 AWS 클라우드 및 컨테이너 인프라 아키텍처](#12-aws-클라우드-및-컨테이너-인프라-아키텍처)
-- [1.3 GitHub Actions 기반 CI/CD 배포 자동화 파이프라인](#13-github-actions-기반-cicd-배포-자동화-파이프라인)
-- [1.4 핵심 비즈니스 데이터 흐름도](#14-핵심-비즈니스-데이터-흐름도)
+- 1.1 시스템 아키텍처 개요
+- 1.2 AWS 클라우드 및 컨테이너 인프라 아키텍처
+- 1.3 GitHub Actions 기반 CI/CD 배포 자동화 파이프라인
+- 1.4 핵심 비즈니스 데이터 흐름도
 
 ---
 
 ## 1.1 시스템 아키텍처 개요
 
-PRODFLOW는 휴대폰 케이스 수주·생산·배송·입금을 관리하는 B2B 백오피스다. **AWS Amplify에 호스팅한 프론트엔드(React SPA)**와 **AWS EC2에서 Docker Compose로 기동하는
-백엔드(Spring Boot)**를 분리하고, 운영 DB는 AWS RDS(MySQL), 파일은 AWS S3, 그 외 결제·배송·메일·AI는 외부 서비스와 연동하는 계층형 RESTful API 구조다.
+PRODFLOW는 휴대폰 케이스 수주·생산·배송·입금을 관리하는 B2B 백오피스다. 프론트엔드(React SPA)와 백엔드(Spring Boot)가 분리된 계층형 RESTful API 구조를 사용한다.
 
-- **사용자 브라우저**: 임직원이 React SPA를 사용하며, API 요청 시 JWT를 전달한다.
-- **프론트엔드**: AWS Amplify Hosting (React · TypeScript · Vite)
-- **백엔드 (AWS EC2 / Docker Compose)**: Nginx(HTTPS, 호스트 80/443, Certbot 인증서 갱신) → Spring Boot API(Java 25 · REST · JWT ·
-  MCP)
-- **데이터베이스**: AWS RDS (운영 MySQL)
-- **Spring Boot 연동 서비스**
-    - AWS S3: 품목 도면·견적 PDF 저장, Presigned URL 발급
-    - PortOne: 가상계좌 발급, Webhook 기반 입금 검증
-    - 업무 외부 API: 스마트택배(Sweet Tracker 배송조회), 공공데이터 공휴일 API, Gmail SMTP
-    - 외부 AI 모델: Gemini · Groq (MCP는 Spring Boot API 내부에서 동작)
+백엔드는 Spring Boot 4.1.1 / Java 25, Spring Data JPA, Spring Security(JWT), Spring Mail, AWS SDK(S3), Spring AI(
+Gemini·Groq·MCP)를 사용한다. 외부 연동은 PortOne(가상계좌), 스마트택배(Sweet Tracker 배송조회), 공공데이터 공휴일 API, Gmail SMTP다.
 
-로컬 개발은 Docker Compose로 MySQL 9.7을 띄운다. CI는 `main`/`dev` push·PR에서 테스트(docs-only 변경은 생략), CD는 `main` 푸시 시 Docker Hub 이미지
-빌드 → Secrets 기반 `.env` 반영 → EC2에서 `prodflow-app` 재기동 순으로 진행한다. 프론트엔드는 Amplify에서 별도 배포한다.
+로컬 개발은 Docker Compose로 MySQL 9.7을 띄우고, 운영은 EC2의 Docker Compose로 앱·Nginx를 기동한다. CI는 `main`/`dev` push·PR에서 테스트, CD는
+`main` 푸시 시 Docker Hub 이미지 빌드 후 EC2에 `prodflow-app`을 재기동한다.
 
 QueryDSL·Spring Batch는 사용하지 않는다. 주기 작업은 `@EnableScheduling` + `@Scheduled`다.
 
 ```mermaid
-graph LR
-    Browser["사용자 브라우저<br/>임직원 · React SPA<br/>API 요청 시 JWT 전달"]
-    Amplify["AWS Amplify Hosting<br/>React · TypeScript · Vite"]
 
-    subgraph EC2["AWS EC2 / Docker Compose"]
-        Nginx["Nginx · HTTPS<br/>호스트 80/443 · Certbot 인증서 갱신<br/>(Let's Encrypt TLS 인증서)"]
-        App["Spring Boot API<br/>Java 25 · REST · JWT · MCP"]
-    end
+graph TD
+    Client["React SPA 클라이언트 (브라우저)"]
+    Amplify["AWS Amplify (프론트엔드 호스팅 / HTTPS)"]
+    S3_Files["AWS S3 파일 버킷 (품목 도면, 견적 PDF)"]
+    EC2["AWS EC2 (Amazon Linux)"]
+    Docker_Nginx["Nginx 리버스 프록시 (80/443)"]
+    Docker_App["Spring Boot API (8080)"]
+    DB["MySQL 9.7 (로컬 Docker / 운영 RDS)"]
+    PortOne["PortOne 결제 (가상계좌)"]
+    Tracker["스마트택배 Tracker API"]
+    Holiday["공공데이터 공휴일 API"]
+    Mail["Gmail SMTP"]
+    AI["외부 LLM (Gemini / Groq) + MCP Tool"]
 
-    RDS["AWS RDS<br/>운영 MySQL"]
+    Client -->|프론트엔드 정적 리소스 요청| Amplify
+    Amplify -->|React SPA 제공| Client
+    Client -->|"REST API / JSON / JWT"| EC2
+    EC2 --> Docker_Nginx
+    Docker_Nginx --> Docker_App
+    Docker_App -->|JPA / JDBC| DB
+    Docker_App -->|도면·PDF 업로드 / Presigned GET| S3_Files
 
-    subgraph Ext["Spring Boot에서 연동하는 스토리지 · 외부 업무 API · AI 서비스"]
-        S3["AWS S3<br/>도면 · 견적 PDF<br/>Presigned URL"]
-        PortOne["PortOne<br/>가상계좌 · Webhook<br/>입금 검증"]
-        BizAPI["업무 외부 API<br/>스마트택배 · 공휴일<br/>Gmail SMTP"]
-        AI["외부 AI 모델<br/>Gemini · Groq<br/>(MCP는 API 내부)"]
-    end
+    Docker_App -->|가상계좌 발급·말소·조회| PortOne
+    PortOne -->|"Webhook POST /api/v1/payments/webhook"| Docker_Nginx
+    Docker_App -->|배송 상태 조회| Tracker
+    Docker_App -->|공휴일 수집| Holiday
+    Docker_App -->|견적 PDF·입금 안내 메일| Mail
+    Docker_App -->|자연어 질의 / Tool 호출| AI
 
-    Browser -->|SPA| Amplify
-    Browser -->|" REST API / JWT "| Nginx
-    Nginx --> App
-    App -->|JPA / JDBC| RDS
-    App --> S3
-    App -->|가상계좌 발급·말소·조회| PortOne
-    PortOne -->|" Webhook POST /api/v1/payments/webhook "| Nginx
-    App --> BizAPI
-    App --> AI
 ```
 
 주요 기술 스택:
 
-- Frontend: React, TypeScript, Vite (AWS Amplify Hosting)
-- Backend: Spring Boot 4.1.1, Java 25, Spring Data JPA, Spring Security, Validation, Mail
-- AI: Spring AI BOM 2.0.2 (Google GenAI, OpenAI 호환 Groq), MCP Server/Client, JSqlParser
-- Infra/연동: AWS EC2, AWS RDS(MySQL), AWS S3 (SDK 2.31.x), Nginx + Let's Encrypt(Certbot), PortOne, 스마트택배, OpenPDF,
-  Apache POI
-- 인증: JWT
+- Frontend: React, Vite
+- Backend: Java 25, Spring Boot, Spring Data JPA, Spring Security, Swagger OpenAPI
+- DevOps (배포)
+    - Frontend: AWS Amplify
+    - Backend: AWS EC2 (Nginx + Spring App)
+    - DB: RDS(MySQL), AWS S3(파일 및 이미지)
+- 외부 API 및 라이브러리
+    - 결제: PortOne
+    - 택배: 스마트택배
+    - PDF: OpenPDF
+    - 엑셀: Apache POI
+    - AI: Spring AI (Google GenAI, OpenAI 호환 Groq)
 
 ---
 
 ## 1.2 AWS 클라우드 및 컨테이너 인프라 아키텍처
 
-### 1.2.1 프론트엔드 호스팅 (AWS Amplify Hosting)
+### **1.2.1 프론트엔드 배포 및 호스팅 (AWS Amplify)**
 
-- React · TypeScript · Vite로 빌드한 SPA를 AWS Amplify Hosting에 배포한다.
-- HTTPS·CDN 배포는 Amplify가 처리한다.
-- 브라우저는 Amplify에서 SPA를 받고, API 요청은 JWT와 함께 EC2의 Nginx(HTTPS)로 보낸다.
+- Vite/React SPA를 AWS Amplify로 배포한다.
+- AWS Amplify Hosting을 통해 프론트엔드 호스팅과 HTTPS를 제공한다.
+- SPA 라우팅에 필요한 리라이트/리다이렉트 설정은 AWS Amplify에서 관리한다.
 - 백엔드 CORS 허용 Origin 기본값: `http://localhost:3000`, `http://localhost:5173`, `https://www.prodflow.site` (
   `AUTH_ALLOWED_ORIGINS`)
 
@@ -87,16 +87,15 @@ graph LR
 - 운영 배포 이미지: Docker Hub `minkyolim/prodflow:latest` 및 `minkyolim/prodflow:{github.sha}`
 - Dockerfile: multi-stage (`eclipse-temurin:25-jdk-alpine` 빌드 → `25-jre-alpine` 런타임), `bootJar -x test`, 비루트 사용자로
   `java -jar app.jar`, 포트 8080
-- Nginx가 호스트 80/443을 받아 HTTPS를 종료하고 Spring Boot(8080)로 리버스 프록시한다. TLS 인증서는 Let's Encrypt를 사용하며 Certbot으로 갱신한다.
-- PortOne Webhook(`POST /api/v1/payments/webhook`)도 Nginx를 거쳐 Spring Boot로 전달된다.
+- Nginx가 80/443을 받아 Spring Boot(8080)로 리버스 프록시한다. Let's Encrypt 인증서는 Certbot 볼륨으로 관리하는 구성을 사용한다.
 - 로컬 `docker-compose.yaml`은 MySQL(`prodflow-db`, mysql:9.7)을 제공하며, 앱/Nginx 서비스 정의는 운영용으로 주석 처리된 형태를 포함한다.
-- CD 배포 경로: EC2 `/home/ec2-user/prodflow`에서 `docker compose pull/up`으로 `prodflow-app`만 재기동하고, Nginx는 내려가 있을 때만 기동한다.
+- CD 배포 경로: EC2 `/home/ec2-user/prodflow`에서 `docker compose pull/up`으로 `prodflow-app`만 재기동한다.
 
-### 1.2.3 데이터베이스 (AWS RDS / MySQL)
+### 1.2.3 데이터베이스 (MySQL 9.7)
 
-- 운영: AWS RDS(MySQL). EC2의 Spring Boot가 `.env`의 `MYSQL_*`로 RDS에 연결한다.
 - 로컬: Docker Compose MySQL 9.7, 포트 3306, 볼륨 `mysql-data`, TZ `Asia/Seoul`
 - CI: GitHub Actions `services.mysql` (mysql:9.7)로 테스트 DB 제공
+- 운영: 기획·문서 기준 RDS(MySQL). 앱 DataSource는 `.env`의 `MYSQL_*`로 연결한다.
 - AI 자연어 조회는 별도 읽기 계정(`AI_DB_USERNAME` / `AI_DB_PASSWORD`) DataSource를 사용하는 read-only 풀이다.
 
 ### 1.2.4 파일 스토리지 (AWS S3)
@@ -110,36 +109,27 @@ graph LR
 
 ## 1.3 GitHub Actions 기반 CI/CD 배포 자동화 파이프라인
 
-CI 테스트와 CD 배포는 별도 워크플로로 분리되어 있으며, `main` 푸시 시 백엔드가 자동 배포된다. 프론트엔드는 이 파이프라인과 별개로 AWS Amplify Hosting에서 배포한다.
-
 ### 1.3.1 CI (`ci.yml`)
 
 - 트리거: `main`/`dev` push, `main`/`dev` pull_request
-- **변경 파일 필터 (`changes` job)**: `dorny/paths-filter`로 변경 파일을 확인한다. `docs/**`만 바뀐 경우 `build-and-test` job을 건너뛴다.
-- **검증 환경 (`build-and-test` job)**: `ubuntu-latest`, TZ `Asia/Seoul`, MySQL 9.7 서비스 컨테이너(health check
-  `mysqladmin ping`), Temurin JDK 25, Gradle 캐시(PR에서는 읽기 전용)
-- Secret `PRODFLOW_SYSTEM_PROMPT`를 `src/main/resources/prompts/prodflow-system.txt`로 배치한다. 값이 없으면 실패한다.
-- 테스트: `./gradlew test --no-daemon --console=plain --stacktrace --max-workers=2` (제한 시간 20분)
-- Secrets로 DB/AI DB/JWT/AWS/Mail/Holiday/Shipment/AI 키를 주입하고, DB는 RDS 대신 서비스 컨테이너(`127.0.0.1:3306`)를 사용한다.
-- 외부 API 호출을 막기 위해 `HOLIDAY_INITIALIZATION_ENABLED=false`, `SHIPMENT_TRACKING_REFRESH_ENABLED=false`로 설정한다.
+- Runner: `ubuntu-latest`, TZ `Asia/Seoul`
+- MySQL 9.7 서비스 컨테이너 + Temurin JDK 25 + Gradle 캐시
+- `./gradlew test --no-daemon --info --stacktrace --scan`
+- Secrets로 DB/JWT/AWS/Mail/Holiday/Shipment/AI 키를 주입
+- 테스트 시 `SHIPMENT_TRACKING_REFRESH_ENABLED=false`로 배송 주기 조회 스케줄러를 끈다
+- `docs/`만 변경된 경우 테스트 작업을 생략한다.
 
 ### 1.3.2 CD (`deploy.yml`)
 
-- 트리거: `main` push 또는 수동 `workflow_dispatch`, `github.ref == refs/heads/main`일 때만 실행
+- 트리거: `main` push (또는 `workflow_dispatch`), `github.ref == refs/heads/main`일 때만 실행
 - concurrency group `prodflow-production`, `cancel-in-progress: false`
-- 실행 순서:
-    1. 체크아웃 후 `PRODFLOW_SYSTEM_PROMPT`를 프롬프트 파일로 배치(이미지에 포함)
-    2. **이미지 빌드**: Docker Hub 로그인 → Buildx → multi-stage 빌드
-    3. **Docker Hub 푸시**: `minkyolim/prodflow:latest`, `minkyolim/prodflow:{github.sha}`
-    4. **Secrets 반영**: GitHub Secrets로 `.env.deploy`를 생성(누락 시 실패)하고 `appleboy/scp-action`으로 EC2
-       `/home/ec2-user/prodflow`에 전송
-    5. **EC2 배포**: `appleboy/ssh-action`으로 접속해 다음을 수행
-        - 기존 `.env`를 `.env.backup`으로 백업하고, `.env.deploy` 값으로 기존 `.env`를 갱신(기존 키 유지, 권한 600)
-        - `docker compose config -q`로 설정 검증. 실패 시 `.env`를 백업본으로 복구하고 중단
-        - `docker compose pull prodflow-app`
-        - `docker compose up -d --no-deps --force-recreate prodflow-app`
-    6. **서비스 확인**: `docker compose up -d --no-deps nginx`(Nginx가 내려가 있으면 기동) → `docker compose ps`
-    7. Runner의 `.env.deploy` 임시 파일 정리(`if: always()`)
+- Docker Hub 로그인 → Buildx → 이미지 빌드·푸시 (`minkyolim/prodflow:latest`, `minkyolim/prodflow:{sha}`)
+- SSH(`appleboy/ssh-action`)로 EC2 `ec2-user` 접속 후:
+    - `cd /home/ec2-user/prodflow`
+    - `docker compose config -q`
+    - `docker compose pull prodflow-app`
+    - `docker compose up -d --no-deps --force-recreate prodflow-app`
+    - `docker compose ps`
 
 ```mermaid
 sequenceDiagram
@@ -149,22 +139,19 @@ sequenceDiagram
     participant Action as GitHub Actions
     participant Hub as Docker Hub
     participant EC2 as AWS EC2
-    Dev ->> GH: push / PR (dev, main)
-    GH ->> Action: ci.yml 트리거
-    Action ->> Action: 변경 파일 필터 (docs-only면 종료)
-    Action ->> Action: JDK 25 + MySQL 9.7 서비스 컨테이너
-    Action ->> Action: ./gradlew test
-    Dev ->> GH: main 머지/푸시 (또는 workflow_dispatch)
-    GH ->> Action: deploy.yml 트리거
-    Action ->> Action: 시스템 프롬프트 배치 + Docker Buildx 빌드
-    Action ->> Hub: push minkyolim/prodflow:latest / :sha
-    Action ->> Action: Secrets로 .env.deploy 생성
-    Action ->> EC2: SCP .env.deploy 전송
-    Action ->> EC2: SSH 배포 스크립트
-    EC2 ->> EC2: .env 백업·갱신 + docker compose config -q
-    EC2 ->> Hub: docker compose pull prodflow-app
-    EC2 ->> EC2: up -d --force-recreate prodflow-app
-    EC2 ->> EC2: up -d nginx + docker compose ps
+
+    Dev->>GH: push / PR (dev, main)
+    GH->>Action: ci.yml 트리거
+    Action->>Action: JDK 25 + Gradle 캐시
+    Action->>Action: ./gradlew test (MySQL 9.7 service)
+
+    Dev->>GH: main 머지/푸시
+    GH->>Action: deploy.yml 트리거
+    Action->>Action: Docker multi-stage 빌드 (bootJar)
+    Action->>Hub: push minkyolim/prodflow:latest / :sha
+    Action->>EC2: SSH 배포 스크립트
+    EC2->>Hub: docker compose pull prodflow-app
+    EC2->>EC2: docker compose up -d --no-deps --force-recreate prodflow-app
 ```
 
 ---
@@ -186,24 +173,27 @@ sequenceDiagram
     participant Back as Spring Boot
     participant DB as MySQL
     participant PG as PortOne
-    Staff ->> Front: 계약금 계좌 발급·입금 안내
-    Front ->> Back: POST /api/v1/payments/orders/{orderId}/notifications
-    Back ->> DB: DEPOSIT payment 준비 (READY 등)
-    Back ->> PG: 가상계좌 발급 요청
-    PG -->> Back: 은행·계좌·만료시각
-    Back ->> DB: virtual_account ACTIVE 저장
-    Back ->> Back: 입금 안내 메일 발송
-    Back -->> Front: PaymentNotificationDto
-    Note over PG, Back: 고객 입금
-    PG ->> Back: POST /api/v1/payments/webhook
-    Back ->> Back: webhook 서명·storeId·type 검증
-    Back ->> PG: 결제 단건 조회(동기화)
-    Back ->> DB: payment PAID + payment_history
-    Back ->> DB: 수주 WAITING → CONFIRMED + work_order 생성
-    Note over Staff, Back: 출고 시
-    Staff ->> Back: POST /api/v1/shipments
-    Back ->> DB: shipment 생성, 수주 SHIPPING
-    Back ->> Back: prepareAndScheduleIssue(BALANCE)
+
+    Staff->>Front: 계약금 계좌 발급·입금 안내
+    Front->>Back: POST /api/v1/payments/orders/{orderId}/notifications
+    Back->>DB: DEPOSIT payment 준비 (READY 등)
+    Back->>PG: 가상계좌 발급 요청
+    PG-->>Back: 은행·계좌·만료시각
+    Back->>DB: virtual_account ACTIVE 저장
+    Back->>Back: 입금 안내 메일 발송
+    Back-->>Front: PaymentNotificationDto
+
+    Note over PG,Back: 고객 입금
+    PG->>Back: POST /api/v1/payments/webhook
+    Back->>Back: webhook 서명·storeId·type 검증
+    Back->>PG: 결제 단건 조회(동기화)
+    Back->>DB: payment PAID + payment_history
+    Back->>DB: 수주 WAITING → CONFIRMED + work_order 생성
+
+    Note over Staff,Back: 출고 시
+    Staff->>Back: POST /api/v1/shipments
+    Back->>DB: shipment 생성, 수주 SHIPPING
+    Back->>Back: prepareAndScheduleIssue(BALANCE)
 ```
 
 ### 1.4.2 견적 승인 → 수주 → 작업지시 연계
@@ -219,23 +209,27 @@ sequenceDiagram
     participant DB as MySQL
     participant Mail as Gmail SMTP
     participant S3 as AWS S3
-    Staff ->> Front: 견적 작성·PDF 확인
-    Front ->> Back: 견적 저장 / PDF 생성
-    Back ->> S3: quotations/{quotation_no}.pdf 업로드
-    Back ->> DB: pdf_object_key 저장
-    Staff ->> Front: 견적 발송
-    Front ->> Back: 발송 API
-    Back ->> Mail: PDF 첨부 메일
-    Back ->> DB: quotation SENT
-    Staff ->> Front: 견적 승인
-    Front ->> Back: 승인 API
-    Back ->> DB: quotation APPROVED
-    Staff ->> Front: 수주 등록
-    Front ->> Back: POST /api/v1/orders
-    Back ->> DB: customer_order WAITING + order_product
-    Note over Back, DB: 계약금 PAID (웹훅 또는 현금 수동입금)
-    Back ->> DB: PARTIALLY_PAID + CONFIRMED
-    Back ->> DB: work_order / production_plan 생성
+
+    Staff->>Front: 견적 작성·PDF 확인
+    Front->>Back: 견적 저장 / PDF 생성
+    Back->>S3: quotations/{quotation_no}.pdf 업로드
+    Back->>DB: pdf_object_key 저장
+    Staff->>Front: 견적 발송
+    Front->>Back: 발송 API
+    Back->>Mail: PDF 첨부 메일
+    Back->>DB: quotation SENT
+
+    Staff->>Front: 견적 승인
+    Front->>Back: 승인 API
+    Back->>DB: quotation APPROVED
+
+    Staff->>Front: 수주 등록
+    Front->>Back: POST /api/v1/orders
+    Back->>DB: customer_order WAITING + order_product
+
+    Note over Back,DB: 계약금 PAID (웹훅 또는 현금 수동입금)
+    Back->>DB: PARTIALLY_PAID + CONFIRMED
+    Back->>DB: work_order / production_plan 생성
 ```
 
 ### 1.4.3 배송 등록·조회 갱신·완료
@@ -252,24 +246,26 @@ sequenceDiagram
     participant DB as MySQL
     participant Tracker as 스마트택배 API
     participant Sched as ShipmentTrackingScheduler
-    Staff ->> Front: 운송장 등록
-    Front ->> Back: POST /api/v1/shipments
-    Back ->> DB: shipment 저장, 수주 SHIPPING, 잔금 결제 준비
-    Back -->> Front: 201 Created
-    Staff ->> Front: 배송조회 갱신
-    Front ->> Back: POST /api/v1/shipments/{id}/tracking/refresh
-    Back ->> Tracker: 운송장 조회
-    Tracker -->> Back: level, result, complete, estimate
-    Back ->> DB: shipment 추적 필드 갱신
+
+    Staff->>Front: 운송장 등록
+    Front->>Back: POST /api/v1/shipments
+    Back->>DB: shipment 저장, 수주 SHIPPING, 잔금 결제 준비
+    Back-->>Front: 201 Created
+
+    Staff->>Front: 배송조회 갱신
+    Front->>Back: POST /api/v1/shipments/{id}/tracking/refresh
+    Back->>Tracker: 운송장 조회
+    Tracker-->>Back: level, result, complete, estimate
+    Back->>DB: shipment 추적 필드 갱신
     alt 배송완료
-        Back ->> DB: 수주 COMPLETED + 상태이력
+        Back->>DB: 수주 COMPLETED + 상태이력
     end
-    Back -->> Front: ShipmentTrackingDto
+    Back-->>Front: ShipmentTrackingDto
 
     loop fixedDelay (기본 600000ms, refresh-enabled=true)
-        Sched ->> Back: refreshIncompleteShipments
-        Back ->> Tracker: 미완료 운송장 조회
-        Back ->> DB: 상태 반영 / 필요 시 COMPLETED
+        Sched->>Back: refreshIncompleteShipments
+        Back->>Tracker: 미완료 운송장 조회
+        Back->>DB: 상태 반영 / 필요 시 COMPLETED
     end
 ```
 
@@ -287,22 +283,24 @@ sequenceDiagram
     participant DB as MySQL (앱 계정)
     participant AiDB as MySQL (AI 읽기 계정)
     participant LLM as Gemini / Groq
-    User ->> Front: 새 대화
-    Front ->> Back: POST /api/v1/ai/conversations
-    Back ->> DB: ai_conversation 저장
-    Back -->> Front: conversationId
-    User ->> Front: 질문 입력 (모델 선택)
-    Front ->> Back: POST /api/v1/ai/conversations/{id}/messages
-    Back ->> DB: 대화방 소유·종료 여부 검증
-    Back ->> LLM: 질의 (필요 시 MCP Tool 호출)
+
+    User->>Front: 새 대화
+    Front->>Back: POST /api/v1/ai/conversations
+    Back->>DB: ai_conversation 저장
+    Back-->>Front: conversationId
+
+    User->>Front: 질문 입력 (모델 선택)
+    Front->>Back: POST /api/v1/ai/conversations/{id}/messages
+    Back->>DB: 대화방 소유·종료 여부 검증
+    Back->>LLM: 질의 (필요 시 MCP Tool 호출)
     opt 자연어 조건 검색
-        LLM ->> Back: Tool 호출
-        Back ->> AiDB: 검증된 SELECT 실행 (JSqlParser)
-        AiDB -->> Back: 조회 결과
+        LLM->>Back: Tool 호출
+        Back->>AiDB: 검증된 SELECT 실행 (JSqlParser)
+        AiDB-->>Back: 조회 결과
     end
-    LLM -->> Back: 답변 텍스트
-    Back ->> DB: user/assistant ai_message 저장
-    Back -->> Front: AskResponse (answer)
+    LLM-->>Back: 답변 텍스트
+    Back->>DB: user/assistant ai_message 저장
+    Back-->>Front: AskResponse (answer)
 ```
 
 ### 1.4.5 스케줄러 기반 주기 작업
@@ -327,14 +325,18 @@ sequenceDiagram
     participant Quote as QuotationStatusService
     participant Pay as PaymentStore
     participant Ext as 외부 API / DB
-    Sched ->> Holiday: 월간·기동 공휴일 sync
-    Holiday ->> Ext: 공공데이터 SpcdeInfoService
-    Holiday ->> Ext: holiday 저장
-    Sched ->> Ship: 미완료 운송장 refresh
-    Ship ->> Ext: 스마트택배 API
-    Ship ->> Ext: shipment / order 갱신
-    Sched ->> Quote: expireQuotations
-    Quote ->> Ext: quotation EXPIRED
-    Sched ->> Pay: 가상계좌 만료 점검
-    Pay ->> Ext: virtual_account EXPIRED
+
+    Sched->>Holiday: 월간·기동 공휴일 sync
+    Holiday->>Ext: 공공데이터 SpcdeInfoService
+    Holiday->>Ext: holiday 저장
+
+    Sched->>Ship: 미완료 운송장 refresh
+    Ship->>Ext: 스마트택배 API
+    Ship->>Ext: shipment / order 갱신
+
+    Sched->>Quote: expireQuotations
+    Quote->>Ext: quotation EXPIRED
+
+    Sched->>Pay: 가상계좌 만료 점검
+    Pay->>Ext: virtual_account EXPIRED
 ```
