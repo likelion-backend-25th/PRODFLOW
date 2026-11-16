@@ -939,16 +939,16 @@ erDiagram
 
 ### 2.28 ai_message (ai대화 메시지)
 
-| 컬럼명                | 데이터 타입       | 제약 조건                                                | 설명                          |
-|--------------------|--------------|------------------------------------------------------|-----------------------------|
-| id                 | BIGINT       | PK, AUTO_INCREMENT                                   | 메시지 고유 식별자                  |
-| ai_conversation_id | BIGINT       | FK → ai_conversation.id, NOT NULL, ON DELETE CASCADE | 대화방 ID                      |
-| sequence_no        | INT          | NOT NULL                                             | 대화방 내 메세지 순서                |
-| role               | VARCHAR(255) | NOT NULL                                             | 메시지 발신자 구분 ASSISTANT / USER |
-| content            | TEXT         | NOT NULL                                             | 질문 또는 AI 응답 내용              |
-| result_json        | LONGTEXT     | NULL                                                 | MCP 조회 결과. 표·차트 데이터         |
-| generated_sql      | TEXT         | NULL                                                 | AI가 생성한 SQL 쿼리문             |
-| created_at         | DATETIME     | NOT NULL                                             | 메시지 생성 일시                   |
+| 컬럼명                | 데이터 타입       | 제약 조건                                                | 설명                            |
+|--------------------|--------------|------------------------------------------------------|-------------------------------|
+| id                 | BIGINT       | PK, AUTO_INCREMENT                                   | 메시지 고유 식별자                    |
+| ai_conversation_id | BIGINT       | FK → ai_conversation.id, NOT NULL, ON DELETE CASCADE | 대화방 ID                        |
+| sequence_no        | INT          | NOT NULL                                             | 대화방 내 메세지 순서                  |
+| role               | VARCHAR(255) | NOT NULL                                             | 메시지 발신자 구분 ASSISTANT / USER   |
+| content            | TEXT         | NOT NULL                                             | 질문 또는 AI 응답 내용                |
+| result_json        | LONGTEXT     | NULL                                                 | MCP 조회 결과. 표·차트 데이터           |
+| generated_sql      | TEXT         | NULL                                                 | 과거 MCP 조회 결과 재확인을 위한 JSON 데이터 |
+| created_at         | DATETIME     | NOT NULL                                             | 메시지 생성 일시                     |
 
 - `UNIQUE(ai_conversation_id, sequence_no)`
 

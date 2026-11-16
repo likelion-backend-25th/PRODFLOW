@@ -57,7 +57,7 @@ public class AiMessage {
     @Column(columnDefinition = "TEXT")
     private String generatedSql;
 
-    // MCP 조회 결과 (표, 차트 데이터)
+    // 과거 MCP 조회 결과 재확인을 위한 JSON 데이터
     @Column(columnDefinition = "LONGTEXT")
     private String resultJson;
 
