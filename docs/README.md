@@ -44,7 +44,7 @@ flowchart LR
 | 생산계획·라인  | 계약금 입금 후 작업지시 생성, 날짜별 생산량 배정, 담당자·라인 변경, 생산·포장 상태 관리, 생산능력 변경·점검·고장 처리 |
 | 결제·입금    | PortOne 가상계좌 발급·재발급·조회, 입금 웹훅 반영, 현금 계약금 처리, 결제·입금 내역 조회               |
 | 출고·배송    | 포장완료 확인, 잔금 계좌 준비·이메일 전송 후 출고 확정, 스마트택배 조회, 배송 완료 처리                   |
-| 거래처·품목   | 거래처 등록·수정·엑셀 일괄등록, 품목·기종 관리, 도면 업로드·조회·삭제와 Presigned URL               |
+| 거래처·품목   | 거래처 등록·수정·엑셀 일괄등록, 품목·기종 관리, 도면 업로드·조회·삭제            |
 | 대시보드·일정  | 수주·생산·납기·입금 집계, 생산 캘린더·일일 생산계획, 내부 납기·라인 알림                            |
 | AI 업무 조회 | Gemini·Groq 모델 선택, MCP 기반 데이터 조회·SQL 검증, 대화방 생성·제목 변경·종료               |
 | 계정·인증    | JWT 인증·재발급, 최초 비밀번호 변경, 직원 계정·역할·활성 상태 관리                              |
@@ -61,29 +61,33 @@ flowchart LR
 | 구분            | 기술                                                                               |
 |---------------|----------------------------------------------------------------------------------|
 | Backend       | Java 25, Spring Boot 4.1.1, Gradle 9.8.1, Spring Data JPA                        |
-| Security      | Spring Security, JJWT 0.13.0, BCrypt, Bean Validation                            |
+| Security      | Spring Security, JJWT 0.13.0, BCrypt                           |
 | Frontend      | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, Zustand 5, React Router 8, Axios |
 | Database      | MySQL, H2(테스트), JDBC(AI 조회)                                                      |
 | AI            | Spring AI 2.0.2, Gemini, Groq, MCP Server/Client, JSqlParser 5.4                 |
 | File·Document | AWS S3, OpenPDF 3.0.5, Apache POI 6.0.0                                          |
 | API Docs      | springdoc OpenAPI 3.2.0                                                          |
 | Build·Deploy  | Docker, Docker Compose, GitHub Actions                                           |
-| Integration   | PortOne, 스마트택배, 공공데이터 공휴일 API, 주소 검색, Gmail SMTP                                 |
+| Integration   | PortOne, 스마트택배, 공공데이터 공휴일 API, Gmail SMTP                                 |
 
-백엔드 버전은 [build.gradle](../build.gradle)과 [Gradle Wrapper](../gradle/wrapper/gradle-wrapper.properties)에 정의되어 있다. 프런트엔드는
-별도 저장소에서 관리한다.
 
 ## 프로젝트 구조
 
 ```text
 PRODFLOW/
 ├── src/main/java/net/likelion/bebc25/prodflow/
-│   ├── auth/ · user/                 # 인증·직원 계정
-│   ├── client/ · product/            # 거래처·생산품목
-│   ├── quotation/ · customer_order/  # 견적·수주
-│   ├── work_order/ · line/           # 작업지시·생산라인
-│   ├── payment/ · shipment/          # 결제·배송
-│   ├── dashboard/ · ai/              # 통계·AI 조회
+│   ├── auth/                         # 인증
+│   ├── user/                         # 직원
+│   ├── client/                       # 거래처
+│   ├── product/                      # 생산품목
+│   ├── quotation/                    # 견적·수주
+│   ├── customer_order/               # 견적·수주
+│   ├── work_order/                   # 작업지시·생산라인
+│   ├── line/                         # 생산라인
+│   ├── payment/                      # 결제
+│   ├── shipment/                     # 배송
+│   ├── dashboard/                    # 통계
+│   ├── ai/                           # AI
 │   └── ...                          # 공통·알림·메일·공휴일 등
 ├── src/main/resources/               # 설정·초기 데이터·폰트
 ├── src/test/                         # 테스트 코드·H2 설정
