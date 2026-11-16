@@ -999,9 +999,9 @@ flowchart TD
     AiChat["AI 챗봇"]
     PG["PG 웹훅"]
     Tracker["스마트택배 배송조회 API"]
-    Login -->|로그인 성공, 비밀번호 변경 불필요| Dashboard
+    Login -->|로그인 성공, 비밀번호 변경 불필요| AiChat
     Login -->|must_change_password가 TRUE| ChangePassword["비밀번호 변경"]
-    ChangePassword -->|변경 완료| Dashboard
+    ChangePassword -->|변경 완료| Login
     Dashboard --> Me
     Dashboard -->|최고 관리자| Users
     Dashboard --> Clients
@@ -1027,7 +1027,7 @@ flowchart TD
     WorkOrders -->|라인 배정| Lines
     WorkOrders --> Calendar
     WorkOrders -->|생산 완료, 포장| Shipments
-    Shipments -->|출고, SMS 또는 이메일 알림| OrderDetail
+    Shipments -->|출고, 이메일 알림| OrderDetail
     Tracker -.->|배송 진행단계 갱신| Shipments
     AiChat -->|조회 결과 클릭| OrderDetail
 ```
